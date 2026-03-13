@@ -2,7 +2,9 @@ import json
 import os
 import sys
 import unittest
+from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -14,6 +16,14 @@ if str(SRC) not in sys.path:
 os.environ.setdefault("DISCORD_TOKEN", "test-token")
 
 import discord_mcp.server as server  # noqa: E402
+from discord_mcp.core.resolve import (  # noqa: E402
+    _collect_forum_threads,
+    _normalize_name,
+    _resolve_guild,
+    _try_int,
+)
+from discord_mcp.core.runtime import set_discord_client  # noqa: E402
+from discord_mcp.core.serialize import _serialize_message  # noqa: E402
 from tests.fakes.discord_fixtures import (  # noqa: E402
     FakeChannel,
     FakeDiscordClient,
@@ -283,6 +293,90 @@ class ToolContractsBaselineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             result[0].text, "Available Servers (1):\nAcme (ID: 100, Members: 3)"
         )
+
+
+class _FakeGuild:
+    def __init__(self, guild_id: int, name: str):
+        self.id = guild_id
+        self.name = name
+
+
+class _FakeClient:
+    def __init__(self, guilds):
+        self.guilds = guilds
+
+    def get_guild(self, guild_id: int):
+        for guild in self.guilds:
+            if guild.id == guild_id:
+                return guild
+        return None
+
+    async def fetch_guild(self, guild_id: int):
+        return self.get_guild(guild_id)
+
+
+class _FakeForum:
+    def __init__(self, active_threads, archived_threads):
+        self.threads = active_threads
+        self._archived_threads = archived_threads
+
+    async def archived_threads(self, limit=1000):
+        for thread in self._archived_threads[:limit]:
+            yield thread
+
+
+class CoreHelperContractTests(unittest.IsolatedAsyncioTestCase):
+    def test_try_int_and_normalize_name(self):
+        self.assertEqual(_try_int("42"), 42)
+        self.assertIsNone(_try_int("not-a-number"))
+        self.assertEqual(_normalize_name(" #General "), "general")
+
+    async def test_resolve_guild_raises_on_ambiguous_name(self):
+        set_discord_client(_FakeClient([_FakeGuild(1, "Foo"), _FakeGuild(2, "foo")]))
+        with self.assertRaisesRegex(ValueError, "Multiple servers found for 'foo'"):
+            await _resolve_guild("foo")
+
+    async def test_collect_forum_threads_includes_archived_and_deduplicates(self):
+        os.environ["DISCORD_FORUM_MAX_FETCH"] = "1000"
+        active = [SimpleNamespace(id=1), SimpleNamespace(id=2)]
+        archived = [SimpleNamespace(id=2), SimpleNamespace(id=3)]
+        forum = _FakeForum(active, archived)
+
+        threads = await _collect_forum_threads(forum, include_archived=True)
+        self.assertEqual({thread.id for thread in threads}, {1, 2, 3})
+
+    def test_serialize_message_shape(self):
+        attachment = SimpleNamespace(
+            id=11,
+            filename="file.png",
+            url="https://cdn/file.png",
+            proxy_url="https://proxy/file.png",
+            size=99,
+            content_type="image/png",
+            width=120,
+            height=80,
+        )
+        embed = SimpleNamespace(
+            title="Embed title",
+            description="Embed description",
+            url="https://example.com",
+            image=SimpleNamespace(url="https://img"),
+            thumbnail=SimpleNamespace(url="https://thumb"),
+        )
+        message = SimpleNamespace(
+            id=100,
+            author="author#0001",
+            content="hello",
+            created_at=datetime(2025, 1, 1, 0, 0, 0),
+            attachments=[attachment],
+            embeds=[embed],
+        )
+
+        payload = _serialize_message(message)
+        self.assertEqual(payload["messageId"], "100")
+        self.assertEqual(payload["author"], "author#0001")
+        self.assertEqual(payload["attachments"][0]["name"], "file.png")
+        self.assertEqual(payload["embeds"][0]["title"], "Embed title")
 
 
 if __name__ == "__main__":

@@ -16,6 +16,18 @@ from mcp.server import Server
 from mcp.types import Tool, TextContent
 from mcp.server.stdio import stdio_server
 
+from discord_mcp.core.resolve import (
+    _collect_forum_threads,
+    _normalize_name,
+    _resolve_forum_channel,
+    _resolve_guild,
+    _resolve_text_or_thread_channel,
+    _resolve_thread,
+    _try_int,
+)
+from discord_mcp.core.runtime import get_discord_client, set_discord_client
+from discord_mcp.core.serialize import _serialize_forum_tag, _serialize_message
+
 
 def _configure_windows_stdout_encoding():
     if sys.platform == "win32":
@@ -32,12 +44,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("discord-mcp-server")
 
 # Discord bot setup
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-if not DISCORD_TOKEN:
-    raise ValueError("DISCORD_TOKEN environment variable is required")
-
-DEFAULT_GUILD_ID = os.getenv("DEFAULT_GUILD_ID") or os.getenv("DISCORD_GUILD_ID")
-MAX_ARCHIVED_THREADS_SCAN = max(100, int(os.getenv("DISCORD_FORUM_MAX_FETCH", "1000")))
 
 # Initialize Discord bot with necessary intents
 intents = discord.Intents.default()
@@ -48,14 +54,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Initialize MCP server
 app = Server("discord-server")
 
-# Store Discord client reference
-discord_client = None
-
 
 @bot.event
 async def on_ready():
-    global discord_client
-    discord_client = bot
+    set_discord_client(bot)
     logger.info(f"Logged in as {bot.user.name}")
 
 
@@ -63,228 +65,11 @@ async def on_ready():
 def require_discord_client(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        if not discord_client:
+        if not get_discord_client():
             raise RuntimeError("Discord client not ready")
         return await func(*args, **kwargs)
 
     return wrapper
-
-
-def _try_int(value: Any) -> Optional[int]:
-    try:
-        return int(str(value))
-    except (TypeError, ValueError):
-        return None
-
-
-def _normalize_name(value: str) -> str:
-    return value.strip().lower().removeprefix("#")
-
-
-async def _resolve_guild(server_id: Optional[str] = None) -> discord.Guild:
-    if server_id:
-        guild_id = _try_int(server_id)
-        if guild_id is not None:
-            guild = discord_client.get_guild(guild_id)
-            if guild is not None:
-                return guild
-            guild = await discord_client.fetch_guild(guild_id)
-            if guild is not None:
-                return guild
-
-        matches = [
-            guild
-            for guild in discord_client.guilds
-            if guild.name.lower() == str(server_id).lower()
-        ]
-        if len(matches) == 1:
-            return matches[0]
-        if len(matches) > 1:
-            detail = ", ".join(f"{g.name} ({g.id})" for g in matches)
-            raise ValueError(
-                f"Multiple servers found for '{server_id}'. Use server ID. Matches: {detail}"
-            )
-
-        available = ", ".join(f"{g.name} ({g.id})" for g in discord_client.guilds)
-        raise ValueError(f"Server '{server_id}' not found. Available: {available}")
-
-    if DEFAULT_GUILD_ID:
-        default_id = _try_int(DEFAULT_GUILD_ID)
-        if default_id is not None:
-            guild = discord_client.get_guild(default_id)
-            if guild is not None:
-                return guild
-            guild = await discord_client.fetch_guild(default_id)
-            if guild is not None:
-                return guild
-
-    if len(discord_client.guilds) == 1:
-        return discord_client.guilds[0]
-
-    available = ", ".join(f"{g.name} ({g.id})" for g in discord_client.guilds)
-    raise ValueError(
-        f"Server ID is required because bot is in multiple servers. Available: {available}"
-    )
-
-
-async def _resolve_forum_channel(
-    channel_identifier: str, server_id: Optional[str] = None
-) -> discord.ForumChannel:
-    guild = await _resolve_guild(server_id)
-
-    channel_id = _try_int(channel_identifier)
-    if channel_id is not None:
-        channel = guild.get_channel(channel_id)
-        if channel is None:
-            channel = await guild.fetch_channel(channel_id)
-        if isinstance(channel, discord.ForumChannel):
-            return channel
-
-    normalized = _normalize_name(channel_identifier)
-    matches = [
-        ch
-        for ch in guild.channels
-        if isinstance(ch, discord.ForumChannel)
-        and _normalize_name(ch.name) == normalized
-    ]
-    if len(matches) == 1:
-        return matches[0]
-    if len(matches) > 1:
-        detail = ", ".join(f"{ch.name} ({ch.id})" for ch in matches)
-        raise ValueError(
-            f"Multiple forum channels found for '{channel_identifier}'. Use channel ID. Matches: {detail}"
-        )
-
-    available = ", ".join(
-        f"#{ch.name}" for ch in guild.channels if isinstance(ch, discord.ForumChannel)
-    )
-    raise ValueError(
-        f"Forum channel '{channel_identifier}' not found in '{guild.name}'. Available forums: {available}"
-    )
-
-
-async def _resolve_text_or_thread_channel(
-    channel_identifier: str, server_id: Optional[str] = None
-) -> discord.TextChannel | discord.Thread:
-    guild = await _resolve_guild(server_id)
-
-    channel_id = _try_int(channel_identifier)
-    if channel_id is not None:
-        channel = discord_client.get_channel(channel_id)
-        if channel is None:
-            channel = await discord_client.fetch_channel(channel_id)
-
-        if isinstance(channel, (discord.TextChannel, discord.Thread)):
-            if channel.guild.id != guild.id:
-                raise ValueError(
-                    f"Channel '{channel_identifier}' is not in server '{guild.name}'"
-                )
-            return channel
-
-    normalized = _normalize_name(channel_identifier)
-    matches = [
-        ch for ch in guild.text_channels if _normalize_name(ch.name) == normalized
-    ]
-    if len(matches) == 1:
-        return matches[0]
-    if len(matches) > 1:
-        detail = ", ".join(f"#{ch.name} ({ch.id})" for ch in matches)
-        raise ValueError(
-            f"Multiple channels found for '{channel_identifier}'. Use channel ID. Matches: {detail}"
-        )
-
-    available = ", ".join(f"#{ch.name}" for ch in guild.text_channels)
-    raise ValueError(
-        f"Text channel '{channel_identifier}' not found in '{guild.name}'. Available channels: {available}"
-    )
-
-
-async def _resolve_thread(
-    thread_id: str, server_id: Optional[str] = None
-) -> tuple[discord.Thread, discord.Guild]:
-    parsed_id = _try_int(thread_id)
-    if parsed_id is None:
-        raise ValueError("thread_id must be a valid integer Discord ID")
-
-    channel = discord_client.get_channel(parsed_id)
-    if channel is None:
-        channel = await discord_client.fetch_channel(parsed_id)
-
-    if not isinstance(channel, discord.Thread):
-        raise ValueError(f"Channel '{thread_id}' is not a thread")
-
-    if server_id:
-        guild = await _resolve_guild(server_id)
-        if channel.guild.id != guild.id:
-            raise ValueError(f"Thread '{thread_id}' is not in server '{guild.name}'")
-        return channel, guild
-
-    return channel, channel.guild
-
-
-def _serialize_attachment(attachment: discord.Attachment) -> Dict[str, Any]:
-    return {
-        "id": str(attachment.id),
-        "name": attachment.filename,
-        "url": attachment.url,
-        "proxyUrl": attachment.proxy_url,
-        "size": attachment.size,
-        "contentType": attachment.content_type,
-        "width": attachment.width,
-        "height": attachment.height,
-    }
-
-
-def _serialize_embed(embed: discord.Embed) -> Dict[str, Any]:
-    return {
-        "title": embed.title,
-        "description": embed.description,
-        "url": embed.url,
-        "image": embed.image.url if embed.image else None,
-        "thumbnail": embed.thumbnail.url if embed.thumbnail else None,
-    }
-
-
-def _serialize_message(message: discord.Message) -> Dict[str, Any]:
-    return {
-        "messageId": str(message.id),
-        "author": str(message.author),
-        "content": message.content,
-        "timestamp": message.created_at.isoformat(),
-        "attachments": [_serialize_attachment(att) for att in message.attachments],
-        "embeds": [_serialize_embed(embed) for embed in message.embeds],
-    }
-
-
-def _serialize_forum_tag(tag: discord.ForumTag) -> Dict[str, Any]:
-    emoji_name = None
-    if tag.emoji:
-        emoji_name = getattr(tag.emoji, "name", str(tag.emoji))
-    return {
-        "id": str(tag.id),
-        "name": tag.name,
-        "emoji": emoji_name,
-        "moderated": tag.moderated,
-    }
-
-
-async def _collect_forum_threads(
-    forum_channel: discord.ForumChannel, include_archived: bool
-) -> List[discord.Thread]:
-    threads: List[discord.Thread] = list(forum_channel.threads)
-
-    if include_archived:
-        scanned = 0
-        async for archived in forum_channel.archived_threads(
-            limit=MAX_ARCHIVED_THREADS_SCAN
-        ):
-            threads.append(archived)
-            scanned += 1
-            if scanned >= MAX_ARCHIVED_THREADS_SCAN:
-                break
-
-    unique: Dict[int, discord.Thread] = {thread.id: thread for thread in threads}
-    return list(unique.values())
 
 
 @app.list_tools()
@@ -750,6 +535,7 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     """Handle Discord tool calls."""
 
     arguments = arguments or {}
+    discord_client = get_discord_client()
 
     if name in {"send_message", "send-message"}:
         server_id = arguments.get("server_id") or arguments.get("server")
@@ -1329,8 +1115,12 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
 
 
 async def main():
+    discord_token = os.getenv("DISCORD_TOKEN")
+    if not discord_token:
+        raise ValueError("DISCORD_TOKEN environment variable is required")
+
     # Start Discord bot in the background
-    asyncio.create_task(bot.start(DISCORD_TOKEN))
+    asyncio.create_task(bot.start(discord_token))
 
     # Run MCP server
     async with stdio_server() as (read_stream, write_stream):
