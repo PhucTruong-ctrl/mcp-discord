@@ -379,5 +379,39 @@ class CoreHelperContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["embeds"][0]["title"], "Embed title")
 
 
+class ToolRegistryBaselineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_list_tools_contract_name_order_is_stable(self):
+        tools = await server.list_tools()
+        names = [tool.name for tool in tools]
+
+        self.assertEqual(
+            names,
+            [
+                "get_server_info",
+                "get_channels",
+                "list_members",
+                "add_role",
+                "remove_role",
+                "create_text_channel",
+                "delete_channel",
+                "add_reaction",
+                "add_multiple_reactions",
+                "remove_reaction",
+                "send_message",
+                "read_messages",
+                "edit_message",
+                "read_forum_threads",
+                "list_threads",
+                "search_threads",
+                "add_thread_tags",
+                "unarchive_thread",
+                "download_attachment",
+                "get_user_info",
+                "moderate_message",
+                "list_servers",
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
