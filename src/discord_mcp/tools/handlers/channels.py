@@ -3,33 +3,11 @@ from typing import Any, Dict, List
 from mcp.types import TextContent
 
 
-async def handle_get_channels(
-    arguments: Dict[str, Any], deps: Dict[str, Any]
-) -> List[TextContent]:
-    try:
-        guild = deps["discord_client"].get_guild(int(arguments["server_id"]))
-        if guild:
-            channel_list = []
-            for channel in guild.channels:
-                channel_list.append(
-                    f"#{channel.name} (ID: {channel.id}) - {channel.type}"
-                )
-
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Channels in {guild.name}:\n" + "\n".join(channel_list),
-                )
-            ]
-        return [TextContent(type="text", text="Guild not found")]
-    except Exception as e:
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
-
-
 async def handle_create_text_channel(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    guild = await deps["discord_client"].fetch_guild(int(arguments["server_id"]))
+    gateway = deps["gateway"]
+    guild = await gateway.fetch_guild(arguments["server_id"])
     category = None
     if "category_id" in arguments:
         category = guild.get_channel(int(arguments["category_id"]))
@@ -50,6 +28,7 @@ async def handle_create_text_channel(
 async def handle_delete_channel(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    channel = await deps["discord_client"].fetch_channel(int(arguments["channel_id"]))
+    gateway = deps["gateway"]
+    channel = await gateway.fetch_channel(arguments["channel_id"])
     await channel.delete(reason=arguments.get("reason", "Channel deleted via MCP"))
     return [TextContent(type="text", text="Deleted channel successfully")]

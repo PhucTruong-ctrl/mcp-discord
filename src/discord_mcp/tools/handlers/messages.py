@@ -16,7 +16,8 @@ async def handle_send_message(
     if content is None:
         raise ValueError("content (or message) is required")
 
-    channel = await deps["resolve_text_or_thread_channel"](
+    gateway = deps["gateway"]
+    channel = await gateway.resolve_text_or_thread_channel(
         str(channel_identifier), server_id
     )
     message = await channel.send(str(content))
@@ -35,12 +36,14 @@ async def handle_read_messages(
     if not channel_identifier:
         raise ValueError("channel_id (or channel) is required")
 
-    channel = await deps["resolve_text_or_thread_channel"](
+    gateway = deps["gateway"]
+    try_int = deps["try_int"]
+    channel = await gateway.resolve_text_or_thread_channel(
         str(channel_identifier), server_id
     )
     limit = min(int(arguments.get("limit", 10)), 100)
     before = arguments.get("before")
-    before_obj = discord.Object(id=int(before)) if deps["try_int"](before) else None
+    before_obj = discord.Object(id=int(before)) if try_int(before) else None
     messages = []
     async for message in channel.history(limit=limit, before=before_obj):
         reaction_data = []
@@ -63,7 +66,7 @@ async def handle_read_messages(
             }
         )
 
-    def format_reaction(r: Dict[str, Any]) -> str:
+    def format_reaction(r):
         return f"{r['emoji']}({r['count']})"
 
     return [
@@ -84,7 +87,8 @@ async def handle_read_messages(
 async def handle_edit_message(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    channel = await deps["discord_client"].fetch_channel(int(arguments["channel_id"]))
+    gateway = deps["gateway"]
+    channel = await gateway.fetch_channel(arguments["channel_id"])
     message = await channel.fetch_message(int(arguments["message_id"]))
     await message.edit(content=arguments["content"])
     return [
