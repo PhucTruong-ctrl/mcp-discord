@@ -16,33 +16,10 @@ from mcp.server import Server
 from mcp.types import Tool, TextContent
 from mcp.server.stdio import stdio_server
 
-from discord_mcp.core.resolve import (
-    normalize_name as core_normalize_name,
-    try_int as core_try_int,
-)
-from discord_mcp.services import DiscordGateway
-from discord_mcp.tools.handlers.channels import (
-    handle_create_text_channel,
-    handle_delete_channel,
-)
-from discord_mcp.tools.handlers.forums import (
-    handle_add_thread_tags,
-    handle_list_threads,
-    handle_read_forum_threads,
-    handle_search_threads,
-    handle_unarchive_thread,
-)
-from discord_mcp.tools.handlers.messages import (
-    handle_edit_message,
-    handle_read_messages,
-    handle_send_message,
-)
-from discord_mcp.tools.handlers.roles import handle_add_role, handle_remove_role
-from discord_mcp.tools.handlers.server_info import (
-    handle_get_channels,
-    handle_get_server_info,
-    handle_list_members,
-    handle_list_servers,
+from .composition import (
+    build_tool_dependencies,
+    compose_tool_registry,
+    dispatch_tool_call,
 )
 
 
@@ -79,7 +56,6 @@ app = Server("discord-server")
 
 # Store Discord client reference
 discord_client = None
-gateway = DiscordGateway(lambda: discord_client, DEFAULT_GUILD_ID)
 
 
 @bot.event
@@ -101,33 +77,155 @@ def require_discord_client(func):
 
 
 def _try_int(value: Any) -> Optional[int]:
-    return core_try_int(value)
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
 
 
 def _normalize_name(value: str) -> str:
-    return core_normalize_name(value)
+    return value.strip().lower().removeprefix("#")
 
 
 async def _resolve_guild(server_id: Optional[str] = None) -> discord.Guild:
-    return await gateway.resolve_guild(server_id)
+    if server_id:
+        guild_id = _try_int(server_id)
+        if guild_id is not None:
+            guild = discord_client.get_guild(guild_id)
+            if guild is not None:
+                return guild
+            guild = await discord_client.fetch_guild(guild_id)
+            if guild is not None:
+                return guild
+
+        matches = [
+            guild
+            for guild in discord_client.guilds
+            if guild.name.lower() == str(server_id).lower()
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            detail = ", ".join(f"{g.name} ({g.id})" for g in matches)
+            raise ValueError(
+                f"Multiple servers found for '{server_id}'. Use server ID. Matches: {detail}"
+            )
+
+        available = ", ".join(f"{g.name} ({g.id})" for g in discord_client.guilds)
+        raise ValueError(f"Server '{server_id}' not found. Available: {available}")
+
+    if DEFAULT_GUILD_ID:
+        default_id = _try_int(DEFAULT_GUILD_ID)
+        if default_id is not None:
+            guild = discord_client.get_guild(default_id)
+            if guild is not None:
+                return guild
+            guild = await discord_client.fetch_guild(default_id)
+            if guild is not None:
+                return guild
+
+    if len(discord_client.guilds) == 1:
+        return discord_client.guilds[0]
+
+    available = ", ".join(f"{g.name} ({g.id})" for g in discord_client.guilds)
+    raise ValueError(
+        f"Server ID is required because bot is in multiple servers. Available: {available}"
+    )
 
 
 async def _resolve_forum_channel(
     channel_identifier: str, server_id: Optional[str] = None
 ) -> discord.ForumChannel:
-    return await gateway.resolve_forum_channel(channel_identifier, server_id)
+    guild = await _resolve_guild(server_id)
+
+    channel_id = _try_int(channel_identifier)
+    if channel_id is not None:
+        channel = guild.get_channel(channel_id)
+        if channel is None:
+            channel = await guild.fetch_channel(channel_id)
+        if isinstance(channel, discord.ForumChannel):
+            return channel
+
+    normalized = _normalize_name(channel_identifier)
+    matches = [
+        ch
+        for ch in guild.channels
+        if isinstance(ch, discord.ForumChannel)
+        and _normalize_name(ch.name) == normalized
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        detail = ", ".join(f"{ch.name} ({ch.id})" for ch in matches)
+        raise ValueError(
+            f"Multiple forum channels found for '{channel_identifier}'. Use channel ID. Matches: {detail}"
+        )
+
+    available = ", ".join(
+        f"#{ch.name}" for ch in guild.channels if isinstance(ch, discord.ForumChannel)
+    )
+    raise ValueError(
+        f"Forum channel '{channel_identifier}' not found in '{guild.name}'. Available forums: {available}"
+    )
 
 
 async def _resolve_text_or_thread_channel(
     channel_identifier: str, server_id: Optional[str] = None
 ) -> discord.TextChannel | discord.Thread:
-    return await gateway.resolve_text_or_thread_channel(channel_identifier, server_id)
+    guild = await _resolve_guild(server_id)
+
+    channel_id = _try_int(channel_identifier)
+    if channel_id is not None:
+        channel = discord_client.get_channel(channel_id)
+        if channel is None:
+            channel = await discord_client.fetch_channel(channel_id)
+
+        if isinstance(channel, (discord.TextChannel, discord.Thread)):
+            if channel.guild.id != guild.id:
+                raise ValueError(
+                    f"Channel '{channel_identifier}' is not in server '{guild.name}'"
+                )
+            return channel
+
+    normalized = _normalize_name(channel_identifier)
+    matches = [
+        ch for ch in guild.text_channels if _normalize_name(ch.name) == normalized
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        detail = ", ".join(f"#{ch.name} ({ch.id})" for ch in matches)
+        raise ValueError(
+            f"Multiple channels found for '{channel_identifier}'. Use channel ID. Matches: {detail}"
+        )
+
+    available = ", ".join(f"#{ch.name}" for ch in guild.text_channels)
+    raise ValueError(
+        f"Text channel '{channel_identifier}' not found in '{guild.name}'. Available channels: {available}"
+    )
 
 
 async def _resolve_thread(
     thread_id: str, server_id: Optional[str] = None
 ) -> tuple[discord.Thread, discord.Guild]:
-    return await gateway.resolve_thread(thread_id, server_id)
+    parsed_id = _try_int(thread_id)
+    if parsed_id is None:
+        raise ValueError("thread_id must be a valid integer Discord ID")
+
+    channel = discord_client.get_channel(parsed_id)
+    if channel is None:
+        channel = await discord_client.fetch_channel(parsed_id)
+
+    if not isinstance(channel, discord.Thread):
+        raise ValueError(f"Channel '{thread_id}' is not a thread")
+
+    if server_id:
+        guild = await _resolve_guild(server_id)
+        if channel.guild.id != guild.id:
+            raise ValueError(f"Thread '{thread_id}' is not in server '{guild.name}'")
+        return channel, guild
+
+    return channel, channel.guild
 
 
 def _serialize_attachment(attachment: discord.Attachment) -> Dict[str, Any]:
@@ -198,6 +296,10 @@ async def _collect_forum_threads(
 @app.list_tools()
 async def list_tools() -> List[Tool]:
     """List available Discord tools."""
+    return compose_tool_registry(_list_tools_impl)
+
+
+def _list_tools_impl() -> List[Tool]:
     return [
         # Server Information Tools
         Tool(
@@ -656,58 +758,332 @@ async def list_tools() -> List[Tool]:
 @require_discord_client
 async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     """Handle Discord tool calls."""
+    arguments = arguments or {}
+    dependencies = build_tool_dependencies(discord_client, _call_tool_impl)
+    return await dispatch_tool_call(name, arguments, dependencies)
 
+
+async def _call_tool_impl(name: str, arguments: Any) -> List[TextContent]:
     arguments = arguments or {}
 
     if name in {"send_message", "send-message"}:
-        return await handle_send_message(arguments, {"gateway": gateway})
+        server_id = arguments.get("server_id") or arguments.get("server")
+        channel_identifier = arguments.get("channel_id") or arguments.get("channel")
+        content = arguments.get("content") or arguments.get("message")
+
+        if not channel_identifier:
+            raise ValueError("channel_id (or channel) is required")
+        if content is None:
+            raise ValueError("content (or message) is required")
+
+        channel = await _resolve_text_or_thread_channel(
+            str(channel_identifier), server_id
+        )
+        message = await channel.send(str(content))
+        return [
+            TextContent(
+                type="text", text=f"Message sent successfully. Message ID: {message.id}"
+            )
+        ]
 
     elif name in {"read_messages", "read-messages"}:
-        return await handle_read_messages(
-            arguments, {"gateway": gateway, "try_int": _try_int}
+        server_id = arguments.get("server_id") or arguments.get("server")
+        channel_identifier = arguments.get("channel_id") or arguments.get("channel")
+        if not channel_identifier:
+            raise ValueError("channel_id (or channel) is required")
+
+        channel = await _resolve_text_or_thread_channel(
+            str(channel_identifier), server_id
         )
+        limit = min(int(arguments.get("limit", 10)), 100)
+        before = arguments.get("before")
+        before_obj = discord.Object(id=int(before)) if _try_int(before) else None
+        messages = []
+        async for message in channel.history(limit=limit, before=before_obj):
+            reaction_data = []
+            for reaction in message.reactions:
+                emoji_str = (
+                    str(reaction.emoji.name)
+                    if hasattr(reaction.emoji, "name") and reaction.emoji.name
+                    else str(reaction.emoji.id)
+                    if hasattr(reaction.emoji, "id")
+                    else str(reaction.emoji)
+                )
+                reaction_info = {"emoji": emoji_str, "count": reaction.count}
+                reaction_data.append(reaction_info)
+            messages.append(
+                {
+                    "id": str(message.id),
+                    "author": str(message.author),
+                    "content": message.content,
+                    "timestamp": message.created_at.isoformat(),
+                    "reactions": reaction_data,  # Add reactions to message dict
+                }
+            )
+
+        # Helper function to format reactions
+        def format_reaction(r):
+            return f"{r['emoji']}({r['count']})"
+
+        return [
+            TextContent(
+                type="text",
+                text=f"Retrieved {len(messages)} messages:\n\n"
+                + "\n".join(
+                    [
+                        f"{m['author']} ({m['timestamp']}): {m['content']}\n"
+                        + f"Reactions: {', '.join([format_reaction(r) for r in m['reactions']]) if m['reactions'] else 'No reactions'}"
+                        for m in messages
+                    ]
+                ),
+            )
+        ]
 
     elif name in {"edit_message", "edit-message"}:
-        return await handle_edit_message(arguments, {"gateway": gateway})
+        channel = await discord_client.fetch_channel(int(arguments["channel_id"]))
+        message = await channel.fetch_message(int(arguments["message_id"]))
+        await message.edit(content=arguments["content"])
+        return [
+            TextContent(
+                type="text",
+                text=f"Message edited successfully. Message ID: {message.id}",
+            )
+        ]
 
     elif name in {"read_forum_threads", "read-forum-threads"}:
-        return await handle_read_forum_threads(
-            arguments,
-            {
-                "gateway": gateway,
-                "try_int": _try_int,
-                "serialize_message": _serialize_message,
-                "serialize_forum_tag": _serialize_forum_tag,
-            },
-        )
+        server_id = arguments.get("server_id") or arguments.get("server")
+        channel_identifier = arguments["channel"]
+        limit = min(int(arguments.get("limit", 10)), 50)
+        before = arguments.get("before")
+        before_obj = discord.Object(id=int(before)) if _try_int(before) else None
+
+        forum_channel = await _resolve_forum_channel(channel_identifier, server_id)
+        threads = sorted(
+            list(forum_channel.threads),
+            key=lambda t: t.created_at or discord.utils.utcnow(),
+            reverse=True,
+        )[:limit]
+
+        thread_payload = []
+        for thread in threads:
+            messages = []
+            async for msg in thread.history(limit=10, before=before_obj):
+                payload = _serialize_message(msg)
+                payload.update(
+                    {
+                        "thread": thread.name,
+                        "threadId": str(thread.id),
+                        "channel": f"#{forum_channel.name}",
+                        "server": thread.guild.name,
+                    }
+                )
+                messages.append(payload)
+
+            thread_payload.append(
+                {
+                    "thread": thread.name,
+                    "threadId": str(thread.id),
+                    "tags": [_serialize_forum_tag(tag) for tag in thread.applied_tags],
+                    "messages": messages,
+                }
+            )
+
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(thread_payload, ensure_ascii=False, indent=2),
+            )
+        ]
 
     elif name in {"list_threads", "list-threads"}:
-        return await handle_list_threads(
-            arguments,
-            {
-                "gateway": gateway,
-                "serialize_forum_tag": _serialize_forum_tag,
-                "max_archived_threads_scan": MAX_ARCHIVED_THREADS_SCAN,
-            },
+        server_id = arguments.get("server_id") or arguments.get("server")
+        channel_identifier = arguments["channel"]
+        limit = min(int(arguments.get("limit", 50)), 100)
+        include_archived = bool(
+            arguments.get("include_archived", arguments.get("includeArchived", False))
         )
+
+        forum_channel = await _resolve_forum_channel(channel_identifier, server_id)
+        all_threads = await _collect_forum_threads(forum_channel, include_archived)
+        thread_list = sorted(
+            all_threads,
+            key=lambda t: t.created_at or discord.utils.utcnow(),
+            reverse=True,
+        )[:limit]
+
+        result = {
+            "forumChannel": forum_channel.name,
+            "server": forum_channel.guild.name,
+            "includeArchived": include_archived,
+            "totalThreads": len(thread_list),
+            "threads": [
+                {
+                    "threadId": str(thread.id),
+                    "threadName": thread.name,
+                    "createdAt": thread.created_at.isoformat()
+                    if thread.created_at
+                    else None,
+                    "ownerId": str(thread.owner_id) if thread.owner_id else None,
+                    "archived": thread.archived,
+                    "locked": thread.locked,
+                    "messageCount": thread.message_count,
+                    "memberCount": thread.member_count,
+                    "totalMessageSent": thread.total_message_sent,
+                    "rateLimitPerUser": thread.slowmode_delay,
+                    "tags": [_serialize_forum_tag(tag) for tag in thread.applied_tags],
+                    "lastMessageId": str(thread.last_message_id)
+                    if thread.last_message_id
+                    else None,
+                }
+                for thread in thread_list
+            ],
+        }
+
+        return [
+            TextContent(
+                type="text", text=json.dumps(result, ensure_ascii=False, indent=2)
+            )
+        ]
 
     elif name in {"search_threads", "search-threads"}:
-        return await handle_search_threads(
-            arguments,
-            {
-                "gateway": gateway,
-                "serialize_forum_tag": _serialize_forum_tag,
-                "max_archived_threads_scan": MAX_ARCHIVED_THREADS_SCAN,
-            },
+        server_id = arguments.get("server_id") or arguments.get("server")
+        channel_identifier = arguments["channel"]
+        query = str(arguments["query"]).strip()
+        limit = min(int(arguments.get("limit", 50)), 100)
+        include_archived = bool(
+            arguments.get("include_archived", arguments.get("includeArchived", True))
         )
+        exact_match = bool(
+            arguments.get("exact_match", arguments.get("exactMatch", False))
+        )
+
+        forum_channel = await _resolve_forum_channel(channel_identifier, server_id)
+        all_threads = await _collect_forum_threads(forum_channel, include_archived)
+        query_lower = query.lower()
+
+        def matches(thread: discord.Thread) -> bool:
+            name_lower = thread.name.lower()
+            if exact_match:
+                return name_lower == query_lower
+            return query_lower in name_lower
+
+        filtered = [thread for thread in all_threads if matches(thread)]
+        thread_list = sorted(
+            filtered,
+            key=lambda t: t.created_at or discord.utils.utcnow(),
+            reverse=True,
+        )[:limit]
+
+        result = {
+            "forumChannel": forum_channel.name,
+            "server": forum_channel.guild.name,
+            "query": query,
+            "exactMatch": exact_match,
+            "totalFound": len(thread_list),
+            "totalMatched": len(filtered),
+            "includeArchived": include_archived,
+            "threads": [
+                {
+                    "threadId": str(thread.id),
+                    "threadName": thread.name,
+                    "createdAt": thread.created_at.isoformat()
+                    if thread.created_at
+                    else None,
+                    "ownerId": str(thread.owner_id) if thread.owner_id else None,
+                    "archived": thread.archived,
+                    "locked": thread.locked,
+                    "messageCount": thread.message_count,
+                    "memberCount": thread.member_count,
+                    "totalMessageSent": thread.total_message_sent,
+                    "rateLimitPerUser": thread.slowmode_delay,
+                    "tags": [_serialize_forum_tag(tag) for tag in thread.applied_tags],
+                    "lastMessageId": str(thread.last_message_id)
+                    if thread.last_message_id
+                    else None,
+                }
+                for thread in thread_list
+            ],
+        }
+
+        return [
+            TextContent(
+                type="text", text=json.dumps(result, ensure_ascii=False, indent=2)
+            )
+        ]
 
     elif name in {"add_thread_tags", "add-thread-tags"}:
-        return await handle_add_thread_tags(
-            arguments, {"gateway": gateway, "normalize_name": _normalize_name}
-        )
+        server_id = arguments.get("server_id") or arguments.get("server")
+        channel_identifier = arguments["channel"]
+        thread_id = arguments.get("thread_id") or arguments.get("threadId")
+        tag_names = arguments.get("tag_names") or arguments.get("tagNames")
+
+        if not thread_id:
+            raise ValueError("thread_id is required")
+        if not isinstance(tag_names, list) or not tag_names:
+            raise ValueError("tag_names must be a non-empty array")
+
+        forum_channel = await _resolve_forum_channel(channel_identifier, server_id)
+        thread, _ = await _resolve_thread(str(thread_id), server_id)
+
+        if thread.parent_id != forum_channel.id:
+            raise ValueError(
+                f"Thread '{thread.id}' does not belong to forum channel '{forum_channel.name}'"
+            )
+
+        requested = {_normalize_name(tag): tag for tag in tag_names}
+        tag_lookup = {
+            _normalize_name(tag.name): tag for tag in forum_channel.available_tags
+        }
+
+        missing = [
+            original for key, original in requested.items() if key not in tag_lookup
+        ]
+        if missing:
+            available = ", ".join(tag.name for tag in forum_channel.available_tags)
+            raise ValueError(
+                f"Tags not found: {', '.join(missing)}. Available tags: {available}"
+            )
+
+        merged: Dict[int, discord.ForumTag] = {
+            tag.id: tag for tag in thread.applied_tags
+        }
+        for key in requested:
+            tag = tag_lookup[key]
+            merged[tag.id] = tag
+
+        await thread.edit(applied_tags=list(merged.values()))
+        applied_names = [tag.name for tag in merged.values()]
+        return [
+            TextContent(
+                type="text",
+                text=f"Tags added to thread '{thread.name}'. Applied tags: {', '.join(applied_names)}",
+            )
+        ]
 
     elif name in {"unarchive_thread", "unarchive-thread"}:
-        return await handle_unarchive_thread(arguments, {"gateway": gateway})
+        server_id = arguments.get("server_id") or arguments.get("server")
+        thread_id = arguments.get("thread_id") or arguments.get("threadId")
+        reason = arguments.get("reason")
+
+        if not thread_id:
+            raise ValueError("thread_id is required")
+
+        thread, _ = await _resolve_thread(str(thread_id), server_id)
+        if not thread.archived:
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Thread '{thread.name}' is already active.",
+                )
+            ]
+
+        await thread.edit(archived=False, reason=reason)
+        return [
+            TextContent(
+                type="text",
+                text=f"Thread '{thread.name}' has been unarchived.",
+            )
+        ]
 
     elif name in {"download_attachment", "download-attachment"}:
         url = arguments["url"]
@@ -786,27 +1162,127 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
 
     # Server Information Tools
     elif name == "get_server_info":
-        return await handle_get_server_info(arguments, {"gateway": gateway})
+        guild = await discord_client.fetch_guild(int(arguments["server_id"]))
+        info = {
+            "name": guild.name,
+            "id": str(guild.id),
+            "owner_id": str(guild.owner_id),
+            "member_count": guild.member_count,
+            "created_at": guild.created_at.isoformat(),
+            "description": guild.description,
+            "premium_tier": guild.premium_tier,
+            "explicit_content_filter": str(guild.explicit_content_filter),
+        }
+        return [
+            TextContent(
+                type="text",
+                text=f"Server Information:\n"
+                + "\n".join(f"{k}: {v}" for k, v in info.items()),
+            )
+        ]
 
     elif name == "get_channels":
-        return await handle_get_channels(arguments, {"gateway": gateway})
+        try:
+            guild = discord_client.get_guild(int(arguments["server_id"]))
+            if guild:
+                channel_list = []
+                for channel in guild.channels:
+                    channel_list.append(
+                        f"#{channel.name} (ID: {channel.id}) - {channel.type}"
+                    )
+
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"Channels in {guild.name}:\n" + "\n".join(channel_list),
+                    )
+                ]
+            else:
+                return [TextContent(type="text", text="Guild not found")]
+        except Exception as e:
+            return [TextContent(type="text", text=f"Error: {str(e)}")]
 
     elif name == "list_members":
-        return await handle_list_members(arguments, {"gateway": gateway})
+        guild = await discord_client.fetch_guild(int(arguments["server_id"]))
+        limit = min(int(arguments.get("limit", 100)), 1000)
+
+        members = []
+        async for member in guild.fetch_members(limit=limit):
+            members.append(
+                {
+                    "id": str(member.id),
+                    "name": member.name,
+                    "nick": member.nick,
+                    "joined_at": member.joined_at.isoformat()
+                    if member.joined_at
+                    else None,
+                    "roles": [
+                        str(role.id) for role in member.roles[1:]
+                    ],  # Skip @everyone
+                }
+            )
+
+        return [
+            TextContent(
+                type="text",
+                text=f"Server Members ({len(members)}):\n"
+                + "\n".join(
+                    f"{m['name']} (ID: {m['id']}, Roles: {', '.join(m['roles'])})"
+                    for m in members
+                ),
+            )
+        ]
 
     # Role Management Tools
     elif name == "add_role":
-        return await handle_add_role(arguments, {"gateway": gateway})
+        guild = await discord_client.fetch_guild(int(arguments["server_id"]))
+        member = await guild.fetch_member(int(arguments["user_id"]))
+        role = guild.get_role(int(arguments["role_id"]))
+
+        await member.add_roles(role, reason="Role added via MCP")
+        return [
+            TextContent(
+                type="text", text=f"Added role {role.name} to user {member.name}"
+            )
+        ]
 
     elif name == "remove_role":
-        return await handle_remove_role(arguments, {"gateway": gateway})
+        guild = await discord_client.fetch_guild(int(arguments["server_id"]))
+        member = await guild.fetch_member(int(arguments["user_id"]))
+        role = guild.get_role(int(arguments["role_id"]))
+
+        await member.remove_roles(role, reason="Role removed via MCP")
+        return [
+            TextContent(
+                type="text", text=f"Removed role {role.name} from user {member.name}"
+            )
+        ]
 
     # Channel Management Tools
     elif name == "create_text_channel":
-        return await handle_create_text_channel(arguments, {"gateway": gateway})
+        guild = await discord_client.fetch_guild(int(arguments["server_id"]))
+        category = None
+        if "category_id" in arguments:
+            category = guild.get_channel(int(arguments["category_id"]))
+
+        channel = await guild.create_text_channel(
+            name=arguments["name"],
+            category=category,
+            topic=arguments.get("topic"),
+            reason="Channel created via MCP",
+        )
+
+        return [
+            TextContent(
+                type="text",
+                text=f"Created text channel #{channel.name} (ID: {channel.id})",
+            )
+        ]
 
     elif name == "delete_channel":
-        return await handle_delete_channel(arguments, {"gateway": gateway})
+        channel = await discord_client.fetch_channel(int(arguments["channel_id"]))
+        await channel.delete(reason=arguments.get("reason", "Channel deleted via MCP"))
+        return [TextContent(type="text", text=f"Deleted channel successfully")]
 
     # Message Reaction Tools
     elif name == "add_reaction":
@@ -842,7 +1318,27 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
         ]
 
     elif name == "list_servers":
-        return await handle_list_servers(arguments, {"gateway": gateway})
+        servers = []
+        for guild in discord_client.guilds:
+            servers.append(
+                {
+                    "id": str(guild.id),
+                    "name": guild.name,
+                    "member_count": guild.member_count,
+                    "created_at": guild.created_at.isoformat(),
+                }
+            )
+
+        return [
+            TextContent(
+                type="text",
+                text=f"Available Servers ({len(servers)}):\n"
+                + "\n".join(
+                    f"{s['name']} (ID: {s['id']}, Members: {s['member_count']})"
+                    for s in servers
+                ),
+            )
+        ]
 
     raise ValueError(f"Unknown tool: {name}")
 

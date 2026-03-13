@@ -17,14 +17,26 @@ A Model Context Protocol (MCP) server that provides Discord integration capabili
 ### Message Management
 - `send_message`: Send a message to a channel
 - `read_messages`: Read recent message history
+- `edit_message`: Edit a message sent by the bot
 - `add_reaction`: Add a reaction to a message
 - `add_multiple_reactions`: Add multiple reactions to a message
 - `remove_reaction`: Remove a reaction from a message
 - `moderate_message`: Delete messages and timeout users
 
+### Forum & Thread Management
+- `read_forum_threads`: Read active forum threads and recent posts
+- `list_threads`: List forum threads without reading full history
+- `search_threads`: Search forum threads by title
+- `add_thread_tags`: Add tags to a forum thread
+- `unarchive_thread`: Unarchive a forum thread
+
 ### Channel Management
 - `create_text_channel`: Create a new text channel
 - `delete_channel`: Delete an existing channel
+
+### Attachments & Users
+- `download_attachment`: Download a Discord attachment URL to local filesystem
+- `get_user_info`: Get detailed information about a user
 
 ### Role Management
 - `add_role`: Add a role to a user
