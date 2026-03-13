@@ -6,16 +6,16 @@ from discord_mcp import server
 
 
 class EntrypointWiringTests(unittest.IsolatedAsyncioTestCase):
-    async def test_list_tools_delegates_to_registry(self):
+    async def test_list_tools_delegates_to_schema_registry(self):
         expected = [object()]
         with patch(
             "discord_mcp.server.compose_tool_registry", return_value=expected
         ) as compose:
             tools = await server.list_tools()
         self.assertIs(tools, expected)
-        compose.assert_called_once_with(server._list_tools_impl)
+        compose.assert_called_once_with()
 
-    async def test_call_tool_delegates_to_router(self):
+    async def test_call_tool_delegates_to_router_dispatcher(self):
         expected = [object()]
         deps = object()
         fake_client = object()
@@ -32,7 +32,7 @@ class EntrypointWiringTests(unittest.IsolatedAsyncioTestCase):
             result = await server.call_tool("list_servers", {"x": 1})
 
         self.assertIs(result, expected)
-        build.assert_called_once_with(fake_client, server._call_tool_impl)
+        build.assert_called_once_with(fake_client)
         dispatch.assert_awaited_once_with("list_servers", {"x": 1}, deps)
 
 

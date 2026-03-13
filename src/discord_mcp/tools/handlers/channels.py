@@ -25,6 +25,28 @@ async def handle_create_text_channel(
     ]
 
 
+async def handle_get_channels(
+    arguments: Dict[str, Any], deps: Dict[str, Any]
+) -> List[TextContent]:
+    gateway = deps["gateway"]
+    try:
+        guild = gateway.client.get_guild(int(arguments["server_id"]))
+        if guild:
+            channel_list = [
+                f"#{channel.name} (ID: {channel.id}) - {channel.type}"
+                for channel in guild.channels
+            ]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Channels in {guild.name}:\n" + "\n".join(channel_list),
+                )
+            ]
+        return [TextContent(type="text", text="Guild not found")]
+    except Exception as e:
+        return [TextContent(type="text", text=f"Error: {str(e)}")]
+
+
 async def handle_delete_channel(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
