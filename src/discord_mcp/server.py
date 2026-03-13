@@ -16,6 +16,12 @@ from mcp.server import Server
 from mcp.types import Tool, TextContent
 from mcp.server.stdio import stdio_server
 
+from .composition import (
+    build_tool_dependencies,
+    compose_tool_registry,
+    dispatch_tool_call,
+)
+
 
 def _configure_windows_stdout_encoding():
     if sys.platform == "win32":
@@ -290,6 +296,10 @@ async def _collect_forum_threads(
 @app.list_tools()
 async def list_tools() -> List[Tool]:
     """List available Discord tools."""
+    return compose_tool_registry(_list_tools_impl)
+
+
+def _list_tools_impl() -> List[Tool]:
     return [
         # Server Information Tools
         Tool(
@@ -748,7 +758,12 @@ async def list_tools() -> List[Tool]:
 @require_discord_client
 async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     """Handle Discord tool calls."""
+    arguments = arguments or {}
+    dependencies = build_tool_dependencies(discord_client, _call_tool_impl)
+    return await dispatch_tool_call(name, arguments, dependencies)
 
+
+async def _call_tool_impl(name: str, arguments: Any) -> List[TextContent]:
     arguments = arguments or {}
 
     if name in {"send_message", "send-message"}:
