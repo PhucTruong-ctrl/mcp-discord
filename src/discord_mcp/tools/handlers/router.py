@@ -23,8 +23,12 @@ from .misc import (
     handle_moderate_message,
     handle_remove_reaction,
 )
-from .roles import handle_add_role, handle_list_members, handle_remove_role
-from .server_info import handle_get_server_info, handle_list_servers
+from .roles import handle_add_role, handle_remove_role
+from .server_info import (
+    handle_get_server_info,
+    handle_list_members,
+    handle_list_servers,
+)
 
 
 Handler = Callable[[Dict[str, Any], Dict[str, Any]], Awaitable[List[TextContent]]]
