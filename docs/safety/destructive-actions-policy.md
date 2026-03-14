@@ -20,8 +20,8 @@ Supporting details:
 ## Confirm-token contract
 
 - Token generation/verification is deterministic via shared safety helpers.
-- Dry-run payload includes `confirmToken` (or `confirm_token` in tool-specific payloads where implemented).
-- Execute path validates token against the same action/targets or action+reason tuple used by the handler.
+- Dry-run payload includes `confirmToken` from `build_dry_run_result(action, targets, details)`.
+- Execute path validates token with `verify_confirm_token(action, targets, confirm_token)`.
 
 ## Tools that explicitly require `confirm_token` on execute path
 
@@ -35,6 +35,11 @@ When `dry_run=false`, these tools require a valid token in this codebase:
 6. `incident_rollback_lockdown`
 7. `automod_apply_ruleset`
 8. `automod_rollback_ruleset`
+9. `add_roles_bulk`
+10. `remove_roles_bulk`
+11. `bulk_ban_members`
+12. `prune_inactive_members`
+13. `delete_category`
 
 ## Operational guidance
 
