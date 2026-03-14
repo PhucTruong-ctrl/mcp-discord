@@ -31,8 +31,21 @@ from .forum_intel import (
     handle_tag_forum_post,
 )
 from .expansion_fillers import (
+    handle_append_incident_event,
+    handle_automod_export_rules,
     handle_bulk_ban_members,
+    handle_close_incident,
+    handle_create_auto_moderation_rule,
+    handle_create_category,
+    handle_create_incident_room,
+    handle_delete_category,
+    handle_list_auto_moderation_rules,
+    handle_move_category,
     handle_prune_inactive_members,
+    handle_remove_member_timeout,
+    handle_rename_category,
+    handle_unban_member,
+    handle_update_auto_moderation_rule,
 )
 from .inventory import (
     handle_diff_channel_permissions,
@@ -228,6 +241,19 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "automod-rollback-ruleset": handle_automod_rollback_ruleset,
     "bulk_ban_members": handle_bulk_ban_members,
     "prune_inactive_members": handle_prune_inactive_members,
+    "remove_member_timeout": handle_remove_member_timeout,
+    "unban_member": handle_unban_member,
+    "create_category": handle_create_category,
+    "rename_category": handle_rename_category,
+    "move_category": handle_move_category,
+    "delete_category": handle_delete_category,
+    "create_incident_room": handle_create_incident_room,
+    "append_incident_event": handle_append_incident_event,
+    "close_incident": handle_close_incident,
+    "list_auto_moderation_rules": handle_list_auto_moderation_rules,
+    "create_auto_moderation_rule": handle_create_auto_moderation_rule,
+    "update_auto_moderation_rule": handle_update_auto_moderation_rule,
+    "automod_export_rules": handle_automod_export_rules,
 }
 
 
