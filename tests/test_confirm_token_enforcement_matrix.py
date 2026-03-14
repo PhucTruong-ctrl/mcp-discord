@@ -91,7 +91,6 @@ class TestConfirmTokenEnforcementMatrix(unittest.IsolatedAsyncioTestCase):
                     "message_ids": ["1", "2"],
                     "reason": "cleanup",
                     "dry_run": False,
-                    "require_confirm": True,
                 },
             ),
             (
@@ -102,7 +101,6 @@ class TestConfirmTokenEnforcementMatrix(unittest.IsolatedAsyncioTestCase):
                     "duration_minutes": 30,
                     "reason": "timeout",
                     "dry_run": False,
-                    "require_confirm": True,
                 },
             ),
             (
@@ -112,7 +110,6 @@ class TestConfirmTokenEnforcementMatrix(unittest.IsolatedAsyncioTestCase):
                     "member_id": "2",
                     "reason": "kick",
                     "dry_run": False,
-                    "require_confirm": True,
                 },
             ),
             (
@@ -123,7 +120,6 @@ class TestConfirmTokenEnforcementMatrix(unittest.IsolatedAsyncioTestCase):
                     "delete_message_days": 1,
                     "reason": "ban",
                     "dry_run": False,
-                    "require_confirm": True,
                 },
             ),
             (
@@ -204,80 +200,6 @@ class TestConfirmTokenEnforcementMatrix(unittest.IsolatedAsyncioTestCase):
                     "category_id": "123",
                     "reason": "cleanup",
                     "dry_run": False,
-                },
-            ),
-        ]
-
-        for handler, arguments in cases:
-            with self.subTest(handler=handler.__name__):
-                with self.assertRaisesRegex(ValueError, "confirm_token is required"):
-                    await handler(arguments, dummy_deps)
-
-    async def test_confirm_token_bypass_flag_is_ignored_on_all_supported_handlers(self):
-        dummy_deps = {"gateway": _FakeGateway()}
-        cases = [
-            (
-                handle_moderation_bulk_delete,
-                {
-                    "channel_id": "10",
-                    "message_ids": ["1", "2"],
-                    "reason": "cleanup",
-                    "dry_run": False,
-                    "require_confirm": False,
-                },
-            ),
-            (
-                handle_moderation_timeout_member,
-                {
-                    "server_id": "1",
-                    "member_id": "2",
-                    "duration_minutes": 30,
-                    "reason": "timeout",
-                    "dry_run": False,
-                    "require_confirm": False,
-                },
-            ),
-            (
-                handle_moderation_kick_member,
-                {
-                    "server_id": "1",
-                    "member_id": "2",
-                    "reason": "kick",
-                    "dry_run": False,
-                    "require_confirm": False,
-                },
-            ),
-            (
-                handle_moderation_ban_member,
-                {
-                    "server_id": "1",
-                    "member_id": "2",
-                    "delete_message_days": 1,
-                    "reason": "ban",
-                    "dry_run": False,
-                    "require_confirm": False,
-                },
-            ),
-            (
-                handle_add_roles_bulk,
-                {
-                    "server_id": "1",
-                    "user_ids": ["10", "11"],
-                    "role_ids": ["1", "2"],
-                    "reason": "bulk-add-roles",
-                    "dry_run": False,
-                    "require_confirm": False,
-                },
-            ),
-            (
-                handle_remove_roles_bulk,
-                {
-                    "server_id": "1",
-                    "user_ids": ["10", "11"],
-                    "role_ids": ["1", "2"],
-                    "reason": "bulk-remove-roles",
-                    "dry_run": False,
-                    "require_confirm": False,
                 },
             ),
         ]

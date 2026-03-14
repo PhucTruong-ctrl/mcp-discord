@@ -21,6 +21,14 @@ ALIAS_MATRIX = {
     "add_thread_tags": "add-thread-tags",
     "unarchive_thread": "unarchive-thread",
     "download_attachment": "download-attachment",
+    "incident_get_channel_state": "incident-get-channel-state",
+    "incident_set_channel_state": "incident-set-channel-state",
+    "incident_apply_lockdown": "incident-apply-lockdown",
+    "incident_rollback_lockdown": "incident-rollback-lockdown",
+    "automod_validate_ruleset": "automod-validate-ruleset",
+    "automod_get_ruleset": "automod-get-ruleset",
+    "automod_apply_ruleset": "automod-apply-ruleset",
+    "automod_rollback_ruleset": "automod-rollback-ruleset",
 }
 
 NON_ALIAS_TOOLS = {
@@ -41,8 +49,8 @@ NON_ALIAS_TOOLS = {
 
 
 class TestRouterAliasCompatibility(unittest.TestCase):
-    def test_alias_enabled_tools_are_exactly_nine(self):
-        self.assertEqual(len(ALIAS_MATRIX), 9)
+    def test_alias_enabled_tools_are_exactly_seventeen(self):
+        self.assertEqual(len(ALIAS_MATRIX), 17)
         self.assertEqual(len(NON_ALIAS_TOOLS), 13)
 
     def test_alias_pairs_map_to_same_handler(self):
