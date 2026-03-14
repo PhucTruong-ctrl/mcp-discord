@@ -5,9 +5,11 @@ from mcp.types import Tool
 from .channels import CHANNEL_TOOLS
 from .forums import FORUM_TOOLS
 from .messages import MESSAGE_TOOLS
+from .moderation_core import MODERATION_CORE_TOOLS
 from .misc import MISC_TOOLS
 from .roles import ROLE_TOOLS
 from .server_info import SERVER_INFO_TOOLS
+from .topology import TOPOLOGY_TOOLS
 
 
 def compose_tool_registry() -> List[Tool]:
@@ -17,6 +19,8 @@ def compose_tool_registry() -> List[Tool]:
         *CHANNEL_TOOLS,
         *MESSAGE_TOOLS,
         *FORUM_TOOLS,
+        *MODERATION_CORE_TOOLS,
+        *TOPOLOGY_TOOLS,
         *MISC_TOOLS,
         SERVER_INFO_TOOLS[3],
     ]

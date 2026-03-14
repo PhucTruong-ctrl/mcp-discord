@@ -15,6 +15,12 @@ from .forums import (
     handle_unarchive_thread,
 )
 from .messages import handle_edit_message, handle_read_messages, handle_send_message
+from .moderation_core import (
+    handle_moderation_ban_member,
+    handle_moderation_bulk_delete,
+    handle_moderation_kick_member,
+    handle_moderation_timeout_member,
+)
 from .misc import (
     handle_add_multiple_reactions,
     handle_add_reaction,
@@ -28,6 +34,12 @@ from .server_info import (
     handle_get_server_info,
     handle_list_members,
     handle_list_servers,
+)
+from .topology import (
+    handle_topology_channel_children,
+    handle_topology_channel_tree,
+    handle_topology_permission_matrix,
+    handle_topology_role_hierarchy,
 )
 
 
@@ -51,6 +63,14 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "add-thread-tags": handle_add_thread_tags,
     "unarchive_thread": handle_unarchive_thread,
     "unarchive-thread": handle_unarchive_thread,
+    "moderation_bulk_delete": handle_moderation_bulk_delete,
+    "moderation_timeout_member": handle_moderation_timeout_member,
+    "moderation_kick_member": handle_moderation_kick_member,
+    "moderation_ban_member": handle_moderation_ban_member,
+    "topology_channel_tree": handle_topology_channel_tree,
+    "topology_channel_children": handle_topology_channel_children,
+    "topology_role_hierarchy": handle_topology_role_hierarchy,
+    "topology_permission_matrix": handle_topology_permission_matrix,
     "download_attachment": handle_download_attachment,
     "download-attachment": handle_download_attachment,
     "get_user_info": handle_get_user_info,
