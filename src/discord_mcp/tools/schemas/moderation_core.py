@@ -16,10 +16,6 @@ MODERATION_CORE_TOOLS = [
                 },
                 "reason": {"type": "string", "description": "Audit log reason"},
                 "dry_run": {"type": "boolean", "description": "Return dry-run result"},
-                "require_confirm": {
-                    "type": "boolean",
-                    "description": "Require confirm_token for execute path",
-                },
                 "confirm_token": {
                     "type": "string",
                     "description": "Confirm token from dry-run",
@@ -43,10 +39,6 @@ MODERATION_CORE_TOOLS = [
                 },
                 "reason": {"type": "string", "description": "Audit log reason"},
                 "dry_run": {"type": "boolean", "description": "Return dry-run result"},
-                "require_confirm": {
-                    "type": "boolean",
-                    "description": "Require confirm_token for execute path",
-                },
                 "confirm_token": {
                     "type": "string",
                     "description": "Confirm token from dry-run",
@@ -65,10 +57,6 @@ MODERATION_CORE_TOOLS = [
                 "member_id": {"type": "string", "description": "Member ID"},
                 "reason": {"type": "string", "description": "Audit log reason"},
                 "dry_run": {"type": "boolean", "description": "Return dry-run result"},
-                "require_confirm": {
-                    "type": "boolean",
-                    "description": "Require confirm_token for execute path",
-                },
                 "confirm_token": {
                     "type": "string",
                     "description": "Confirm token from dry-run",
@@ -93,10 +81,6 @@ MODERATION_CORE_TOOLS = [
                 },
                 "reason": {"type": "string", "description": "Audit log reason"},
                 "dry_run": {"type": "boolean", "description": "Return dry-run result"},
-                "require_confirm": {
-                    "type": "boolean",
-                    "description": "Require confirm_token for execute path",
-                },
                 "confirm_token": {
                     "type": "string",
                     "description": "Confirm token from dry-run",

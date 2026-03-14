@@ -112,3 +112,12 @@ Deferral keeps waves 1-10 focused on deterministic Discord API operations and av
 - Canonical tools: `101`
 - Router keys (including aliases): `118`
 - Baseline first 22 canonical names: preserved and verified by tests.
+
+## Plan-to-implementation substitution notes
+
+To preserve the 101-tool contract without introducing out-of-scope stateful orchestration/runtime dependencies, the implementation includes substitutions from the original plan naming for selected expansion slots:
+
+- Wave 3 equivalents: `moderation_timeout_member`, `moderation_kick_member`, `moderation_ban_member`, `moderation_bulk_delete`.
+- Wave 9 equivalents: `incident_apply_lockdown`, `incident_rollback_lockdown`.
+
+These substitutions are reflected in the canonical registry/tests/docs and keep the destructive safety model (`dry_run` + `confirm_token`) enforced on execute paths.

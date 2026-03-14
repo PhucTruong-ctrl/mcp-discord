@@ -239,6 +239,33 @@ class RoleGovernanceToolTests(unittest.IsolatedAsyncioTestCase):
         remove_payload = json.loads(removed[0].text)
         self.assertEqual(remove_payload["appliedCount"], 1)
 
+    async def test_bulk_role_ops_cannot_bypass_confirm_with_require_confirm_false(self):
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_add_roles_bulk(
+                {
+                    "server_id": "1",
+                    "user_ids": ["10"],
+                    "role_ids": ["1"],
+                    "reason": "bulk-add",
+                    "dry_run": False,
+                    "require_confirm": False,
+                },
+                self.deps,
+            )
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_remove_roles_bulk(
+                {
+                    "server_id": "1",
+                    "user_ids": ["11"],
+                    "role_ids": ["1"],
+                    "reason": "bulk-remove",
+                    "dry_run": False,
+                    "require_confirm": False,
+                },
+                self.deps,
+            )
+
     async def test_mute_and_unmute_member(self):
         muted = await handle_mute_member_role_based(
             {"server_id": "1", "user_id": "10", "mute_role_id": "2"}, self.deps

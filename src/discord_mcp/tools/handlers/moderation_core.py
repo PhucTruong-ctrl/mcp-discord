@@ -6,10 +6,6 @@ from mcp.types import TextContent
 from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 
 
-def _should_require_confirm(arguments: Dict[str, Any]) -> bool:
-    return bool(arguments.get("require_confirm", True))
-
-
 def _is_dry_run(arguments: Dict[str, Any]) -> bool:
     return bool(arguments.get("dry_run", True))
 
@@ -32,8 +28,7 @@ async def handle_moderation_bulk_delete(
         )
         return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]
 
-    if _should_require_confirm(arguments):
-        verify_confirm_token(action, targets, arguments.get("confirm_token"))
+    verify_confirm_token(action, targets, arguments.get("confirm_token"))
 
     deleted = await gateway.bulk_delete_messages(channel_id, message_ids, reason)
     payload = {"status": "executed", "action": action, "deleted": deleted}
@@ -59,8 +54,7 @@ async def handle_moderation_timeout_member(
         payload = build_dry_run_result(action, targets, {"reason": reason})
         return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]
 
-    if _should_require_confirm(arguments):
-        verify_confirm_token(action, targets, arguments.get("confirm_token"))
+    verify_confirm_token(action, targets, arguments.get("confirm_token"))
 
     await gateway.timeout_member(server_id, member_id, duration_minutes, reason)
     payload = {"status": "executed", "action": action}
@@ -81,8 +75,7 @@ async def handle_moderation_kick_member(
         payload = build_dry_run_result(action, targets, {"reason": reason})
         return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]
 
-    if _should_require_confirm(arguments):
-        verify_confirm_token(action, targets, arguments.get("confirm_token"))
+    verify_confirm_token(action, targets, arguments.get("confirm_token"))
 
     await gateway.kick_member(server_id, member_id, reason)
     payload = {"status": "executed", "action": action}
@@ -108,8 +101,7 @@ async def handle_moderation_ban_member(
         payload = build_dry_run_result(action, targets, {"reason": reason})
         return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]
 
-    if _should_require_confirm(arguments):
-        verify_confirm_token(action, targets, arguments.get("confirm_token"))
+    verify_confirm_token(action, targets, arguments.get("confirm_token"))
 
     await gateway.ban_member(server_id, member_id, delete_message_days, reason)
     payload = {"status": "executed", "action": action}

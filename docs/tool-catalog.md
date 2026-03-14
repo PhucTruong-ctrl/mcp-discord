@@ -126,6 +126,9 @@
 84. `automod_get_ruleset`
 85. `automod_apply_ruleset`
 86. `automod_rollback_ruleset`
+
+### Post-wave expansion fillers/utilities (15)
+
 87. `bulk_ban_members`
 88. `prune_inactive_members`
 89. `remove_member_timeout`
@@ -141,6 +144,10 @@
 99. `create_auto_moderation_rule`
 100. `update_auto_moderation_rule`
 101. `automod_export_rules`
+
+## Implementation-status note
+
+Tools 87-101 are currently implemented as expansion filler/utility handlers; a subset are lightweight stubs intended to preserve the 101-tool registry contract while deeper Discord side-effect implementations continue in follow-up work.
 
 ## 101-tool contract status
 
