@@ -27,13 +27,50 @@ from discord_mcp.tools.handlers.moderation_core import (
 )
 from discord_mcp.tools.handlers.expansion_fillers import (
     handle_bulk_ban_members,
+    handle_delete_category,
     handle_prune_inactive_members,
+)
+from discord_mcp.tools.handlers.role_governance import (
+    handle_add_roles_bulk,
+    handle_remove_roles_bulk,
 )
 
 
+class _FakeRole:
+    def __init__(self, role_id: int):
+        self.id = role_id
+
+
+class _FakeMember:
+    async def add_roles(self, *roles, reason=None):
+        return None
+
+    async def remove_roles(self, *roles, reason=None):
+        return None
+
+
+class _FakeGuild:
+    def __init__(self):
+        self.roles = [_FakeRole(1), _FakeRole(2)]
+
+    def get_role(self, role_id: int):
+        for role in self.roles:
+            if role.id == role_id:
+                return role
+        return None
+
+    async def fetch_member(self, user_id: int):
+        return _FakeMember()
+
+
+class _FakeGateway:
+    async def fetch_guild(self, _server_id):
+        return _FakeGuild()
+
+
 class TestConfirmTokenEnforcementMatrix(unittest.IsolatedAsyncioTestCase):
-    async def test_confirm_token_required_for_all_10_execute_paths(self):
-        dummy_deps = {"gateway": object()}
+    async def test_confirm_token_required_for_all_13_execute_paths(self):
+        dummy_deps = {"gateway": _FakeGateway()}
         cases = [
             (
                 handle_moderation_bulk_delete,
@@ -129,11 +166,40 @@ class TestConfirmTokenEnforcementMatrix(unittest.IsolatedAsyncioTestCase):
                     "dry_run": False,
                 },
             ),
+            (
+                handle_add_roles_bulk,
+                {
+                    "server_id": "1",
+                    "user_ids": ["10", "11"],
+                    "role_ids": ["1", "2"],
+                    "reason": "bulk-add-roles",
+                    "dry_run": False,
+                },
+            ),
+            (
+                handle_remove_roles_bulk,
+                {
+                    "server_id": "1",
+                    "user_ids": ["10", "11"],
+                    "role_ids": ["1", "2"],
+                    "reason": "bulk-remove-roles",
+                    "dry_run": False,
+                },
+            ),
+            (
+                handle_delete_category,
+                {
+                    "category_id": "123",
+                    "reason": "cleanup",
+                    "dry_run": False,
+                },
+            ),
         ]
 
         for handler, arguments in cases:
-            with self.assertRaisesRegex(ValueError, "confirm_token is required"):
-                await handler(arguments, dummy_deps)
+            with self.subTest(handler=handler.__name__):
+                with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+                    await handler(arguments, dummy_deps)
 
 
 if __name__ == "__main__":
