@@ -27,18 +27,18 @@ def compose_tool_registry() -> List[Tool]:
         *CHANNEL_TOOLS,
         *MESSAGE_TOOLS,
         *FORUM_TOOLS,
+        *MISC_TOOLS,
+        SERVER_INFO_TOOLS[3],
         *FORUM_INTEL_TOOLS,
         *INVENTORY_TOOLS,
         *MODERATION_CORE_TOOLS,
         *TOPOLOGY_TOOLS,
-        *MISC_TOOLS,
         *ROLE_GOVERNANCE_TOOLS,
         *AUDIT_ANALYTICS_TOOLS,
         *ONBOARDING_TOOLS,
         *MESSAGING_WORKFLOW_TOOLS,
         *INCIDENT_OPS_TOOLS,
         *AUTOMOD_POLICY_TOOLS,
-        SERVER_INFO_TOOLS[3],
     ]
 
 
