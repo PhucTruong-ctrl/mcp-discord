@@ -4,8 +4,8 @@ from typing import Any, Dict, List
 from mcp.types import TextContent
 
 from discord_mcp.core.safety import (
-    generate_confirm_token_with_reason,
-    validate_confirm_token,
+    build_dry_run_result,
+    verify_confirm_token,
 )
 
 
@@ -62,30 +62,19 @@ async def handle_automod_apply_ruleset(
     guild_id = str(arguments["guild_id"])
     ruleset_name = str(ruleset["name"])
     dry_run = bool(arguments.get("dry_run", True))
+    action = "automod_apply_ruleset"
+    targets = {"guild_id": guild_id, "ruleset_name": ruleset_name, "reason": reason}
 
     if dry_run:
-        token = generate_confirm_token_with_reason(
-            action="automod_apply_ruleset",
-            targets=[guild_id, ruleset_name],
-            reason=reason,
+        payload = build_dry_run_result(
+            action,
+            targets,
+            {"guild_id": guild_id, "ruleset": ruleset, "reason": reason},
         )
-        return _json(
-            {
-                "status": "dry_run",
-                "guild_id": guild_id,
-                "ruleset": ruleset,
-                "reason": reason,
-                "confirm_token": token,
-            }
-        )
+        return _json(payload)
 
     confirm_token = _required_confirm_token(arguments)
-    validate_confirm_token(
-        action="automod_apply_ruleset",
-        targets=[guild_id, ruleset_name],
-        reason=reason,
-        confirm_token=confirm_token,
-    )
+    verify_confirm_token(action, targets, confirm_token)
     return _json(
         {
             "status": "applied",
@@ -103,30 +92,19 @@ async def handle_automod_rollback_ruleset(
     guild_id = str(arguments["guild_id"])
     ruleset_name = str(arguments["ruleset_name"])
     dry_run = bool(arguments.get("dry_run", True))
+    action = "automod_rollback_ruleset"
+    targets = {"guild_id": guild_id, "ruleset_name": ruleset_name, "reason": reason}
 
     if dry_run:
-        token = generate_confirm_token_with_reason(
-            action="automod_rollback_ruleset",
-            targets=[guild_id, ruleset_name],
-            reason=reason,
+        payload = build_dry_run_result(
+            action,
+            targets,
+            {"guild_id": guild_id, "ruleset_name": ruleset_name, "reason": reason},
         )
-        return _json(
-            {
-                "status": "dry_run",
-                "guild_id": guild_id,
-                "ruleset_name": ruleset_name,
-                "reason": reason,
-                "confirm_token": token,
-            }
-        )
+        return _json(payload)
 
     confirm_token = _required_confirm_token(arguments)
-    validate_confirm_token(
-        action="automod_rollback_ruleset",
-        targets=[guild_id, ruleset_name],
-        reason=reason,
-        confirm_token=confirm_token,
-    )
+    verify_confirm_token(action, targets, confirm_token)
     return _json(
         {
             "status": "rolled_back",
