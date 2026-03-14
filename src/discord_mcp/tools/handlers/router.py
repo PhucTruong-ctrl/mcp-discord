@@ -14,6 +14,16 @@ from .forums import (
     handle_search_threads,
     handle_unarchive_thread,
 )
+from .inventory import (
+    handle_diff_channel_permissions,
+    handle_export_server_snapshot,
+    handle_get_channel_hierarchy,
+    handle_get_channel_type_counts,
+    handle_get_channels_structured,
+    handle_get_permission_overwrites,
+    handle_get_role_hierarchy,
+    handle_list_inactive_channels,
+)
 from .messages import handle_edit_message, handle_read_messages, handle_send_message
 from .misc import (
     handle_add_multiple_reactions,
@@ -66,6 +76,14 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "add_multiple_reactions": handle_add_multiple_reactions,
     "remove_reaction": handle_remove_reaction,
     "list_servers": handle_list_servers,
+    "get_channels_structured": handle_get_channels_structured,
+    "get_channel_hierarchy": handle_get_channel_hierarchy,
+    "get_role_hierarchy": handle_get_role_hierarchy,
+    "get_permission_overwrites": handle_get_permission_overwrites,
+    "diff_channel_permissions": handle_diff_channel_permissions,
+    "export_server_snapshot": handle_export_server_snapshot,
+    "get_channel_type_counts": handle_get_channel_type_counts,
+    "list_inactive_channels": handle_list_inactive_channels,
 }
 
 
