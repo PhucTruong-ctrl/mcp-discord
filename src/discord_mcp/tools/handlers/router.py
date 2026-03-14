@@ -2,6 +2,12 @@ from typing import Any, Awaitable, Callable, Dict, List
 
 from mcp.types import TextContent
 
+from .automod_policy import (
+    handle_automod_apply_ruleset,
+    handle_automod_get_ruleset,
+    handle_automod_rollback_ruleset,
+    handle_automod_validate_ruleset,
+)
 from .channels import (
     handle_create_text_channel,
     handle_delete_channel,
@@ -78,6 +84,12 @@ from .onboarding import (
     handle_update_guild_onboarding,
     handle_update_guild_welcome_screen,
     handle_verification_gate_orchestrator,
+)
+from .incident_ops import (
+    handle_incident_apply_lockdown,
+    handle_incident_get_channel_state,
+    handle_incident_rollback_lockdown,
+    handle_incident_set_channel_state,
 )
 from .roles import handle_add_role, handle_remove_role
 from .audit_analytics import (
@@ -194,6 +206,22 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "check_audit_reason_compliance": handle_check_audit_reason_compliance,
     "server_health_check": handle_server_health_check,
     "governance_evidence_packager": handle_governance_evidence_packager,
+    "incident_get_channel_state": handle_incident_get_channel_state,
+    "incident-get-channel-state": handle_incident_get_channel_state,
+    "incident_set_channel_state": handle_incident_set_channel_state,
+    "incident-set-channel-state": handle_incident_set_channel_state,
+    "incident_apply_lockdown": handle_incident_apply_lockdown,
+    "incident-apply-lockdown": handle_incident_apply_lockdown,
+    "incident_rollback_lockdown": handle_incident_rollback_lockdown,
+    "incident-rollback-lockdown": handle_incident_rollback_lockdown,
+    "automod_validate_ruleset": handle_automod_validate_ruleset,
+    "automod-validate-ruleset": handle_automod_validate_ruleset,
+    "automod_get_ruleset": handle_automod_get_ruleset,
+    "automod-get-ruleset": handle_automod_get_ruleset,
+    "automod_apply_ruleset": handle_automod_apply_ruleset,
+    "automod-apply-ruleset": handle_automod_apply_ruleset,
+    "automod_rollback_ruleset": handle_automod_rollback_ruleset,
+    "automod-rollback-ruleset": handle_automod_rollback_ruleset,
 }
 
 

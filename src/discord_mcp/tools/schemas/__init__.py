@@ -2,10 +2,12 @@ from typing import List
 
 from mcp.types import Tool
 
+from .automod_policy import AUTOMOD_POLICY_TOOLS
 from .channels import CHANNEL_TOOLS
 from .forum_intel import FORUM_INTEL_TOOLS
 from .forums import FORUM_TOOLS
 from .inventory import INVENTORY_TOOLS
+from .incident_ops import INCIDENT_OPS_TOOLS
 from .messages import MESSAGE_TOOLS
 from .moderation_core import MODERATION_CORE_TOOLS
 from .role_governance import ROLE_GOVERNANCE_TOOLS
@@ -34,6 +36,8 @@ def compose_tool_registry() -> List[Tool]:
         *AUDIT_ANALYTICS_TOOLS,
         *ONBOARDING_TOOLS,
         *MESSAGING_WORKFLOW_TOOLS,
+        *INCIDENT_OPS_TOOLS,
+        *AUTOMOD_POLICY_TOOLS,
         SERVER_INFO_TOOLS[3],
     ]
 

@@ -1,5 +1,11 @@
 from .resolve import normalize_name, try_int
-from .safety import build_dry_run_result, generate_confirm_token, verify_confirm_token
+from .safety import (
+    build_dry_run_result,
+    generate_confirm_token,
+    generate_confirm_token_with_reason,
+    validate_confirm_token,
+    verify_confirm_token,
+)
 from .validation import (
     require_reason,
     validate_enum,
@@ -15,6 +21,8 @@ __all__ = [
     "validate_limit",
     "require_reason",
     "generate_confirm_token",
+    "generate_confirm_token_with_reason",
+    "validate_confirm_token",
     "verify_confirm_token",
     "build_dry_run_result",
 ]
