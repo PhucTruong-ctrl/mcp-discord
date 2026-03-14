@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import os
+from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List
 
 
@@ -75,3 +76,50 @@ def validate_confirm_token(
     )
     if not hmac.compare_digest(expected, confirm_token):
         raise ValueError("Invalid confirm_token")
+
+
+@dataclass(frozen=True)
+class DryRunResult:
+    dryRun: bool
+    action: str
+    targetCount: int
+    targets: List[str]
+    confirmToken: str
+
+
+def build_confirm_token(action: str, targets: Iterable[str], secret: str) -> str:
+    canonical = ",".join(sorted(str(target) for target in targets))
+    payload = f"{action}|{canonical}".encode("utf-8")
+    return hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+
+
+def safety_check(
+    *,
+    dry_run: bool,
+    confirm_token: str | None,
+    action: str,
+    targets: Iterable[str],
+    require_confirm: bool,
+    secret: str | None,
+) -> DryRunResult | None:
+    normalized_targets = [str(target) for target in targets]
+    if not require_confirm:
+        return None
+    if not secret:
+        raise ValueError("DISCORD_MCP_CONFIRM_SECRET is not configured")
+
+    expected = build_confirm_token(action, normalized_targets, secret)
+    if dry_run:
+        return DryRunResult(
+            dryRun=True,
+            action=action,
+            targetCount=len(normalized_targets),
+            targets=normalized_targets,
+            confirmToken=expected,
+        )
+
+    if not confirm_token:
+        raise ValueError(f"confirm_token required for {action}")
+    if not hmac.compare_digest(confirm_token, expected):
+        raise ValueError(f"invalid confirm_token for {action}")
+    return None
