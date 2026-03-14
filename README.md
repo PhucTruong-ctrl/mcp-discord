@@ -10,7 +10,7 @@ A Model Context Protocol (MCP) server that provides Discord integration capabili
 The comprehensive expansion roadmap is documented as a phased rollout:
 
 - **Target scope**: 101 canonical tools (22 baseline + 79 expansion)
-- **Current branch registry snapshot**: 86 canonical tools
+- **Current branch registry snapshot**: 101 canonical tools
 - **Rollout model**: 10 implementation waves, with Wave 11 explicitly deferred for stateful extensions
 
 For full details, use:

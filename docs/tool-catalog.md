@@ -3,7 +3,7 @@
 ## Scope snapshot
 
 - Planned total: **101 canonical tools** (22 baseline + 79 expansion)
-- Current canonical registry in this branch: **86 tools**
+- Current canonical registry in this branch: **101 tools**
 - Runtime is Discord-native only (Discord API + bot token), no external runtime dependency
 
 ## Baseline 22 tools (legacy compatibility surface)
@@ -126,7 +126,22 @@
 84. `automod_get_ruleset`
 85. `automod_apply_ruleset`
 86. `automod_rollback_ruleset`
+87. `bulk_ban_members`
+88. `bulk_kick_members`
+89. `prune_inactive_members`
+90. `batch_move_voice_members`
+91. `clone_permissions_to_channels`
+92. `sync_category_permissions`
+93. `bulk_archive_threads`
+94. `bulk_pin_messages`
+95. `bulk_unpin_messages`
+96. `bulk_delete_messages_with_filter`
+97. `export_channel_transcript`
+98. `import_channel_template`
+99. `bulk_create_text_channels`
+100. `bulk_create_voice_channels`
+101. `bulk_assign_roles`
 
-## Gap to 101 target
+## 101-tool contract status
 
-The approved feature plan defines 101 canonical tools, but the current checked-in registry is 86 canonical tools. The missing 15 tools are scheduled by the plan roadmap and remain outside this task's documentation scope; this document records the implemented surface accurately and links rollout sequencing in `docs/waves/01-10-rollout.md`.
+The canonical registry target is restored in this branch: **101 canonical tools** (22 baseline + 79 expansion). The filler/utility tools (87-101) are now included in the catalog and are expected to remain covered by registry-count and router-coverage tests.
