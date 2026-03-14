@@ -99,7 +99,7 @@ class SafetyProtocolTests(unittest.TestCase):
             os.environ, {"DISCORD_MCP_CONFIRM_SECRET": "test-secret"}, clear=True
         ):
             with self.assertRaisesRegex(
-                ValueError, "confirm_token is required when require_confirm=true"
+                ValueError, "confirm_token is required for execute path"
             ):
                 verify_confirm_token(
                     "bulk_delete_messages", {"message_ids": ["1"]}, None
@@ -118,7 +118,7 @@ class SafetyProtocolTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(
                 ValueError,
-                "DISCORD_MCP_CONFIRM_SECRET environment variable is required when require_confirm=true",
+                "DISCORD_MCP_CONFIRM_SECRET environment variable is required for confirm-token validation",
             ):
                 generate_confirm_token("bulk_delete_messages", {"message_ids": ["1"]})
 

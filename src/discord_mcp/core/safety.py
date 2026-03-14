@@ -9,7 +9,7 @@ def _require_secret() -> str:
     secret = os.getenv("DISCORD_MCP_CONFIRM_SECRET")
     if not secret:
         raise ValueError(
-            "DISCORD_MCP_CONFIRM_SECRET environment variable is required when require_confirm=true"
+            "DISCORD_MCP_CONFIRM_SECRET environment variable is required for confirm-token validation"
         )
     return secret
 
@@ -44,7 +44,7 @@ def verify_confirm_token(
     action: str, targets: Dict[str, Any], confirm_token: str | None
 ):
     if not confirm_token:
-        raise ValueError("confirm_token is required when require_confirm=true")
+        raise ValueError("confirm_token is required for execute path")
     expected = generate_confirm_token(action, targets)
     if not hmac.compare_digest(confirm_token, expected):
         raise ValueError("Invalid confirm_token")

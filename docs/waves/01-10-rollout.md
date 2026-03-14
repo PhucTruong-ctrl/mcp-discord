@@ -118,6 +118,8 @@ Deferral keeps waves 1-10 focused on deterministic Discord API operations and av
 To preserve the 101-tool contract without introducing out-of-scope stateful orchestration/runtime dependencies, the implementation includes substitutions from the original plan naming for selected expansion slots:
 
 - Wave 3 equivalents: `moderation_timeout_member`, `moderation_kick_member`, `moderation_ban_member`, `moderation_bulk_delete`.
+- Wave 4 equivalents: `topology_channel_tree`, `topology_channel_children`, `topology_role_hierarchy`, `topology_permission_matrix`.
 - Wave 9 equivalents: `incident_apply_lockdown`, `incident_rollback_lockdown`.
+- Wave 10 equivalents: `automod_validate_ruleset`, `automod_get_ruleset`, `automod_apply_ruleset`, `automod_rollback_ruleset`.
 
-These substitutions are reflected in the canonical registry/tests/docs and keep the destructive safety model (`dry_run` + `confirm_token`) enforced on execute paths.
+Deferred plan slots for these waves were intentionally replaced by deterministic Discord-native operations to avoid introducing stateful orchestration/runtime persistence. These substitutions are reflected in the canonical registry/tests/docs and keep the destructive safety model (`dry_run` + `confirm_token`) enforced on execute paths.

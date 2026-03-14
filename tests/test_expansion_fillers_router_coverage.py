@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import unittest
 
 
@@ -67,6 +68,26 @@ class TestExpansionFillersRouterCoverage(unittest.IsolatedAsyncioTestCase):
             result = await dispatch_tool_call(name, arguments, {"gateway": object()})
             self.assertEqual(len(result), 1)
             self.assertEqual(result[0].type, "text")
+
+    async def test_dry_run_destructive_fillers_include_confirm_token(self):
+        cases = {
+            "bulk_ban_members": {
+                "server_id": "1",
+                "member_ids": ["2", "3"],
+                "dry_run": True,
+            },
+            "prune_inactive_members": {"server_id": "1", "days": 30, "dry_run": True},
+            "delete_category": {"category_id": "10", "dry_run": True},
+        }
+
+        for name, arguments in cases.items():
+            with self.subTest(tool=name):
+                result = await dispatch_tool_call(
+                    name, arguments, {"gateway": object()}
+                )
+                payload = json.loads(result[0].text)
+                self.assertEqual(payload["status"], "dry_run")
+                self.assertTrue(payload["confirmToken"])
 
 
 if __name__ == "__main__":
