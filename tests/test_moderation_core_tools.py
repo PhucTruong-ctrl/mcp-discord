@@ -136,6 +136,23 @@ class ModerationCoreToolsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(execute_payload["status"], "executed")
         self.assertEqual(gateway.deleted, [("10", ["1", "2"], None)])
 
+    async def test_bulk_delete_cannot_bypass_confirm_with_require_confirm_false(self):
+        moderation = importlib.import_module(
+            "discord_mcp.tools.handlers.moderation_core"
+        )
+        gateway = FakeGateway()
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await moderation.handle_moderation_bulk_delete(
+                {
+                    "channel_id": "10",
+                    "message_ids": ["1", "2"],
+                    "dry_run": False,
+                    "require_confirm": False,
+                },
+                {"gateway": gateway},
+            )
+
     async def test_missing_secret_raises_when_confirm_required(self):
         moderation = importlib.import_module(
             "discord_mcp.tools.handlers.moderation_core"

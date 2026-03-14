@@ -91,8 +91,7 @@ async def handle_add_roles_bulk(
             )
         ]
 
-    if bool(arguments.get("require_confirm", True)):
-        verify_confirm_token(action, targets, arguments.get("confirm_token"))
+    verify_confirm_token(action, targets, arguments.get("confirm_token"))
 
     applied = 0
     for user_id in arguments["user_ids"]:
@@ -144,8 +143,7 @@ async def handle_remove_roles_bulk(
             )
         ]
 
-    if bool(arguments.get("require_confirm", True)):
-        verify_confirm_token(action, targets, arguments.get("confirm_token"))
+    verify_confirm_token(action, targets, arguments.get("confirm_token"))
 
     applied = 0
     for user_id in arguments["user_ids"]:
