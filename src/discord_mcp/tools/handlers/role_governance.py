@@ -3,6 +3,8 @@ from typing import Any, Dict, List
 
 from mcp.types import TextContent
 
+from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
+
 
 def _resolve_role(guild: Any, role_id: str):
     role = guild.get_role(int(role_id))
@@ -63,10 +65,39 @@ async def handle_add_roles_bulk(
     guild = await gateway.fetch_guild(arguments["server_id"])
     roles = [_resolve_role(guild, role_id) for role_id in arguments["role_ids"]]
 
+    user_ids = [str(user_id) for user_id in arguments["user_ids"]]
+    role_ids = [str(role_id) for role_id in arguments["role_ids"]]
+    reason = arguments.get("reason")
+    action = "add_roles_bulk"
+    targets = {
+        "server_id": str(arguments["server_id"]),
+        "user_ids": sorted(user_ids),
+        "role_ids": sorted(role_ids),
+    }
+
+    if bool(arguments.get("dry_run", True)):
+        payload = build_dry_run_result(
+            action,
+            targets,
+            {
+                "target_count": len(user_ids),
+                "role_count": len(role_ids),
+                "reason": reason,
+            },
+        )
+        return [
+            TextContent(
+                type="text", text=json.dumps(payload, ensure_ascii=False, indent=2)
+            )
+        ]
+
+    if bool(arguments.get("require_confirm", True)):
+        verify_confirm_token(action, targets, arguments.get("confirm_token"))
+
     applied = 0
     for user_id in arguments["user_ids"]:
         member = await guild.fetch_member(int(user_id))
-        await member.add_roles(*roles, reason=arguments.get("reason"))
+        await member.add_roles(*roles, reason=reason)
         applied += 1
 
     payload = {
@@ -87,10 +118,39 @@ async def handle_remove_roles_bulk(
     guild = await gateway.fetch_guild(arguments["server_id"])
     roles = [_resolve_role(guild, role_id) for role_id in arguments["role_ids"]]
 
+    user_ids = [str(user_id) for user_id in arguments["user_ids"]]
+    role_ids = [str(role_id) for role_id in arguments["role_ids"]]
+    reason = arguments.get("reason")
+    action = "remove_roles_bulk"
+    targets = {
+        "server_id": str(arguments["server_id"]),
+        "user_ids": sorted(user_ids),
+        "role_ids": sorted(role_ids),
+    }
+
+    if bool(arguments.get("dry_run", True)):
+        payload = build_dry_run_result(
+            action,
+            targets,
+            {
+                "target_count": len(user_ids),
+                "role_count": len(role_ids),
+                "reason": reason,
+            },
+        )
+        return [
+            TextContent(
+                type="text", text=json.dumps(payload, ensure_ascii=False, indent=2)
+            )
+        ]
+
+    if bool(arguments.get("require_confirm", True)):
+        verify_confirm_token(action, targets, arguments.get("confirm_token"))
+
     applied = 0
     for user_id in arguments["user_ids"]:
         member = await guild.fetch_member(int(user_id))
-        await member.remove_roles(*roles, reason=arguments.get("reason"))
+        await member.remove_roles(*roles, reason=reason)
         applied += 1
 
     payload = {

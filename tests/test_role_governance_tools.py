@@ -159,15 +159,81 @@ class RoleGovernanceToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("deleted", deleted[0].text)
 
     async def test_bulk_add_and_remove_roles(self):
+        dry_run = await handle_add_roles_bulk(
+            {
+                "server_id": "1",
+                "user_ids": ["10"],
+                "role_ids": ["1"],
+                "reason": "bulk-add",
+                "dry_run": True,
+            },
+            self.deps,
+        )
+        dry_run_payload = json.loads(dry_run[0].text)
+        self.assertEqual(dry_run_payload["status"], "dry_run")
+        token = dry_run_payload["confirmToken"]
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_add_roles_bulk(
+                {
+                    "server_id": "1",
+                    "user_ids": ["10"],
+                    "role_ids": ["1"],
+                    "reason": "bulk-add",
+                    "dry_run": False,
+                },
+                self.deps,
+            )
+
         added = await handle_add_roles_bulk(
-            {"server_id": "1", "user_ids": ["10"], "role_ids": ["1"]},
+            {
+                "server_id": "1",
+                "user_ids": ["10"],
+                "role_ids": ["1"],
+                "reason": "bulk-add",
+                "dry_run": False,
+                "confirm_token": token,
+            },
             self.deps,
         )
         add_payload = json.loads(added[0].text)
         self.assertEqual(add_payload["appliedCount"], 1)
 
+        removed_dry_run = await handle_remove_roles_bulk(
+            {
+                "server_id": "1",
+                "user_ids": ["11"],
+                "role_ids": ["1"],
+                "reason": "bulk-remove",
+                "dry_run": True,
+            },
+            self.deps,
+        )
+        removed_dry_run_payload = json.loads(removed_dry_run[0].text)
+        self.assertEqual(removed_dry_run_payload["status"], "dry_run")
+        remove_token = removed_dry_run_payload["confirmToken"]
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_remove_roles_bulk(
+                {
+                    "server_id": "1",
+                    "user_ids": ["11"],
+                    "role_ids": ["1"],
+                    "reason": "bulk-remove",
+                    "dry_run": False,
+                },
+                self.deps,
+            )
+
         removed = await handle_remove_roles_bulk(
-            {"server_id": "1", "user_ids": ["11"], "role_ids": ["1"]},
+            {
+                "server_id": "1",
+                "user_ids": ["11"],
+                "role_ids": ["1"],
+                "reason": "bulk-remove",
+                "dry_run": False,
+                "confirm_token": remove_token,
+            },
             self.deps,
         )
         remove_payload = json.loads(removed[0].text)
