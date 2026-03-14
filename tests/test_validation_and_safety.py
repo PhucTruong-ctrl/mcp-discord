@@ -4,14 +4,17 @@ import os
 import unittest
 from unittest.mock import patch
 
+import discord_mcp.core as core
 from discord_mcp.core import (
-    DryRunResult,
-    build_confirm_token,
     require_reason,
-    safety_check,
     validate_enum,
     validate_limit,
     validate_snowflake,
+)
+from discord_mcp.core.safety import (
+    build_dry_run_result,
+    generate_confirm_token,
+    verify_confirm_token,
 )
 
 
@@ -50,11 +53,15 @@ class ValidationHelpersTests(unittest.TestCase):
 
 
 class SafetyProtocolTests(unittest.TestCase):
-    def test_build_confirm_token_uses_sorted_targets_hmac_sha256(self):
-        token = build_confirm_token(
-            "bulk_delete_messages", ["3", "1", "2"], "test-secret"
-        )
-        expected_payload = "bulk_delete_messages|1,2,3".encode("utf-8")
+    def test_generate_confirm_token_uses_sorted_target_keys_hmac_sha256(self):
+        targets = {"message_ids": ["3", "1", "2"], "channel_id": "10"}
+        with patch.dict(
+            os.environ, {"DISCORD_MCP_CONFIRM_SECRET": "test-secret"}, clear=True
+        ):
+            token = generate_confirm_token("bulk_delete_messages", targets)
+        expected_payload = (
+            '{"action":"bulk_delete_messages","targets":{"channel_id":"10","message_ids":["3","1","2"]}}'
+        ).encode("utf-8")
         expected = hmac.new(
             b"test-secret",
             expected_payload,
@@ -62,88 +69,65 @@ class SafetyProtocolTests(unittest.TestCase):
         ).hexdigest()
         self.assertEqual(token, expected)
 
-    def test_safety_check_returns_dry_run_result_with_confirm_token(self):
-        result = safety_check(
-            dry_run=True,
-            confirm_token=None,
-            action="bulk_delete_messages",
-            targets=["2", "1"],
-            require_confirm=True,
-            secret="test-secret",
-        )
+    def test_build_dry_run_result_includes_confirm_token(self):
+        targets = {"channel_id": "10", "message_ids": ["2", "1"]}
+        details = {"reason": "cleanup"}
+        with patch.dict(
+            os.environ, {"DISCORD_MCP_CONFIRM_SECRET": "test-secret"}, clear=True
+        ):
+            result = build_dry_run_result("bulk_delete_messages", targets, details)
 
-        self.assertIsInstance(result, DryRunResult)
-        self.assertTrue(result.dryRun)
-        self.assertEqual(result.action, "bulk_delete_messages")
-        self.assertEqual(result.targetCount, 2)
-        self.assertEqual(result.targets, ["2", "1"])
+        self.assertEqual(result["status"], "dry_run")
+        self.assertEqual(result["action"], "bulk_delete_messages")
+        self.assertEqual(result["targets"], targets)
+        self.assertEqual(result["details"], details)
         self.assertEqual(
-            result.confirmToken,
-            build_confirm_token("bulk_delete_messages", ["2", "1"], "test-secret"),
+            result["confirmToken"],
+            generate_confirm_token("bulk_delete_messages", targets),
         )
 
-    def test_safety_check_returns_none_for_valid_execute_path(self):
-        token = build_confirm_token("bulk_delete_messages", ["x", "y"], "test-secret")
-        result = safety_check(
-            dry_run=False,
-            confirm_token=token,
-            action="bulk_delete_messages",
-            targets=["x", "y"],
-            require_confirm=True,
-            secret="test-secret",
-        )
-        self.assertIsNone(result)
-
-    def test_safety_check_rejects_missing_confirm_token_when_required(self):
-        with self.assertRaisesRegex(
-            ValueError, "confirm_token required for bulk_delete_messages"
+    def test_verify_confirm_token_accepts_valid_token(self):
+        targets = {"category_id": "123"}
+        with patch.dict(
+            os.environ, {"DISCORD_MCP_CONFIRM_SECRET": "test-secret"}, clear=True
         ):
-            safety_check(
-                dry_run=False,
-                confirm_token=None,
-                action="bulk_delete_messages",
-                targets=["1"],
-                require_confirm=True,
-                secret="test-secret",
-            )
+            token = generate_confirm_token("delete_category", targets)
+            verify_confirm_token("delete_category", targets, token)
 
-    def test_safety_check_rejects_invalid_confirm_token(self):
-        with self.assertRaisesRegex(
-            ValueError, "invalid confirm_token for bulk_delete_messages"
+    def test_verify_confirm_token_rejects_missing_confirm_token(self):
+        with patch.dict(
+            os.environ, {"DISCORD_MCP_CONFIRM_SECRET": "test-secret"}, clear=True
         ):
-            safety_check(
-                dry_run=False,
-                confirm_token="bad-token",
-                action="bulk_delete_messages",
-                targets=["1"],
-                require_confirm=True,
-                secret="test-secret",
-            )
-
-    def test_safety_check_requires_secret_when_confirmation_enabled(self):
-        with patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(
-                ValueError, "DISCORD_MCP_CONFIRM_SECRET is not configured"
+                ValueError, "confirm_token is required when require_confirm=true"
             ):
-                safety_check(
-                    dry_run=False,
-                    confirm_token="anything",
-                    action="bulk_delete_messages",
-                    targets=["1"],
-                    require_confirm=True,
-                    secret=None,
+                verify_confirm_token(
+                    "bulk_delete_messages", {"message_ids": ["1"]}, None
                 )
 
-    def test_safety_check_no_confirm_required(self):
-        result = safety_check(
-            dry_run=False,
-            confirm_token=None,
-            action="list_servers",
-            targets=["guild-1"],
-            require_confirm=False,
-            secret=None,
-        )
-        self.assertIsNone(result)
+    def test_verify_confirm_token_rejects_invalid_confirm_token(self):
+        with patch.dict(
+            os.environ, {"DISCORD_MCP_CONFIRM_SECRET": "test-secret"}, clear=True
+        ):
+            with self.assertRaisesRegex(ValueError, "Invalid confirm_token"):
+                verify_confirm_token(
+                    "bulk_delete_messages", {"message_ids": ["1"]}, "bad-token"
+                )
+
+    def test_generate_confirm_token_requires_secret(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(
+                ValueError,
+                "DISCORD_MCP_CONFIRM_SECRET environment variable is required when require_confirm=true",
+            ):
+                generate_confirm_token("bulk_delete_messages", {"message_ids": ["1"]})
+
+    def test_core_no_longer_exports_dead_safety_api_surface(self):
+        self.assertFalse(hasattr(core, "DryRunResult"))
+        self.assertFalse(hasattr(core, "build_confirm_token"))
+        self.assertFalse(hasattr(core, "safety_check"))
+        self.assertFalse(hasattr(core, "generate_confirm_token_with_reason"))
+        self.assertFalse(hasattr(core, "validate_confirm_token"))
 
 
 if __name__ == "__main__":

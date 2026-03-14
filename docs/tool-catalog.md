@@ -127,20 +127,20 @@
 85. `automod_apply_ruleset`
 86. `automod_rollback_ruleset`
 87. `bulk_ban_members`
-88. `bulk_kick_members`
-89. `prune_inactive_members`
-90. `batch_move_voice_members`
-91. `clone_permissions_to_channels`
-92. `sync_category_permissions`
-93. `bulk_archive_threads`
-94. `bulk_pin_messages`
-95. `bulk_unpin_messages`
-96. `bulk_delete_messages_with_filter`
-97. `export_channel_transcript`
-98. `import_channel_template`
-99. `bulk_create_text_channels`
-100. `bulk_create_voice_channels`
-101. `bulk_assign_roles`
+88. `prune_inactive_members`
+89. `remove_member_timeout`
+90. `unban_member`
+91. `create_category`
+92. `rename_category`
+93. `move_category`
+94. `delete_category`
+95. `create_incident_room`
+96. `append_incident_event`
+97. `close_incident`
+98. `list_auto_moderation_rules`
+99. `create_auto_moderation_rule`
+100. `update_auto_moderation_rule`
+101. `automod_export_rules`
 
 ## 101-tool contract status
 

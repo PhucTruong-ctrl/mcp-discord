@@ -110,5 +110,5 @@ Deferral keeps waves 1-10 focused on deterministic Discord API operations and av
 ## Current state snapshot
 
 - Canonical tools: `101`
-- Router keys (including aliases): `103`
+- Router keys (including aliases): `118`
 - Baseline first 22 canonical names: preserved and verified by tests.
