@@ -14,6 +14,16 @@ from .forums import (
     handle_search_threads,
     handle_unarchive_thread,
 )
+from .forum_intel import (
+    handle_get_thread_activity_summary,
+    handle_get_thread_context,
+    handle_list_forum_posts,
+    handle_list_thread_participants,
+    handle_read_forum_post_messages,
+    handle_read_forum_posts_batch,
+    handle_retag_forum_post,
+    handle_tag_forum_post,
+)
 from .inventory import (
     handle_diff_channel_permissions,
     handle_export_server_snapshot,
@@ -61,6 +71,14 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "add-thread-tags": handle_add_thread_tags,
     "unarchive_thread": handle_unarchive_thread,
     "unarchive-thread": handle_unarchive_thread,
+    "list_forum_posts": handle_list_forum_posts,
+    "read_forum_post_messages": handle_read_forum_post_messages,
+    "read_forum_posts_batch": handle_read_forum_posts_batch,
+    "get_thread_context": handle_get_thread_context,
+    "list_thread_participants": handle_list_thread_participants,
+    "get_thread_activity_summary": handle_get_thread_activity_summary,
+    "tag_forum_post": handle_tag_forum_post,
+    "retag_forum_post": handle_retag_forum_post,
     "download_attachment": handle_download_attachment,
     "download-attachment": handle_download_attachment,
     "get_user_info": handle_get_user_info,
