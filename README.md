@@ -5,42 +5,19 @@ A Model Context Protocol (MCP) server that provides Discord integration capabili
 
 <a href="https://glama.ai/mcp/servers/wvwjgcnppa"><img width="380" height="200" src="https://glama.ai/mcp/servers/wvwjgcnppa/badge" alt="mcp-discord MCP server" /></a>
 
-## Available Tools
+## Tool Catalog & Rollout Documentation
 
-### Server Information
-- `list_servers`: List available servers
-- `get_server_info`: Get detailed server information
-- `get_channels`: List channels in a server
-- `list_members`: List server members and their roles
-- `get_user_info`: Get detailed information about a user
+The comprehensive expansion roadmap is documented as a phased rollout:
 
-### Message Management
-- `send_message`: Send a message to a channel
-- `read_messages`: Read recent message history
-- `edit_message`: Edit a message sent by the bot
-- `add_reaction`: Add a reaction to a message
-- `add_multiple_reactions`: Add multiple reactions to a message
-- `remove_reaction`: Remove a reaction from a message
-- `moderate_message`: Delete messages and timeout users
+- **Target scope**: 101 canonical tools (22 baseline + 79 expansion)
+- **Current branch registry snapshot**: 86 canonical tools
+- **Rollout model**: 10 implementation waves, with Wave 11 explicitly deferred for stateful extensions
 
-### Forum & Thread Management
-- `read_forum_threads`: Read active forum threads and recent posts
-- `list_threads`: List forum threads without reading full history
-- `search_threads`: Search forum threads by title
-- `add_thread_tags`: Add tags to a forum thread
-- `unarchive_thread`: Unarchive a forum thread
+For full details, use:
 
-### Channel Management
-- `create_text_channel`: Create a new text channel
-- `delete_channel`: Delete an existing channel
-
-### Attachments & Users
-- `download_attachment`: Download a Discord attachment URL to local filesystem
-- `get_user_info`: Get detailed information about a user
-
-### Role Management
-- `add_role`: Add a role to a user
-- `remove_role`: Remove a role from a user
+- [`docs/tool-catalog.md`](docs/tool-catalog.md) — canonical catalog by domain, baseline vs expansion mapping
+- [`docs/waves/01-10-rollout.md`](docs/waves/01-10-rollout.md) — wave-by-wave map and Wave 11 deferral rationale
+- [`docs/safety/destructive-actions-policy.md`](docs/safety/destructive-actions-policy.md) — destructive-action guardrails and `confirm_token` policy
 
 ## Installation
 
