@@ -41,6 +41,16 @@ from .moderation_core import (
     handle_moderation_kick_member,
     handle_moderation_timeout_member,
 )
+from .messaging_workflow import (
+    handle_create_channel_webhook,
+    handle_crosspost_announcement,
+    handle_execute_channel_webhook,
+    handle_get_guild_vanity_url,
+    handle_list_channel_webhooks,
+    handle_list_guild_integrations,
+    handle_send_embed_message,
+    handle_send_rich_announcement,
+)
 from .misc import (
     handle_add_multiple_reactions,
     handle_add_reaction,
@@ -58,6 +68,16 @@ from .role_governance import (
     handle_remove_roles_bulk,
     handle_unmute_member_role_based,
     handle_update_role,
+)
+from .onboarding import (
+    handle_dynamic_role_provision,
+    handle_get_guild_onboarding,
+    handle_get_guild_welcome_screen,
+    handle_onboarding_friction_audit,
+    handle_progressive_access_unlock,
+    handle_update_guild_onboarding,
+    handle_update_guild_welcome_screen,
+    handle_verification_gate_orchestrator,
 )
 from .roles import handle_add_role, handle_remove_role
 from .audit_analytics import (
@@ -133,6 +153,22 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "add_reaction": handle_add_reaction,
     "add_multiple_reactions": handle_add_multiple_reactions,
     "remove_reaction": handle_remove_reaction,
+    "get_guild_welcome_screen": handle_get_guild_welcome_screen,
+    "update_guild_welcome_screen": handle_update_guild_welcome_screen,
+    "get_guild_onboarding": handle_get_guild_onboarding,
+    "update_guild_onboarding": handle_update_guild_onboarding,
+    "dynamic_role_provision": handle_dynamic_role_provision,
+    "verification_gate_orchestrator": handle_verification_gate_orchestrator,
+    "progressive_access_unlock": handle_progressive_access_unlock,
+    "onboarding_friction_audit": handle_onboarding_friction_audit,
+    "send_embed_message": handle_send_embed_message,
+    "send_rich_announcement": handle_send_rich_announcement,
+    "crosspost_announcement": handle_crosspost_announcement,
+    "create_channel_webhook": handle_create_channel_webhook,
+    "list_channel_webhooks": handle_list_channel_webhooks,
+    "execute_channel_webhook": handle_execute_channel_webhook,
+    "list_guild_integrations": handle_list_guild_integrations,
+    "get_guild_vanity_url": handle_get_guild_vanity_url,
     "list_servers": handle_list_servers,
     "get_channels_structured": handle_get_channels_structured,
     "get_channel_hierarchy": handle_get_channel_hierarchy,
