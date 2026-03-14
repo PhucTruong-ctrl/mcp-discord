@@ -23,7 +23,27 @@ from .misc import (
     handle_moderate_message,
     handle_remove_reaction,
 )
+from .role_governance import (
+    handle_add_roles_bulk,
+    handle_create_role,
+    handle_delete_role,
+    handle_mute_member_role_based,
+    handle_permission_drift_check,
+    handle_remove_roles_bulk,
+    handle_unmute_member_role_based,
+    handle_update_role,
+)
 from .roles import handle_add_role, handle_remove_role
+from .audit_analytics import (
+    handle_check_audit_reason_compliance,
+    handle_get_audit_actor_summary,
+    handle_get_audit_log,
+    handle_get_channel_activity_summary,
+    handle_get_incident_timeline,
+    handle_get_member_moderation_history,
+    handle_governance_evidence_packager,
+    handle_server_health_check,
+)
 from .server_info import (
     handle_get_server_info,
     handle_list_members,
@@ -66,6 +86,22 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "add_multiple_reactions": handle_add_multiple_reactions,
     "remove_reaction": handle_remove_reaction,
     "list_servers": handle_list_servers,
+    "create_role": handle_create_role,
+    "delete_role": handle_delete_role,
+    "update_role": handle_update_role,
+    "add_roles_bulk": handle_add_roles_bulk,
+    "remove_roles_bulk": handle_remove_roles_bulk,
+    "mute_member_role_based": handle_mute_member_role_based,
+    "unmute_member_role_based": handle_unmute_member_role_based,
+    "permission_drift_check": handle_permission_drift_check,
+    "get_audit_log": handle_get_audit_log,
+    "get_member_moderation_history": handle_get_member_moderation_history,
+    "get_channel_activity_summary": handle_get_channel_activity_summary,
+    "get_incident_timeline": handle_get_incident_timeline,
+    "get_audit_actor_summary": handle_get_audit_actor_summary,
+    "check_audit_reason_compliance": handle_check_audit_reason_compliance,
+    "server_health_check": handle_server_health_check,
+    "governance_evidence_packager": handle_governance_evidence_packager,
 }
 
 
