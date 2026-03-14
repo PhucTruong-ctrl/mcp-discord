@@ -1,5 +1,5 @@
 from .resolve import normalize_name, try_int
-from .safety import DryRunResult, build_confirm_token, safety_check
+from .safety import build_dry_run_result, generate_confirm_token, verify_confirm_token
 from .validation import (
     require_reason,
     validate_enum,
@@ -14,7 +14,7 @@ __all__ = [
     "validate_enum",
     "validate_limit",
     "require_reason",
-    "DryRunResult",
-    "build_confirm_token",
-    "safety_check",
+    "generate_confirm_token",
+    "verify_confirm_token",
+    "build_dry_run_result",
 ]

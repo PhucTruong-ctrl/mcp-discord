@@ -1,58 +1,50 @@
-from __future__ import annotations
-
 import hashlib
 import hmac
+import json
 import os
-from dataclasses import asdict, dataclass
+from typing import Any, Dict
 
 
-@dataclass
-class DryRunResult:
-    dryRun: bool
-    action: str
-    targetCount: int
-    targets: list[str]
-    wouldChange: list[str]
-    confirmToken: str
-
-    def to_dict(self) -> dict[str, object]:
-        return asdict(self)
-
-
-def build_confirm_token(action: str, targets: list[str], secret: str) -> str:
-    payload = f"{action}|{','.join(sorted(targets))}".encode("utf-8")
-    return hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
-
-
-def safety_check(
-    dry_run: bool,
-    confirm_token: str | None,
-    action: str,
-    targets: list[str],
-    require_confirm: bool,
-    secret: str | None,
-) -> DryRunResult | None:
-    if not require_confirm:
-        return None
-
-    resolved_secret = secret or os.getenv("DISCORD_MCP_CONFIRM_SECRET")
-    if not resolved_secret:
-        raise ValueError("DISCORD_MCP_CONFIRM_SECRET is not configured")
-
-    expected = build_confirm_token(action, targets, resolved_secret)
-
-    if dry_run:
-        return DryRunResult(
-            dryRun=True,
-            action=action,
-            targetCount=len(targets),
-            targets=targets,
-            wouldChange=targets,
-            confirmToken=expected,
+def _require_secret() -> str:
+    secret = os.getenv("DISCORD_MCP_CONFIRM_SECRET")
+    if not secret:
+        raise ValueError(
+            "DISCORD_MCP_CONFIRM_SECRET environment variable is required when require_confirm=true"
         )
+    return secret
 
+
+def _token_payload(action: str, targets: Dict[str, Any]) -> str:
+    return json.dumps(
+        {"action": action, "targets": targets},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def generate_confirm_token(action: str, targets: Dict[str, Any]) -> str:
+    secret = _require_secret()
+    payload = _token_payload(action, targets).encode("utf-8")
+    digest = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+    return digest
+
+
+def build_dry_run_result(action: str, targets: Dict[str, Any], details: Dict[str, Any]):
+    return {
+        "status": "dry_run",
+        "action": action,
+        "targets": targets,
+        "details": details,
+        "confirmToken": generate_confirm_token(action, targets),
+    }
+
+
+def verify_confirm_token(
+    action: str, targets: Dict[str, Any], confirm_token: str | None
+):
     if not confirm_token:
-        raise ValueError(f"confirm_token required for {action}")
+        raise ValueError("confirm_token is required when require_confirm=true")
+    expected = generate_confirm_token(action, targets)
     if not hmac.compare_digest(confirm_token, expected):
-        raise ValueError(f"invalid confirm_token for {action}")
-    return None
+        raise ValueError("Invalid confirm_token")
