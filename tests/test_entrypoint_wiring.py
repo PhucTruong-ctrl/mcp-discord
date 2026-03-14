@@ -3,6 +3,8 @@ from unittest.mock import AsyncMock, patch
 
 import discord_mcp
 from discord_mcp import server
+from discord_mcp.tools.handlers.router import TOOL_ROUTER
+from discord_mcp.tools.schemas import compose_tool_registry
 
 
 class EntrypointWiringTests(unittest.IsolatedAsyncioTestCase):
@@ -49,6 +51,36 @@ class PackageEntrypointTests(unittest.TestCase):
         self.assertTrue(hasattr(arg, "__await__"))
         arg.close()
         server_main.assert_called_once_with()
+
+    def test_registry_and_alias_gate_snapshots(self):
+        tools = compose_tool_registry()
+        names = [tool.name for tool in tools]
+        self.assertEqual(len(names), 101)
+        self.assertEqual(len(set(names)), 101)
+
+        alias_matrix = {
+            "send_message": "send-message",
+            "read_messages": "read-messages",
+            "edit_message": "edit-message",
+            "read_forum_threads": "read-forum-threads",
+            "list_threads": "list-threads",
+            "search_threads": "search-threads",
+            "add_thread_tags": "add-thread-tags",
+            "unarchive_thread": "unarchive-thread",
+            "download_attachment": "download-attachment",
+            "incident_get_channel_state": "incident-get-channel-state",
+            "incident_set_channel_state": "incident-set-channel-state",
+            "incident_apply_lockdown": "incident-apply-lockdown",
+            "incident_rollback_lockdown": "incident-rollback-lockdown",
+            "automod_validate_ruleset": "automod-validate-ruleset",
+            "automod_get_ruleset": "automod-get-ruleset",
+            "automod_apply_ruleset": "automod-apply-ruleset",
+            "automod_rollback_ruleset": "automod-rollback-ruleset",
+        }
+        for canonical, alias in alias_matrix.items():
+            self.assertIn(canonical, TOOL_ROUTER)
+            self.assertIn(alias, TOOL_ROUTER)
+            self.assertIs(TOOL_ROUTER[canonical], TOOL_ROUTER[alias])
 
 
 if __name__ == "__main__":

@@ -30,6 +30,10 @@ from .forum_intel import (
     handle_retag_forum_post,
     handle_tag_forum_post,
 )
+from .expansion_fillers import (
+    handle_bulk_ban_members,
+    handle_prune_inactive_members,
+)
 from .inventory import (
     handle_diff_channel_permissions,
     handle_export_server_snapshot,
@@ -222,6 +226,8 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "automod-apply-ruleset": handle_automod_apply_ruleset,
     "automod_rollback_ruleset": handle_automod_rollback_ruleset,
     "automod-rollback-ruleset": handle_automod_rollback_ruleset,
+    "bulk_ban_members": handle_bulk_ban_members,
+    "prune_inactive_members": handle_prune_inactive_members,
 }
 
 
