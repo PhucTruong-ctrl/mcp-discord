@@ -99,7 +99,7 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
             },
             {},
         )
-        token = _payload(dry_run)["confirm_token"]
+        token = _payload(dry_run)["confirmToken"]
 
         with self.assertRaisesRegex(ValueError, "confirm_token is required"):
             await handle_automod_apply_ruleset(
@@ -133,7 +133,7 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
             },
             {},
         )
-        rollback_token = _payload(rollback_dry_run)["confirm_token"]
+        rollback_token = _payload(rollback_dry_run)["confirmToken"]
         rolled_back = await handle_automod_rollback_ruleset(
             {
                 "guild_id": "1",

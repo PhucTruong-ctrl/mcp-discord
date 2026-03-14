@@ -4,8 +4,8 @@ from typing import Any, Dict, List
 from mcp.types import TextContent
 
 from discord_mcp.core.safety import (
-    generate_confirm_token_with_reason,
-    validate_confirm_token,
+    build_dry_run_result,
+    verify_confirm_token,
 )
 
 
@@ -55,30 +55,19 @@ async def handle_incident_apply_lockdown(
     reason = _required_reason(arguments)
     channel_ids = [str(channel_id) for channel_id in arguments["channel_ids"]]
     dry_run = bool(arguments.get("dry_run", True))
+    action = "incident_apply_lockdown"
+    targets = {"channel_ids": sorted(channel_ids), "reason": reason}
 
     if dry_run:
-        token = generate_confirm_token_with_reason(
-            action="incident_apply_lockdown",
-            targets=channel_ids,
-            reason=reason,
+        payload = build_dry_run_result(
+            action,
+            targets,
+            {"reason": reason, "channel_ids": channel_ids},
         )
-        return _json(
-            {
-                "status": "dry_run",
-                "action": "incident_apply_lockdown",
-                "reason": reason,
-                "channel_ids": channel_ids,
-                "confirm_token": token,
-            }
-        )
+        return _json(payload)
 
     confirm_token = _required_confirm_token(arguments)
-    validate_confirm_token(
-        action="incident_apply_lockdown",
-        targets=channel_ids,
-        reason=reason,
-        confirm_token=confirm_token,
-    )
+    verify_confirm_token(action, targets, confirm_token)
     return _json(
         {
             "status": "applied",
@@ -94,30 +83,19 @@ async def handle_incident_rollback_lockdown(
     reason = _required_reason(arguments)
     channel_ids = [str(channel_id) for channel_id in arguments["channel_ids"]]
     dry_run = bool(arguments.get("dry_run", True))
+    action = "incident_rollback_lockdown"
+    targets = {"channel_ids": sorted(channel_ids), "reason": reason}
 
     if dry_run:
-        token = generate_confirm_token_with_reason(
-            action="incident_rollback_lockdown",
-            targets=channel_ids,
-            reason=reason,
+        payload = build_dry_run_result(
+            action,
+            targets,
+            {"reason": reason, "channel_ids": channel_ids},
         )
-        return _json(
-            {
-                "status": "dry_run",
-                "action": "incident_rollback_lockdown",
-                "reason": reason,
-                "channel_ids": channel_ids,
-                "confirm_token": token,
-            }
-        )
+        return _json(payload)
 
     confirm_token = _required_confirm_token(arguments)
-    validate_confirm_token(
-        action="incident_rollback_lockdown",
-        targets=channel_ids,
-        reason=reason,
-        confirm_token=confirm_token,
-    )
+    verify_confirm_token(action, targets, confirm_token)
     return _json(
         {
             "status": "rolled_back",

@@ -82,7 +82,7 @@ class IncidentOpsToolTests(unittest.IsolatedAsyncioTestCase):
         )
         payload = _payload(result)
         self.assertEqual(payload["status"], "dry_run")
-        self.assertTrue(payload["confirm_token"])
+        self.assertTrue(payload["confirmToken"])
 
     async def test_lockdown_execute_requires_valid_confirm_token(self):
         dry_run = await handle_incident_apply_lockdown(
@@ -93,7 +93,7 @@ class IncidentOpsToolTests(unittest.IsolatedAsyncioTestCase):
             },
             {},
         )
-        token = _payload(dry_run)["confirm_token"]
+        token = _payload(dry_run)["confirmToken"]
 
         with self.assertRaisesRegex(ValueError, "confirm_token is required"):
             await handle_incident_apply_lockdown(
