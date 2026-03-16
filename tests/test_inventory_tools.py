@@ -77,7 +77,7 @@ class InventoryHandlerTests(unittest.IsolatedAsyncioTestCase):
             )
         ]
         guild = SimpleNamespace(id=1, name="Guild", channels=channels)
-        gateway = SimpleNamespace(fetch_guild=self._async_value(guild))
+        gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
 
         result = await handle_get_channels_structured(
             {"server_id": "1"}, {"gateway": gateway}
@@ -94,7 +94,7 @@ class InventoryHandlerTests(unittest.IsolatedAsyncioTestCase):
             id=11, name="alerts", type="text", position=1, category_id=10
         )
         guild = SimpleNamespace(id=1, channels=[category, child])
-        gateway = SimpleNamespace(fetch_guild=self._async_value(guild))
+        gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
 
         result = await handle_get_channel_hierarchy(
             {"server_id": "1"}, {"gateway": gateway}
@@ -108,7 +108,7 @@ class InventoryHandlerTests(unittest.IsolatedAsyncioTestCase):
             SimpleNamespace(id=2, name="Admin", position=5, managed=False),
         ]
         guild = SimpleNamespace(id=1, roles=roles)
-        gateway = SimpleNamespace(fetch_guild=self._async_value(guild))
+        gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
 
         result = await handle_get_role_hierarchy(
             {"server_id": "1"}, {"gateway": gateway}
@@ -168,7 +168,7 @@ class InventoryHandlerTests(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(type="voice"),
             ],
         )
-        gateway = SimpleNamespace(fetch_guild=self._async_value(guild))
+        gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
         result = await handle_get_channel_type_counts(
             {"server_id": "1"}, {"gateway": gateway}
         )
@@ -196,7 +196,7 @@ class InventoryHandlerTests(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(id=11, name="active", history=history_new),
             ],
         )
-        gateway = SimpleNamespace(fetch_guild=self._async_value(guild))
+        gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
         result = await handle_list_inactive_channels(
             {"server_id": "1", "days": 30}, {"gateway": gateway}
         )

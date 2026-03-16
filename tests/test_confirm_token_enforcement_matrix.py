@@ -76,7 +76,7 @@ class _FakeGateway:
     async def ban_member(self, server_id, member_id, delete_message_days, reason):
         return None
 
-    async def fetch_guild(self, _server_id):
+    async def resolve_guild(self, _server_id):
         return _FakeGuild()
 
 

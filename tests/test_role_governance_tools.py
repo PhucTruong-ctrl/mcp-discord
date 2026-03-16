@@ -102,7 +102,7 @@ class FakeGateway:
     def __init__(self, guild):
         self.guild = guild
 
-    async def fetch_guild(self, _server_id):
+    async def resolve_guild(self, _server_id):
         return self.guild
 
 
