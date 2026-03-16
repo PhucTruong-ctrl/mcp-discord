@@ -30,7 +30,11 @@ MISC_TOOLS = [
         inputSchema={
             "type": "object",
             "properties": {
-                "user_id": {"type": "string", "description": "Discord user ID"}
+                "server_id": {
+                    "type": "string",
+                    "description": "Discord server (guild) ID",
+                },
+                "user_id": {"type": "string", "description": "Discord user ID"},
             },
             "required": ["user_id"],
         },
@@ -44,6 +48,10 @@ MISC_TOOLS = [
                 "channel_id": {
                     "type": "string",
                     "description": "Channel ID containing the message",
+                },
+                "server_id": {
+                    "type": "string",
+                    "description": "Discord server (guild) ID",
                 },
                 "message_id": {
                     "type": "string",
