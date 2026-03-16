@@ -24,6 +24,22 @@ class DiscordGateway:
     async def resolve_guild(self, server_id: Optional[str] = None):
         client = self.client
 
+        if self._default_guild_id:
+            default_id = try_int(self._default_guild_id)
+            if default_id is None:
+                raise ValueError(
+                    f"Configured default server '{self._default_guild_id}' is invalid"
+                )
+            guild = client.get_guild(default_id)
+            if guild is not None:
+                return guild
+            guild = await client.fetch_guild(default_id)
+            if guild is not None:
+                return guild
+            raise ValueError(
+                f"Configured default server '{self._default_guild_id}' is not accessible"
+            )
+
         if server_id:
             guild_id = try_int(server_id)
             if guild_id is not None:
@@ -49,16 +65,6 @@ class DiscordGateway:
 
             available = ", ".join(f"{g.name} ({g.id})" for g in client.guilds)
             raise ValueError(f"Server '{server_id}' not found. Available: {available}")
-
-        if self._default_guild_id:
-            default_id = try_int(self._default_guild_id)
-            if default_id is not None:
-                guild = client.get_guild(default_id)
-                if guild is not None:
-                    return guild
-                guild = await client.fetch_guild(default_id)
-                if guild is not None:
-                    return guild
 
         if len(client.guilds) == 1:
             return client.guilds[0]

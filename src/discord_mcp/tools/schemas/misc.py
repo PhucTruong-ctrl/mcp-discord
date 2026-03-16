@@ -30,7 +30,11 @@ MISC_TOOLS = [
         inputSchema={
             "type": "object",
             "properties": {
-                "user_id": {"type": "string", "description": "Discord user ID"}
+                "server_id": {
+                    "type": "string",
+                    "description": "Discord server ID",
+                },
+                "user_id": {"type": "string", "description": "Discord user ID"},
             },
             "required": ["user_id"],
         },
@@ -52,6 +56,10 @@ MISC_TOOLS = [
                 "reason": {
                     "type": "string",
                     "description": "Reason for moderation",
+                },
+                "server_id": {
+                    "type": "string",
+                    "description": "Discord server ID",
                 },
                 "timeout_minutes": {
                     "type": "number",

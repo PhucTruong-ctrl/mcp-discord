@@ -162,6 +162,32 @@ class DiscordGatewayUnitTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "Channel '80' is not a thread"):
             await gateway.resolve_thread("80")
 
+    async def test_resolve_guild_prefers_configured_default_over_provided_server_id(
+        self,
+    ):
+        client = FakeClient()
+        default_guild = FakeGuild(1, "Default")
+        other_guild = FakeGuild(2, "Other")
+        client._guilds[default_guild.id] = default_guild
+        client._guilds[other_guild.id] = other_guild
+        client.guilds = [default_guild, other_guild]
+
+        gateway = DiscordGateway(lambda: client, default_guild_id="1")
+        resolved = await gateway.resolve_guild("2")
+
+        self.assertIs(resolved, default_guild)
+
+    async def test_resolve_guild_raises_clear_error_when_default_inaccessible(self):
+        client = FakeClient()
+        client.guilds = []
+
+        gateway = DiscordGateway(lambda: client, default_guild_id="999")
+        with self.assertRaisesRegex(
+            ValueError,
+            "Configured default server '999' is not accessible",
+        ):
+            await gateway.resolve_guild("1")
+
 
 if __name__ == "__main__":
     unittest.main()

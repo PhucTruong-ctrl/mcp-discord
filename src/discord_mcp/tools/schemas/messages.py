@@ -8,6 +8,10 @@ MESSAGE_TOOLS = [
         inputSchema={
             "type": "object",
             "properties": {
+                "server_id": {
+                    "type": "string",
+                    "description": "Discord server ID",
+                },
                 "channel_id": {
                     "type": "string",
                     "description": "Channel containing the message",
@@ -30,6 +34,10 @@ MESSAGE_TOOLS = [
         inputSchema={
             "type": "object",
             "properties": {
+                "server_id": {
+                    "type": "string",
+                    "description": "Discord server ID",
+                },
                 "channel_id": {
                     "type": "string",
                     "description": "Channel containing the message",
@@ -56,6 +64,10 @@ MESSAGE_TOOLS = [
         inputSchema={
             "type": "object",
             "properties": {
+                "server_id": {
+                    "type": "string",
+                    "description": "Discord server ID",
+                },
                 "channel_id": {
                     "type": "string",
                     "description": "Channel containing the message",
