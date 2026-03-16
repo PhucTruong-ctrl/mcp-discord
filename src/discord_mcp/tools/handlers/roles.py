@@ -7,7 +7,7 @@ async def handle_add_role(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     member = await guild.fetch_member(int(arguments["user_id"]))
     role = guild.get_role(int(arguments["role_id"]))
     await member.add_roles(role, reason="Role added via MCP")
@@ -20,7 +20,7 @@ async def handle_remove_role(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     member = await guild.fetch_member(int(arguments["user_id"]))
     role = guild.get_role(int(arguments["role_id"]))
     await member.remove_roles(role, reason="Role removed via MCP")

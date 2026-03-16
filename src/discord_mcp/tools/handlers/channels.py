@@ -7,7 +7,7 @@ async def handle_create_text_channel(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     category = None
     if "category_id" in arguments:
         category = guild.get_channel(int(arguments["category_id"]))
@@ -30,7 +30,7 @@ async def handle_get_channels(
 ) -> List[TextContent]:
     gateway = deps["gateway"]
     try:
-        guild = gateway.client.get_guild(int(arguments["server_id"]))
+        guild = await gateway.resolve_guild(arguments["server_id"])
         if guild:
             channel_list = [
                 f"#{channel.name} (ID: {channel.id}) - {channel.type}"

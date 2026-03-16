@@ -22,7 +22,7 @@ def _overwrites_map(channel: Any) -> Dict[str, Dict[str, int]]:
 async def handle_get_channels_structured(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    guild = await deps["gateway"].fetch_guild(arguments["server_id"])
+    guild = await deps["gateway"].resolve_guild(arguments["server_id"])
     payload = {
         "serverId": str(guild.id),
         "channels": [
@@ -47,7 +47,7 @@ async def handle_get_channels_structured(
 async def handle_get_channel_hierarchy(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    guild = await deps["gateway"].fetch_guild(arguments["server_id"])
+    guild = await deps["gateway"].resolve_guild(arguments["server_id"])
     categories = []
     top_level = []
 
@@ -87,7 +87,7 @@ async def handle_get_channel_hierarchy(
 async def handle_get_role_hierarchy(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    guild = await deps["gateway"].fetch_guild(arguments["server_id"])
+    guild = await deps["gateway"].resolve_guild(arguments["server_id"])
     roles = sorted(guild.roles, key=lambda role: role.position, reverse=True)
     payload = {
         "serverId": str(guild.id),
@@ -150,7 +150,7 @@ async def handle_diff_channel_permissions(
 async def handle_export_server_snapshot(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    guild = await deps["gateway"].fetch_guild(arguments["server_id"])
+    guild = await deps["gateway"].resolve_guild(arguments["server_id"])
     payload = {
         "server": {"id": str(guild.id), "name": guild.name},
         "channels": [
@@ -182,7 +182,7 @@ async def handle_export_server_snapshot(
 async def handle_get_channel_type_counts(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    guild = await deps["gateway"].fetch_guild(arguments["server_id"])
+    guild = await deps["gateway"].resolve_guild(arguments["server_id"])
     counts = Counter(str(channel.type) for channel in guild.channels)
     payload = {
         "serverId": str(guild.id),
@@ -195,7 +195,7 @@ async def handle_get_channel_type_counts(
 async def handle_list_inactive_channels(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    guild = await deps["gateway"].fetch_guild(arguments["server_id"])
+    guild = await deps["gateway"].resolve_guild(arguments["server_id"])
     days = int(arguments.get("days", 30))
     threshold = datetime.now(timezone.utc) - timedelta(days=days)
 

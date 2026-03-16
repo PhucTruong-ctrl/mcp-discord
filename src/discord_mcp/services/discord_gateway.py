@@ -169,6 +169,61 @@ class DiscordGateway:
     async def fetch_guild(self, guild_id: str):
         return await self.client.fetch_guild(int(guild_id))
 
+    async def resolve_member(self, user_id: str, server_id: Optional[str] = None):
+        """Resolve a member in a guild. Falls back to default guild if not specified."""
+        guild = await self.resolve_guild(server_id)
+        user_id_int = try_int(user_id)
+        if user_id_int is None:
+            raise ValueError(f"Invalid user ID: {user_id}")
+
+        try:
+            member = await guild.fetch_member(user_id_int)
+            return member
+        except discord.NotFound:
+            raise ValueError(f"User '{user_id}' not found in server '{guild.name}'")
+
+    async def resolve_role(self, role_id: str, server_id: Optional[str] = None):
+        """Resolve a role in a guild. Falls back to default guild if not specified."""
+        guild = await self.resolve_guild(server_id)
+        role_id_int = try_int(role_id)
+        if role_id_int is None:
+            raise ValueError(f"Invalid role ID: {role_id}")
+
+        role = guild.get_role(role_id_int)
+        if role is None:
+            raise ValueError(f"Role '{role_id}' not found in server '{guild.name}'")
+        return role
+
+    async def fetch_webhook(self, webhook_id: str, token: str):
+        """Fetch a webhook by ID and token."""
+        webhook_id_int = try_int(webhook_id)
+        if webhook_id_int is None:
+            raise ValueError(f"Invalid webhook ID: {webhook_id}")
+
+        try:
+            webhook = await self.client.fetch_webhook(webhook_id_int, token=token)
+            return webhook
+        except discord.NotFound:
+            raise ValueError(f"Webhook '{webhook_id}' not found")
+
+    async def fetch_audit_entries(
+        self, server_id: str, limit: int = 50, action_type: Optional[str] = None
+    ):
+        """Fetch audit log entries for a guild."""
+        guild = await self.resolve_guild(server_id)
+
+        action = None
+        if action_type:
+            try:
+                action = discord.AuditLogAction[action_type.upper()]
+            except KeyError:
+                raise ValueError(f"Invalid audit log action type: {action_type}")
+
+        entries = []
+        async for entry in guild.audit_logs(limit=limit, action=action):
+            entries.append(entry)
+        return entries
+
     async def collect_forum_threads(
         self,
         forum_channel: discord.ForumChannel,

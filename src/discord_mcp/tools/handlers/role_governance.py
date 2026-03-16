@@ -17,7 +17,7 @@ async def handle_create_role(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     role = await guild.create_role(
         name=arguments["name"],
         permissions=arguments.get("permissions"),
@@ -36,7 +36,7 @@ async def handle_delete_role(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     role = _resolve_role(guild, arguments["role_id"])
     await role.delete(reason=arguments.get("reason"))
     return [TextContent(type="text", text=f"Role '{role.name}' ({role.id}) deleted.")]
@@ -46,7 +46,7 @@ async def handle_update_role(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     role = _resolve_role(guild, arguments["role_id"])
 
     updates: Dict[str, Any] = {}
@@ -62,7 +62,7 @@ async def handle_add_roles_bulk(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     roles = [_resolve_role(guild, role_id) for role_id in arguments["role_ids"]]
 
     user_ids = [str(user_id) for user_id in arguments["user_ids"]]
@@ -114,7 +114,7 @@ async def handle_remove_roles_bulk(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     roles = [_resolve_role(guild, role_id) for role_id in arguments["role_ids"]]
 
     user_ids = [str(user_id) for user_id in arguments["user_ids"]]
@@ -166,7 +166,7 @@ async def handle_mute_member_role_based(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     member = await guild.fetch_member(int(arguments["user_id"]))
     mute_role = _resolve_role(guild, arguments["mute_role_id"])
     await member.add_roles(mute_role, reason=arguments.get("reason"))
@@ -182,7 +182,7 @@ async def handle_unmute_member_role_based(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     member = await guild.fetch_member(int(arguments["user_id"]))
     mute_role = _resolve_role(guild, arguments["mute_role_id"])
     await member.remove_roles(mute_role, reason=arguments.get("reason"))
@@ -198,7 +198,7 @@ async def handle_permission_drift_check(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     baseline_snapshot = arguments.get("baseline_snapshot") or {}
     baseline_roles = baseline_snapshot.get("roles") or []
 

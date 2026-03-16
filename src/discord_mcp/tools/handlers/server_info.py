@@ -7,7 +7,7 @@ async def handle_get_server_info(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     info = {
         "name": guild.name,
         "id": str(guild.id),
@@ -32,7 +32,7 @@ async def handle_get_channels(
 ) -> List[TextContent]:
     gateway = deps["gateway"]
     try:
-        guild = gateway.client.get_guild(int(arguments["server_id"]))
+        guild = await gateway.resolve_guild(arguments["server_id"])
         if guild:
             channel_list = [
                 f"#{channel.name} (ID: {channel.id}) - {channel.type}"
@@ -53,7 +53,7 @@ async def handle_list_members(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.fetch_guild(arguments["server_id"])
+    guild = await gateway.resolve_guild(arguments["server_id"])
     limit = min(int(arguments.get("limit", 100)), 1000)
 
     members = []
