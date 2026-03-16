@@ -48,7 +48,7 @@ async def handle_get_user_info(
 ) -> List[TextContent]:
     server_id = arguments.get("server_id")
     member = await deps["gateway"].resolve_member(arguments["user_id"], server_id)
-    user = member.user
+    user = member.user if hasattr(member, "user") else member
     user_info = {
         "id": str(user.id),
         "name": user.name,
