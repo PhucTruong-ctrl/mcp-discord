@@ -46,13 +46,9 @@ async def handle_download_attachment(
 async def handle_get_user_info(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    gateway = deps["gateway"]
-    user_id = str(arguments["user_id"])
     server_id = arguments.get("server_id")
-    if server_id:
-        user = await gateway.resolve_member(user_id, str(server_id))
-    else:
-        user = await deps["discord_client"].fetch_user(int(user_id))
+    member = await deps["gateway"].resolve_member(arguments["user_id"], server_id)
+    user = member.user
     user_info = {
         "id": str(user.id),
         "name": user.name,
@@ -75,9 +71,9 @@ async def handle_get_user_info(
 async def handle_moderate_message(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    gateway = deps["gateway"]
-    channel = await gateway.resolve_text_or_thread_channel(
-        str(arguments["channel_id"]), arguments.get("server_id")
+    server_id = arguments.get("server_id")
+    channel = await deps["gateway"].resolve_text_or_thread_channel(
+        arguments["channel_id"], server_id
     )
     message = await channel.fetch_message(int(arguments["message_id"]))
 
@@ -102,9 +98,9 @@ async def handle_moderate_message(
 async def handle_add_reaction(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    gateway = deps["gateway"]
-    channel = await gateway.resolve_text_or_thread_channel(
-        str(arguments["channel_id"]), arguments.get("server_id")
+    server_id = arguments.get("server_id")
+    channel = await deps["gateway"].resolve_text_or_thread_channel(
+        arguments["channel_id"], server_id
     )
     message = await channel.fetch_message(int(arguments["message_id"]))
     await message.add_reaction(arguments["emoji"])
@@ -116,9 +112,9 @@ async def handle_add_reaction(
 async def handle_add_multiple_reactions(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    gateway = deps["gateway"]
-    channel = await gateway.resolve_text_or_thread_channel(
-        str(arguments["channel_id"]), arguments.get("server_id")
+    server_id = arguments.get("server_id")
+    channel = await deps["gateway"].resolve_text_or_thread_channel(
+        arguments["channel_id"], server_id
     )
     message = await channel.fetch_message(int(arguments["message_id"]))
     for emoji in arguments["emojis"]:
@@ -134,9 +130,9 @@ async def handle_add_multiple_reactions(
 async def handle_remove_reaction(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    gateway = deps["gateway"]
-    channel = await gateway.resolve_text_or_thread_channel(
-        str(arguments["channel_id"]), arguments.get("server_id")
+    server_id = arguments.get("server_id")
+    channel = await deps["gateway"].resolve_text_or_thread_channel(
+        arguments["channel_id"], server_id
     )
     message = await channel.fetch_message(int(arguments["message_id"]))
     await message.remove_reaction(arguments["emoji"], deps["discord_client"].user)

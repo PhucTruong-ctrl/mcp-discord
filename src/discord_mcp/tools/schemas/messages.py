@@ -10,7 +10,7 @@ MESSAGE_TOOLS = [
             "properties": {
                 "server_id": {
                     "type": "string",
-                    "description": "Discord server ID",
+                    "description": "Discord server (guild) ID",
                 },
                 "channel_id": {
                     "type": "string",
@@ -36,7 +36,7 @@ MESSAGE_TOOLS = [
             "properties": {
                 "server_id": {
                     "type": "string",
-                    "description": "Discord server ID",
+                    "description": "Discord server (guild) ID",
                 },
                 "channel_id": {
                     "type": "string",
@@ -66,7 +66,7 @@ MESSAGE_TOOLS = [
             "properties": {
                 "server_id": {
                     "type": "string",
-                    "description": "Discord server ID",
+                    "description": "Discord server (guild) ID",
                 },
                 "channel_id": {
                     "type": "string",

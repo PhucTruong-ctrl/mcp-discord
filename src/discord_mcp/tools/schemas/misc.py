@@ -32,7 +32,7 @@ MISC_TOOLS = [
             "properties": {
                 "server_id": {
                     "type": "string",
-                    "description": "Discord server ID",
+                    "description": "Discord server (guild) ID",
                 },
                 "user_id": {"type": "string", "description": "Discord user ID"},
             },
@@ -49,6 +49,10 @@ MISC_TOOLS = [
                     "type": "string",
                     "description": "Channel ID containing the message",
                 },
+                "server_id": {
+                    "type": "string",
+                    "description": "Discord server (guild) ID",
+                },
                 "message_id": {
                     "type": "string",
                     "description": "ID of message to moderate",
@@ -56,10 +60,6 @@ MISC_TOOLS = [
                 "reason": {
                     "type": "string",
                     "description": "Reason for moderation",
-                },
-                "server_id": {
-                    "type": "string",
-                    "description": "Discord server ID",
                 },
                 "timeout_minutes": {
                     "type": "number",
