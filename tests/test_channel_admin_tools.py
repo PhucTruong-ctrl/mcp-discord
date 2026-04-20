@@ -1,8 +1,9 @@
+import importlib
 import json
 import os
 import sys
-import unittest
 import types
+import unittest
 from types import SimpleNamespace
 
 
@@ -11,10 +12,7 @@ SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-sys.modules.setdefault(
-    "discord",
-    types.ModuleType("discord"),
-)
+sys.modules.setdefault("discord", types.ModuleType("discord"))
 sys.modules["discord"].ForumChannel = type("ForumChannel", (), {})
 sys.modules["discord"].TextChannel = type("TextChannel", (), {})
 sys.modules["discord"].VoiceChannel = type("VoiceChannel", (), {})
@@ -102,18 +100,19 @@ sys.modules.setdefault("aiohttp", aiohttp)
 
 os.environ.setdefault("DISCORD_TOKEN", "test-token")
 
+router = importlib.import_module("discord_mcp.tools.handlers.router")
+schemas = importlib.import_module("discord_mcp.tools.schemas")
+
 from discord_mcp.tools.handlers.inventory import (
     handle_get_channel_hierarchy,
     handle_get_channels_structured,
     handle_get_permission_overwrites,
 )
-from discord_mcp.tools.handlers.router import TOOL_ROUTER
-from discord_mcp.tools.schemas import compose_tool_registry
 
 
 class ChannelAdminToolRegistryTests(unittest.TestCase):
     def test_channel_admin_tools_are_present_in_schema_registry(self):
-        names = [tool.name for tool in compose_tool_registry()]
+        names = [tool.name for tool in schemas.compose_tool_registry()]
 
         for name in [
             "create_voice_channel",
@@ -137,12 +136,12 @@ class ChannelAdminToolRegistryTests(unittest.TestCase):
             "update_forum_channel",
             "update-forum-channel",
         ]:
-            self.assertIn(tool_name, TOOL_ROUTER)
+            self.assertIn(tool_name, router.TOOL_ROUTER)
 
 
 class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
     async def test_update_text_channel_maps_each_field(self):
-        handler = TOOL_ROUTER["update_text_channel"]
+        handler = router.TOOL_ROUTER["update_text_channel"]
         guild = self._guild(
             channels=[
                 self._channel(10, "general", type="text", topic="old", nsfw=False),
@@ -163,9 +162,10 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result[0].type, "text")
         self.assertIn("announcements", result[0].text)
+        self.assertEqual(guild.channels[0].edit_calls[-1]["topic"], "new topic")
 
     async def test_update_voice_channel_maps_each_field(self):
-        handler = TOOL_ROUTER["update_voice_channel"]
+        handler = router.TOOL_ROUTER["update_voice_channel"]
         guild = self._guild(
             channels=[
                 self._channel(20, "voice", type="voice", bitrate=64000, user_limit=0),
@@ -187,9 +187,10 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result[0].type, "text")
         self.assertIn("ops voice", result[0].text)
+        self.assertEqual(guild.channels[0].edit_calls[-1]["bitrate"], 96000)
 
     async def test_update_forum_channel_maps_each_field(self):
-        handler = TOOL_ROUTER["update_forum_channel"]
+        handler = router.TOOL_ROUTER["update_forum_channel"]
         guild = self._guild(
             channels=[
                 self._channel(
@@ -212,9 +213,10 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result[0].type, "text")
         self.assertIn("knowledge-base", result[0].text)
+        self.assertEqual(guild.channels[0].edit_calls[-1]["topic"], "Forum topics")
 
     async def test_update_text_channel_rejects_wrong_channel_type(self):
-        handler = TOOL_ROUTER["update_text_channel"]
+        handler = router.TOOL_ROUTER["update_text_channel"]
         guild = self._guild(
             channels=[
                 self._channel(40, "voice", type="voice"),
@@ -229,7 +231,7 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_update_voice_channel_requires_identifier(self):
-        handler = TOOL_ROUTER["update_voice_channel"]
+        handler = router.TOOL_ROUTER["update_voice_channel"]
         guild = self._guild(channels=[])
         gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
 
@@ -237,7 +239,7 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
             await handler({"server_id": "1", "name": "voice"}, {"gateway": gateway})
 
     async def test_update_forum_channel_rejects_unknown_fields(self):
-        handler = TOOL_ROUTER["update_forum_channel"]
+        handler = router.TOOL_ROUTER["update_forum_channel"]
         guild = self._guild(
             channels=[
                 self._channel(50, "forum", type="forum", available_tags=[]),
@@ -257,7 +259,7 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_update_forum_channel_rejects_library_unsupported_fields(self):
-        handler = TOOL_ROUTER["update_forum_channel"]
+        handler = router.TOOL_ROUTER["update_forum_channel"]
         guild = self._guild(
             channels=[
                 self._channel(60, "forum", type="forum", available_tags=[]),
@@ -276,9 +278,48 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
                 {"gateway": gateway},
             )
 
+    async def test_create_voice_channel_uses_voice_creator(self):
+        handler = router.TOOL_ROUTER["create_voice_channel"]
+        guild = self._guild()
+
+        async def create_voice_channel(**kwargs):
+            payload = dict(kwargs)
+            payload.pop("name", None)
+            return self._channel(80, kwargs["name"], type="voice", **payload)
+
+        guild.create_voice_channel = create_voice_channel
+        gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
+
+        result = await handler(
+            {"server_id": "1", "name": "ops", "bitrate": 64000},
+            {"gateway": gateway},
+        )
+
+        self.assertIn("Created voice channel", result[0].text)
+
+    async def test_create_forum_channel_uses_forum_creator(self):
+        handler = router.TOOL_ROUTER["create_forum_channel"]
+        guild = self._guild()
+
+        async def create_forum_channel(**kwargs):
+            payload = dict(kwargs)
+            payload.pop("name", None)
+            return self._channel(81, kwargs["name"], type="forum", **payload)
+
+        guild.create_forum_channel = create_forum_channel
+        gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
+
+        result = await handler(
+            {"server_id": "1", "name": "support"},
+            {"gateway": gateway},
+        )
+
+        self.assertIn("Created forum channel", result[0].text)
+
     async def test_read_tools_expose_admin_workflow_fields(self):
         guild = self._guild(
             channels=[
+                self._channel(10, "General", type="category", position=0),
                 self._channel(
                     70,
                     "general",
@@ -290,7 +331,7 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
                     bitrate=96000,
                     user_limit=0,
                     available_tags=[{"name": "help"}],
-                )
+                ),
             ]
         )
         gateway = SimpleNamespace(
@@ -312,17 +353,30 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
         hierarchy_payload = json.loads(hierarchy[0].text)
         overwrites_payload = json.loads(overwrites[0].text)
 
-        self.assertIn("nsfw", structured_payload["channels"][0])
-        self.assertIn("bitrate", structured_payload["channels"][0])
-        self.assertIn("availableTags", structured_payload["channels"][0])
+        channel_payload = next(
+            item for item in structured_payload["channels"] if item["name"] == "general"
+        )
+        self.assertEqual(channel_payload["topic"], "hello")
         self.assertIn("children", hierarchy_payload["categories"][0])
         self.assertIn("overwrites", overwrites_payload)
 
     @staticmethod
     def _channel(channel_id, name, **attrs):
-        data = {"id": channel_id, "name": name}
+        data = {"id": channel_id, "name": name, "edit_calls": [], "overwrites": {}}
+
+        async def edit(**kwargs):
+            data["edit_calls"].append(kwargs)
+            for key, value in kwargs.items():
+                setattr(channel, key, value)
+
+        async def delete(**_kwargs):
+            data["deleted"] = True
+
+        data["edit"] = edit
+        data["delete"] = delete
         data.update(attrs)
-        return SimpleNamespace(**data)
+        channel = SimpleNamespace(**data)
+        return channel
 
     @staticmethod
     def _guild(**attrs):
@@ -336,3 +390,7 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
             return value
 
         return inner
+
+
+if __name__ == "__main__":
+    unittest.main()
