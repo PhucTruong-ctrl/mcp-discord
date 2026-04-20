@@ -6,6 +6,25 @@
 - Current canonical registry in this branch: **101 tools**
 - Runtime is Discord-native only (Discord API + bot token), no external runtime dependency
 
+## Channel CRUD/admin tools
+
+The channel admin surface is split by channel type and operation:
+
+- Create: `create_text_channel`, `create_voice_channel`, `create_forum_channel`
+- Update: `update_text_channel`, `update_voice_channel`, `update_forum_channel`
+- Delete: `delete_channel`
+
+Field contracts:
+
+- `create_text_channel`: `server_id`, `name`, optional `category_id`, optional `topic`
+- `update_text_channel`: `channel_id`, optional `name`, optional `category_id`, optional `topic`
+- `create_voice_channel`: `server_id`, `name`, optional `category_id`, optional `bitrate`, optional `user_limit`
+- `update_voice_channel`: `channel_id`, optional `name`, optional `category_id`, optional `bitrate`, optional `user_limit`
+- `create_forum_channel`: `server_id`, `name`, optional `category_id`, optional forum text field
+- `update_forum_channel`: `channel_id`, optional `name`, optional `category_id`, optional forum text field
+
+Forum channel text fields follow the handler fallback behavior: callers may provide the forum text value using the supported alias, and the implementation normalizes it before sending the update.
+
 ## Baseline 22 tools (legacy compatibility surface)
 
 1. `get_server_info`
