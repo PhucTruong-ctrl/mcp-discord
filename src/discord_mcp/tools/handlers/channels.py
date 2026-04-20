@@ -3,6 +3,10 @@ from typing import Any, Dict, List
 from mcp.types import TextContent
 
 
+def _channel_tool_pending(name: str) -> List[TextContent]:
+    raise NotImplementedError(f"{name} is not implemented")
+
+
 async def handle_create_text_channel(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
@@ -23,6 +27,36 @@ async def handle_create_text_channel(
             type="text", text=f"Created text channel #{channel.name} (ID: {channel.id})"
         )
     ]
+
+
+async def handle_create_voice_channel(
+    arguments: Dict[str, Any], deps: Dict[str, Any]
+) -> List[TextContent]:
+    return _channel_tool_pending("create_voice_channel")
+
+
+async def handle_create_forum_channel(
+    arguments: Dict[str, Any], deps: Dict[str, Any]
+) -> List[TextContent]:
+    return _channel_tool_pending("create_forum_channel")
+
+
+async def handle_update_text_channel(
+    arguments: Dict[str, Any], deps: Dict[str, Any]
+) -> List[TextContent]:
+    return _channel_tool_pending("update_text_channel")
+
+
+async def handle_update_voice_channel(
+    arguments: Dict[str, Any], deps: Dict[str, Any]
+) -> List[TextContent]:
+    return _channel_tool_pending("update_voice_channel")
+
+
+async def handle_update_forum_channel(
+    arguments: Dict[str, Any], deps: Dict[str, Any]
+) -> List[TextContent]:
+    return _channel_tool_pending("update_forum_channel")
 
 
 async def handle_get_channels(

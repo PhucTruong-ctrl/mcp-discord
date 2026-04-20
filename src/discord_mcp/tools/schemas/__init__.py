@@ -23,9 +23,8 @@ from .audit_analytics import AUDIT_ANALYTICS_TOOLS
 
 def compose_tool_registry() -> List[Tool]:
     return [
-        *SERVER_INFO_TOOLS[:3],
-        *ROLE_TOOLS,
         *CHANNEL_TOOLS,
+        *ROLE_TOOLS,
         *MESSAGE_TOOLS,
         *FORUM_TOOLS,
         *MISC_TOOLS,
