@@ -9,9 +9,14 @@ from .automod_policy import (
     handle_automod_validate_ruleset,
 )
 from .channels import (
+    handle_create_forum_channel,
+    handle_create_voice_channel,
     handle_create_text_channel,
     handle_delete_channel,
     handle_get_channels,
+    handle_update_forum_channel,
+    handle_update_text_channel,
+    handle_update_voice_channel,
 )
 from .forums import (
     handle_add_thread_tags,
@@ -175,9 +180,14 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "get_server_info": handle_get_server_info,
     "get_channels": handle_get_channels,
     "list_members": handle_list_members,
+    "create_voice_channel": handle_create_voice_channel,
+    "create_forum_channel": handle_create_forum_channel,
     "add_role": handle_add_role,
     "remove_role": handle_remove_role,
     "create_text_channel": handle_create_text_channel,
+    "update_text_channel": handle_update_text_channel,
+    "update_voice_channel": handle_update_voice_channel,
+    "update_forum_channel": handle_update_forum_channel,
     "delete_channel": handle_delete_channel,
     "add_reaction": handle_add_reaction,
     "add_multiple_reactions": handle_add_multiple_reactions,
