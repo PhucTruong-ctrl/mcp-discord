@@ -18,6 +18,7 @@ For full details, use:
 - [`docs/product/tool-catalog.md`](docs/product/tool-catalog.md) — canonical catalog by domain, baseline vs expansion mapping
 - [`docs/product/rollout/01-10-rollout.md`](docs/product/rollout/01-10-rollout.md) — wave-by-wave map and Wave 11 deferral rationale
 - [`docs/product/safety/destructive-actions-policy.md`](docs/product/safety/destructive-actions-policy.md) — destructive-action guardrails and `confirm_token` policy
+- [`docs/README.md`](docs/README.md) — consolidated docs index and navigation
 
 ## Channel CRUD/Admin Mapping
 
@@ -28,7 +29,8 @@ Channel CRUD/admin tools are exposed per channel type:
 - Update: `update_text_channel`, `update_voice_channel`, `update_forum_channel`
 - Delete: `delete_channel`
 
-See `docs/tool-catalog.md` for the field contracts. Forum channel text values accept the handler-supported fallback alias and are normalized before update.
+See `docs/product/tool-catalog.md` for field contracts.
+Note: `update_forum_channel` rejects `default_sort_order` with `field_not_supported_by_library` when unsupported by the runtime library.
 
 ## New Tools Added (79 expansion tools)
 
