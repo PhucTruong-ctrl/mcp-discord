@@ -19,6 +19,17 @@ For full details, use:
 - [`docs/waves/01-10-rollout.md`](docs/waves/01-10-rollout.md) — wave-by-wave map and Wave 11 deferral rationale
 - [`docs/safety/destructive-actions-policy.md`](docs/safety/destructive-actions-policy.md) — destructive-action guardrails and `confirm_token` policy
 
+## Channel CRUD/Admin Mapping
+
+Channel CRUD/admin tools are exposed per channel type:
+
+- Create: `create_text_channel`, `create_voice_channel`, `create_forum_channel`
+- Read: `get_channels`, `get_channels_structured`, `get_channel_hierarchy`, `get_channel_type_counts`
+- Update: `update_text_channel`, `update_voice_channel`, `update_forum_channel`
+- Delete: `delete_channel`
+
+See `docs/tool-catalog.md` for the field contracts. Forum channel text values accept the handler-supported fallback alias and are normalized before update.
+
 ## New Tools Added (79 expansion tools)
 
 The original baseline compatibility surface remains intact (22 tools). The expansion adds these 79 tools:
