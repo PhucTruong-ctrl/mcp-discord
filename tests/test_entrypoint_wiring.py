@@ -55,8 +55,17 @@ class PackageEntrypointTests(unittest.TestCase):
     def test_registry_and_alias_gate_snapshots(self):
         tools = compose_tool_registry()
         names = [tool.name for tool in tools]
-        self.assertEqual(len(names), 101)
-        self.assertEqual(len(set(names)), 101)
+        self.assertEqual(len(names), 106)
+        self.assertEqual(len(set(names)), 106)
+
+        for name in [
+            "create_voice_channel",
+            "create_forum_channel",
+            "update_text_channel",
+            "update_voice_channel",
+            "update_forum_channel",
+        ]:
+            self.assertIn(name, names)
 
         alias_matrix = {
             "send_message": "send-message",
@@ -76,6 +85,11 @@ class PackageEntrypointTests(unittest.TestCase):
             "automod_get_ruleset": "automod-get-ruleset",
             "automod_apply_ruleset": "automod-apply-ruleset",
             "automod_rollback_ruleset": "automod-rollback-ruleset",
+            "create_voice_channel": "create-voice-channel",
+            "create_forum_channel": "create-forum-channel",
+            "update_text_channel": "update-text-channel",
+            "update_voice_channel": "update-voice-channel",
+            "update_forum_channel": "update-forum-channel",
         }
         for canonical, alias in alias_matrix.items():
             self.assertIn(canonical, TOOL_ROUTER)
