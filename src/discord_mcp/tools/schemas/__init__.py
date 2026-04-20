@@ -3,7 +3,7 @@ from typing import List
 from mcp.types import Tool
 
 from .automod_policy import AUTOMOD_POLICY_TOOLS
-from .channels import CHANNEL_TOOLS
+from .channels import CHANNEL_ADMIN_TOOLS, CHANNEL_TOOLS
 from .forum_intel import FORUM_INTEL_TOOLS
 from .forums import FORUM_TOOLS
 from .expansion_fillers import EXPANSION_FILLER_TOOLS
@@ -23,12 +23,14 @@ from .audit_analytics import AUDIT_ANALYTICS_TOOLS
 
 def compose_tool_registry() -> List[Tool]:
     return [
-        *CHANNEL_TOOLS,
+        *SERVER_INFO_TOOLS[:3],
         *ROLE_TOOLS,
+        *CHANNEL_TOOLS,
         *MESSAGE_TOOLS,
         *FORUM_TOOLS,
         *MISC_TOOLS,
         SERVER_INFO_TOOLS[3],
+        *CHANNEL_ADMIN_TOOLS,
         *FORUM_INTEL_TOOLS,
         *INVENTORY_TOOLS,
         *MODERATION_CORE_TOOLS,

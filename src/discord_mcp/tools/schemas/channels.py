@@ -23,6 +23,25 @@ CHANNEL_TOOLS = [
         },
     ),
     Tool(
+        name="delete_channel",
+        description="Delete a channel",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "channel_id": {
+                    "type": "string",
+                    "description": "ID of channel to delete",
+                },
+                "reason": {"type": "string", "description": "Reason for deletion"},
+            },
+            "required": ["channel_id"],
+        },
+    ),
+]
+
+
+CHANNEL_ADMIN_TOOLS = [
+    Tool(
         name="create_voice_channel",
         description="Create a new voice channel",
         inputSchema={
@@ -80,10 +99,6 @@ CHANNEL_TOOLS = [
                     "type": "object",
                     "description": "Optional default reaction emoji",
                 },
-                "default_sort_order": {
-                    "type": "number",
-                    "description": "Optional default sort order",
-                },
                 "available_tags": {
                     "type": "array",
                     "items": {"type": "object"},
@@ -91,21 +106,6 @@ CHANNEL_TOOLS = [
                 },
             },
             "required": ["server_id", "name"],
-        },
-    ),
-    Tool(
-        name="delete_channel",
-        description="Delete a channel",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "channel_id": {
-                    "type": "string",
-                    "description": "ID of channel to delete",
-                },
-                "reason": {"type": "string", "description": "Reason for deletion"},
-            },
-            "required": ["channel_id"],
         },
     ),
     Tool(
@@ -212,10 +212,6 @@ CHANNEL_TOOLS = [
                 "default_reaction_emoji": {
                     "type": "object",
                     "description": "Optional default reaction emoji",
-                },
-                "default_sort_order": {
-                    "type": "number",
-                    "description": "Optional default sort order",
                 },
                 "available_tags": {
                     "type": "array",

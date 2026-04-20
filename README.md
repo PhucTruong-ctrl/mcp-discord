@@ -29,8 +29,8 @@ Channel CRUD/admin tools are exposed per channel type:
 - Update: `update_text_channel`, `update_voice_channel`, `update_forum_channel`
 - Delete: `delete_channel`
 
-See `docs/product/tool-catalog.md` for field contracts.
-Note: `update_forum_channel` rejects `default_sort_order` with `field_not_supported_by_library` when unsupported by the runtime library.
+See `docs/product/tool-catalog.md` for the field contracts.
+Note: `update_forum_channel` will reject `default_sort_order` with `field_not_supported_by_library` when that field is not supported by the runtime library.
 
 ## New Tools Added (79 expansion tools)
 

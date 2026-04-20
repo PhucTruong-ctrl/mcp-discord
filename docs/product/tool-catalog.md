@@ -17,13 +17,15 @@ The channel admin surface is split by channel type and operation:
 Field contracts:
 
 - `create_text_channel`: `server_id`, `name`, optional `category_id`, optional `topic`
-- `update_text_channel`: `channel_id`, optional `name`, optional `category_id`, optional `topic`
-- `create_voice_channel`: `server_id`, `name`, optional `category_id`, optional `bitrate`, optional `user_limit`
-- `update_voice_channel`: `channel_id`, optional `name`, optional `category_id`, optional `bitrate`, optional `user_limit`
-- `create_forum_channel`: `server_id`, `name`, optional `category_id`, optional forum text field
-- `update_forum_channel`: `channel_id`, optional `name`, optional `category_id`, optional forum text field
+- `update_text_channel`: `server_id`, `channel_id`, optional `name`, optional `category_id`, optional `topic`, optional `nsfw`, optional `slowmode_delay`, optional `position`, optional `reason`
+- `create_voice_channel`: `server_id`, `name`, optional `category_id`, optional `bitrate`, optional `user_limit`, optional `rtc_region`, optional `video_quality_mode`
+- `update_voice_channel`: `server_id`, `channel_id`, optional `name`, optional `category_id`, optional `bitrate`, optional `user_limit`, optional `rtc_region`, optional `video_quality_mode`, optional `position`, optional `reason`
+- `create_forum_channel`: `server_id`, `name`, optional `category_id`, optional `topic`, optional `nsfw`, optional `slowmode_delay`, optional `default_auto_archive_duration`, optional `default_reaction_emoji`, optional `default_sort_order`, optional `available_tags`
+- `update_forum_channel`: `server_id`, `channel_id`, optional `name`, optional `category_id`, optional `topic`, optional `nsfw`, optional `slowmode_delay`, optional `default_auto_archive_duration`, optional `default_reaction_emoji`, optional `available_tags`, optional `position`, optional `reason`
 
-Forum channel text fields follow the handler fallback behavior: callers may provide the forum text value using the supported alias, and the implementation normalizes it before sending the update.
+Notes:
+- `update_forum_channel` does **not** support `default_sort_order`; handler returns `field_not_supported_by_library` if provided.
+- Update tools reject unknown fields with `unsupported_fields: ...`.
 
 ## Baseline 22 tools (legacy compatibility surface)
 
