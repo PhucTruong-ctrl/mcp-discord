@@ -15,9 +15,9 @@ The comprehensive expansion roadmap is documented as a phased rollout:
 
 For full details, use:
 
-- [`docs/tool-catalog.md`](docs/tool-catalog.md) — canonical catalog by domain, baseline vs expansion mapping
-- [`docs/waves/01-10-rollout.md`](docs/waves/01-10-rollout.md) — wave-by-wave map and Wave 11 deferral rationale
-- [`docs/safety/destructive-actions-policy.md`](docs/safety/destructive-actions-policy.md) — destructive-action guardrails and `confirm_token` policy
+- [`docs/product/tool-catalog.md`](docs/product/tool-catalog.md) — canonical catalog by domain, baseline vs expansion mapping
+- [`docs/product/rollout/01-10-rollout.md`](docs/product/rollout/01-10-rollout.md) — wave-by-wave map and Wave 11 deferral rationale
+- [`docs/product/safety/destructive-actions-policy.md`](docs/product/safety/destructive-actions-policy.md) — destructive-action guardrails and `confirm_token` policy
 
 ## Channel CRUD/Admin Mapping
 
