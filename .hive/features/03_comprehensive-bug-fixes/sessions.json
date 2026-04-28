@@ -1,0 +1,15 @@
+{
+  "sessions": [
+    {
+      "sessionId": "ses_255e6a2ecffetKOtnWnXnTpYfA",
+      "startedAt": "2026-04-20T08:54:42.277Z",
+      "lastActiveAt": "2026-04-28T02:17:36.823Z",
+      "agent": "hive-master",
+      "sessionKind": "primary",
+      "baseAgent": "hive-master",
+      "directivePrompt": "continue",
+      "featureName": "comprehensive-bug-fixes",
+      "replayDirectivePending": false
+    }
+  ]
+}

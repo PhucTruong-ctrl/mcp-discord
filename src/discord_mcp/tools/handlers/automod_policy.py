@@ -32,8 +32,9 @@ def _validate_ruleset_shape(ruleset: Dict[str, Any]) -> None:
         raise ValueError("ruleset must be an object")
     if not str(ruleset.get("name", "")).strip():
         raise ValueError("ruleset.name is required")
-    rules = ruleset.get("rules")
-    if not isinstance(rules, list):
+    if "rules" not in ruleset or ruleset["rules"] is None:
+        ruleset["rules"] = []
+    elif not isinstance(ruleset["rules"], list):
         raise ValueError("ruleset.rules must be an array")
 
 

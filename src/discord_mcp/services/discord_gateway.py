@@ -146,6 +146,12 @@ class DiscordGateway:
             f"Text channel '{channel_identifier}' not found in '{guild.name}'. Available channels: {available}"
         )
 
+    async def resolve_forum_post(
+        self, post_id: str, server_id: Optional[str] = None
+    ) -> discord.Thread:
+        """Resolve a forum post (which is a Thread)."""
+        return await self.resolve_thread(post_id, server_id)
+
     async def resolve_thread(self, thread_id: str, server_id: Optional[str] = None):
         parsed_id = try_int(thread_id)
         if parsed_id is None:
@@ -218,15 +224,15 @@ class DiscordGateway:
         """Fetch audit log entries for a guild."""
         guild = await self.resolve_guild(server_id)
 
-        action = None
+        kwargs = {"limit": limit}
         if action_type:
             try:
-                action = discord.AuditLogAction[action_type.upper()]
+                kwargs["action"] = discord.AuditLogAction[action_type.upper()]
             except KeyError:
                 raise ValueError(f"Invalid audit log action type: {action_type}")
 
         entries = []
-        async for entry in guild.audit_logs(limit=limit, action=action):
+        async for entry in guild.audit_logs(**kwargs):
             entries.append(entry)
         return entries
 

@@ -2,6 +2,7 @@ import json
 from typing import Any, Dict, List
 
 from mcp.types import TextContent
+import discord
 
 from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 
@@ -18,14 +19,19 @@ async def handle_create_role(
 ) -> List[TextContent]:
     gateway = deps["gateway"]
     guild = await gateway.resolve_guild(arguments["server_id"])
-    role = await guild.create_role(
-        name=arguments["name"],
-        permissions=arguments.get("permissions"),
-        color=arguments.get("color"),
-        hoist=bool(arguments.get("hoist", False)),
-        mentionable=bool(arguments.get("mentionable", False)),
-        reason=arguments.get("reason"),
-    )
+    kwargs = {"name": arguments["name"]}
+    if arguments.get("permissions") is not None:
+        kwargs["permissions"] = discord.Permissions(int(arguments["permissions"]))
+    if arguments.get("color") is not None:
+        kwargs["colour"] = int(arguments["color"])
+    if "hoist" in arguments:
+        kwargs["hoist"] = bool(arguments["hoist"])
+    if "mentionable" in arguments:
+        kwargs["mentionable"] = bool(arguments["mentionable"])
+    if arguments.get("reason") is not None:
+        kwargs["reason"] = str(arguments["reason"])
+
+    role = await guild.create_role(**kwargs)
     payload = {"roleId": str(role.id), "roleName": role.name, "serverId": str(guild.id)}
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))
@@ -50,10 +56,19 @@ async def handle_update_role(
     role = _resolve_role(guild, arguments["role_id"])
 
     updates: Dict[str, Any] = {}
-    for key in ("name", "permissions", "color", "hoist", "mentionable"):
-        if key in arguments:
-            updates[key] = arguments[key]
-    updates["reason"] = arguments.get("reason")
+    if "name" in arguments and arguments["name"] is not None:
+        updates["name"] = str(arguments["name"])
+    if "permissions" in arguments and arguments["permissions"] is not None:
+        updates["permissions"] = discord.Permissions(int(arguments["permissions"]))
+    if "color" in arguments and arguments["color"] is not None:
+        updates["colour"] = int(arguments["color"])
+    if "hoist" in arguments and arguments["hoist"] is not None:
+        updates["hoist"] = bool(arguments["hoist"])
+    if "mentionable" in arguments and arguments["mentionable"] is not None:
+        updates["mentionable"] = bool(arguments["mentionable"])
+    if "reason" in arguments and arguments["reason"] is not None:
+        updates["reason"] = str(arguments["reason"])
+
     await role.edit(**updates)
     return [TextContent(type="text", text=f"Role '{role.id}' updated.")]
 
