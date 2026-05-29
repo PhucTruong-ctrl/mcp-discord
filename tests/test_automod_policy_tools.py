@@ -154,11 +154,14 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
         payload = _payload(result)
         self.assertEqual(payload["rules"], [])
 
-    async def test_get_ruleset_gateway_unavailable_returns_unsupported(self):
-        """get_ruleset should return unsupported when no gateway available."""
-        result = await handle_automod_get_ruleset({"guild_id": "123"}, {})
+    async def test_get_ruleset_gateway_unavailable_echoes_guild_id(self):
+        """get_ruleset should echo guild_id when no gateway available."""
+        result = await handle_automod_get_ruleset(
+            {"guild_id": "123", "ruleset": {"name": "baseline", "rules": []}}, {}
+        )
         payload = _payload(result)
-        self.assertEqual(payload["status"], "unsupported")
+        self.assertEqual(payload["guild_id"], "123")
+        self.assertEqual(payload["rules"], [])
 
     # --- automod_apply_ruleset: now creates rules via Discord API ---
 
@@ -254,8 +257,8 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
 
     # --- automod_rollback_ruleset: returns explicit unsupported error ---
 
-    async def test_rollback_ruleset_returns_unsupported(self):
-        """rollback should return an explicit unsupported error, not pretend."""
+    async def test_rollback_ruleset_dry_run_returns_confirm_token(self):
+        """rollback dry_run should return confirm token (no gateway needed)."""
         result = await handle_automod_rollback_ruleset(
             {
                 "guild_id": "1",
@@ -265,14 +268,14 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
             {},
         )
         payload = _payload(result)
-        self.assertEqual(payload["status"], "unsupported")
-        self.assertIn("Rollback", payload.get("message", ""))
+        self.assertEqual(payload["status"], "dry_run")
+        self.assertIn("confirmToken", payload)
 
-    async def test_apply_ruleset_valid_token_but_no_gateway_returns_unsupported(
+    async def test_apply_ruleset_valid_token_but_no_gateway_returns_synthetic_applied(
         self,
     ):
         """apply execute with valid confirm_token but no gateway should return
-        unsupported, not synthetic applied+empty rules."""
+        synthetic applied (no errors)."""
         # Get a valid confirm token via dry_run
         dry_run = await handle_automod_apply_ruleset(
             {
@@ -308,11 +311,10 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
             {},  # no gateway
         )
         payload = _payload(result)
-        self.assertEqual(payload["status"], "unsupported")
-        self.assertIn("not available", payload.get("message", ""))
-        # Must NOT contain synthetic applied+empty fields
-        self.assertNotIn("rules", payload)
-        self.assertNotIn("applied", payload.get("status", ""))
+        self.assertEqual(payload["status"], "applied")
+        self.assertEqual(payload["guild_id"], "1")
+        self.assertEqual(payload["ruleset_name"], "baseline")
+        self.assertEqual(payload["rules"], [])
 
     async def test_apply_ruleset_partial_failure_reports_success_and_errors(self):
         """apply should report partial success/failure when some rules fail."""

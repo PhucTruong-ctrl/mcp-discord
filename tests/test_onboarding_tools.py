@@ -17,6 +17,7 @@ from discord_mcp.tools.handlers.onboarding import (
     handle_dynamic_role_provision,
     handle_get_guild_onboarding,
     handle_get_guild_welcome_screen,
+    handle_onboarding_friction_audit,
     handle_progressive_access_unlock,
     handle_update_guild_onboarding,
     handle_update_guild_welcome_screen,
@@ -284,6 +285,27 @@ class OnboardingHandlerBehaviorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(payload["unlocked"], [{"type": "role", "id": "12"}])
         self.assertEqual(payload["remainingRequirements"], ["verified_email"])
+
+    async def test_onboarding_friction_audit_reports_metrics_and_context(self):
+        result = await handle_onboarding_friction_audit(
+            {
+                "server_id": "100",
+                "window_days": 14,
+                "stage_stats": [
+                    {"stage": "rules", "entered": 100, "completed": 80},
+                    {"stage": "verify", "entered": 80, "completed": 60},
+                ],
+            },
+            {},
+        )
+        payload = json.loads(result[0].text)
+
+        self.assertEqual(payload["serverId"], "100")
+        self.assertEqual(payload["windowDays"], 14)
+        self.assertEqual(payload["dropOffStages"][0]["dropRate"], 0.2)
+        self.assertEqual(payload["dropOffStages"][1]["dropRate"], 0.25)
+        self.assertEqual(payload["completionRate"], 0.7778)
+        self.assertEqual(len(payload["recommendations"]), 2)
 
 
 if __name__ == "__main__":

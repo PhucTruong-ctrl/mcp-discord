@@ -176,7 +176,7 @@ ONBOARDING_TOOLS = [
                     },
                 },
             },
-            "required": ["server_id", "window_days"],
+            "required": ["server_id", "window_days", "stage_stats"],
         },
     ),
 ]

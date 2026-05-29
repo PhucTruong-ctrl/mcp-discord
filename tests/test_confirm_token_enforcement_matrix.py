@@ -147,10 +147,15 @@ class TestConfirmTokenEnforcementMatrix(unittest.IsolatedAsyncioTestCase):
                     "dry_run": False,
                 },
             ),
-            # NOTE: automod_rollback_ruleset intentionally excluded — it no longer
-            # raises ValueError for missing confirm_token. The handler now returns
-            # {"status": "unsupported"} directly because rollback requires
-            # persistent state tracking which is not implemented.
+            (
+                handle_automod_rollback_ruleset,
+                {
+                    "guild_id": "100",
+                    "ruleset_name": "baseline",
+                    "reason": "rollback",
+                    "dry_run": False,
+                },
+            ),
             (
                 handle_bulk_ban_members,
                 {

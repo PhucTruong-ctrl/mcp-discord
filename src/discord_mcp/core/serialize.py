@@ -47,7 +47,6 @@ def _serialize_forum_tag(tag: Any) -> Dict[str, Any]:
     }
 
 
-<<<<<<< HEAD
 def _serialize_auto_moderation_rule(rule: Any) -> Dict[str, Any]:
     """Serialize an AutoModRule object to a JSON-safe dict."""
     actions = []

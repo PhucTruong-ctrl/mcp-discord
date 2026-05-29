@@ -92,10 +92,27 @@ AUTOMOD_POLICY_TOOLS = [
             "properties": {
                 "guild_id": {
                     "type": "string",
-                    "description": "Discord guild ID (informational only, not used)",
+                    "description": "Discord guild ID for capability-check/execute requests",
+                },
+                "ruleset_name": {
+                    "type": "string",
+                    "description": "Optional ruleset label for operator context",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Required audit reason",
+                },
+                "dry_run": {
+                    "type": "boolean",
+                    "description": "Return confirm token when true",
+                    "default": True,
+                },
+                "confirm_token": {
+                    "type": "string",
+                    "description": "Required for execute path when dry_run is false",
                 },
             },
-            "required": [],
+            "required": ["guild_id", "reason"],
         },
     ),
 ]

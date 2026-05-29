@@ -216,6 +216,8 @@ async def handle_progressive_access_unlock(
 async def handle_onboarding_friction_audit(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
+    server_id = arguments.get("server_id")
+    window_days = arguments.get("window_days")
     stage_stats = arguments.get("stage_stats") or []
     stages = []
     for stage in stage_stats:
@@ -235,6 +237,8 @@ async def handle_onboarding_friction_audit(
     total_completed = sum(stage["completed"] for stage in stages)
     completion_rate = 0.0 if total_entered <= 0 else total_completed / total_entered
     payload = {
+        "serverId": str(server_id) if server_id is not None else None,
+        "windowDays": int(window_days) if window_days is not None else None,
         "dropOffStages": stages,
         "completionRate": round(completion_rate, 4),
         "recommendations": [
