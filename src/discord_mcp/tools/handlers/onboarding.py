@@ -3,6 +3,8 @@ from typing import Any, Dict, List
 
 from mcp.types import TextContent
 
+from discord_mcp.core.serialize import _serialize_welcome_screen
+
 
 async def handle_get_guild_welcome_screen(
     arguments: Dict[str, Any], deps: Dict[str, Any]
@@ -10,10 +12,11 @@ async def handle_get_guild_welcome_screen(
     guild = await deps["gateway"].resolve_guild(
         arguments.get("server_id") or arguments.get("server")
     )
+    screen = await guild.welcome_screen()
     payload = {
         "serverId": str(guild.id),
         "serverName": guild.name,
-        "welcomeScreen": getattr(guild, "welcome_screen", None),
+        "welcomeScreen": _serialize_welcome_screen(screen) if screen else None,
     }
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))
@@ -23,11 +26,24 @@ async def handle_get_guild_welcome_screen(
 async def handle_update_guild_welcome_screen(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
+    guild = await deps["gateway"].resolve_guild(
+        arguments.get("server_id") or arguments.get("server")
+    )
+    screen = await guild.welcome_screen()
+    ws_args = arguments.get("welcome_screen", {})
+    edit_kwargs = {}
+    if "description" in ws_args:
+        edit_kwargs["description"] = ws_args["description"]
+    if "enabled" in ws_args:
+        edit_kwargs["enabled"] = ws_args["enabled"]
+    if arguments.get("reason"):
+        edit_kwargs["reason"] = arguments["reason"]
+    # edit() returns a new WelcomeScreen with the updated data
+    updated_screen = await screen.edit(**edit_kwargs)
     payload = {
-        "serverId": str(arguments.get("server_id") or arguments.get("server")),
-        "welcomeScreen": arguments["welcome_screen"],
-        "reason": arguments.get("reason"),
+        "serverId": str(guild.id),
         "updated": True,
+        "welcomeScreen": _serialize_welcome_screen(updated_screen or screen),
     }
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))
@@ -42,8 +58,12 @@ async def handle_get_guild_onboarding(
     )
     payload = {
         "serverId": str(guild.id),
-        "serverName": guild.name,
-        "onboarding": getattr(guild, "onboarding", None),
+        "status": "not_supported",
+        "message": (
+            "Guild onboarding is not supported by discord.py 2.4.0. "
+            "The Discord API may support this via HTTP requests, "
+            "but it is not exposed in the current library version."
+        ),
     }
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))
@@ -53,11 +73,17 @@ async def handle_get_guild_onboarding(
 async def handle_update_guild_onboarding(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
+    guild = await deps["gateway"].resolve_guild(
+        arguments.get("server_id") or arguments.get("server")
+    )
     payload = {
-        "serverId": str(arguments.get("server_id") or arguments.get("server")),
-        "onboarding": arguments["onboarding"],
-        "reason": arguments.get("reason"),
-        "updated": True,
+        "serverId": str(guild.id),
+        "status": "not_supported",
+        "message": (
+            "Guild onboarding update is not supported by discord.py 2.4.0. "
+            "The Discord API may support this via HTTP requests, "
+            "but it is not exposed in the current library version."
+        ),
     }
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))

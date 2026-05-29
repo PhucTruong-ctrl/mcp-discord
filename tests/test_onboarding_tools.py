@@ -4,8 +4,11 @@ from unittest.mock import AsyncMock
 
 from discord_mcp.tools.handlers.onboarding import (
     handle_dynamic_role_provision,
+    handle_get_guild_onboarding,
     handle_get_guild_welcome_screen,
     handle_progressive_access_unlock,
+    handle_update_guild_onboarding,
+    handle_update_guild_welcome_screen,
     handle_verification_gate_orchestrator,
 )
 from discord_mcp.tools.handlers.router import TOOL_ROUTER
@@ -32,17 +35,34 @@ class OnboardingSchemasAndRouterTests(unittest.TestCase):
 
 
 class OnboardingHandlerBehaviorTests(unittest.IsolatedAsyncioTestCase):
-    async def test_get_guild_welcome_screen_reads_guild_payload(self):
+    async def test_get_guild_welcome_screen_awaits_coroutine_and_serializes(self):
+        """Handler must await guild.welcome_screen() (a coroutine, not a property)
+        and serialize all fields including nested welcome channels."""
+        ws_channel = type(
+            "WelcomeChannel",
+            (),
+            {
+                "channel": type("Channel", (), {"id": 456})(),
+                "description": "Read the rules",
+                "emoji": "\U0001f4dc",
+            },
+        )()
+        welcome_screen = type(
+            "WelcomeScreen",
+            (),
+            {
+                "description": "Welcome!",
+                "welcome_channels": [ws_channel],
+                "enabled": True,
+            },
+        )()
         guild = type(
             "Guild",
             (),
             {
                 "name": "Demo",
                 "id": 123,
-                "welcome_screen": {
-                    "description": "Welcome!",
-                    "welcome_channels": ["rules"],
-                },
+                "welcome_screen": AsyncMock(return_value=welcome_screen),
             },
         )()
         gateway = type(
@@ -55,7 +75,130 @@ class OnboardingHandlerBehaviorTests(unittest.IsolatedAsyncioTestCase):
         payload = json.loads(result[0].text)
 
         self.assertEqual(payload["serverId"], "123")
-        self.assertEqual(payload["welcomeScreen"]["description"], "Welcome!")
+        self.assertEqual(payload["serverName"], "Demo")
+        ws = payload["welcomeScreen"]
+        self.assertEqual(ws["description"], "Welcome!")
+        self.assertTrue(ws["enabled"])
+        self.assertEqual(len(ws["welcomeChannels"]), 1)
+        self.assertEqual(ws["welcomeChannels"][0]["channelId"], "456")
+        self.assertEqual(ws["welcomeChannels"][0]["description"], "Read the rules")
+        self.assertEqual(ws["welcomeChannels"][0]["emoji"], "\U0001f4dc")
+        guild.welcome_screen.assert_awaited_once()
+
+    async def test_get_guild_welcome_screen_handles_null_welcome_screen(self):
+        """When guild.welcome_screen() returns None, the handler should still produce a response
+        with null welcomeScreen, not crash."""
+        guild = type(
+            "Guild",
+            (),
+            {
+                "name": "Demo",
+                "id": 123,
+                "welcome_screen": AsyncMock(return_value=None),
+            },
+        )()
+        gateway = type(
+            "Gateway", (), {"resolve_guild": AsyncMock(return_value=guild)}
+        )()
+
+        result = await handle_get_guild_welcome_screen(
+            {"server_id": "123"}, {"gateway": gateway}
+        )
+        payload = json.loads(result[0].text)
+
+        self.assertEqual(payload["serverId"], "123")
+        self.assertIsNone(payload["welcomeScreen"])
+
+    async def test_update_guild_welcome_screen_calls_edit_api(self):
+        """Update welcome screen must actually call welcome_screen.edit() with the
+        provided parameters instead of just returning {'updated': True}."""
+        updated_screen = type(
+            "WelcomeScreen",
+            (),
+            {
+                "description": "New desc",
+                "welcome_channels": [],
+                "enabled": True,
+            },
+        )()
+        edit_mock = AsyncMock(return_value=updated_screen)
+        welcome_screen = type(
+            "WelcomeScreen",
+            (),
+            {
+                "description": "Old desc",
+                "welcome_channels": [],
+                "enabled": True,
+                "edit": edit_mock,
+            },
+        )()
+        guild = type(
+            "Guild",
+            (),
+            {
+                "name": "Demo",
+                "id": 123,
+                "welcome_screen": AsyncMock(return_value=welcome_screen),
+            },
+        )()
+        gateway = type(
+            "Gateway", (), {"resolve_guild": AsyncMock(return_value=guild)}
+        )()
+
+        result = await handle_update_guild_welcome_screen(
+            {
+                "server_id": "123",
+                "welcome_screen": {"description": "New desc", "enabled": True},
+                "reason": "test update",
+            },
+            {"gateway": gateway},
+        )
+        payload = json.loads(result[0].text)
+
+        self.assertEqual(payload["serverId"], "123")
+        self.assertTrue(payload["updated"])
+        self.assertEqual(payload["welcomeScreen"]["description"], "New desc")
+        self.assertTrue(payload["welcomeScreen"]["enabled"])
+        edit_mock.assert_awaited_once()
+        _, kwargs = edit_mock.call_args
+        self.assertEqual(kwargs.get("description"), "New desc")
+        self.assertIs(kwargs.get("enabled"), True)
+        self.assertEqual(kwargs.get("reason"), "test update")
+
+    async def test_get_guild_onboarding_returns_capability_error(self):
+        """Guild.onboarding is not supported in discord.py 2.4.0.
+        Handler must return a structured 'not_supported' error instead of null."""
+        guild = type("Guild", (), {"name": "Demo", "id": 123})()
+        gateway = type(
+            "Gateway", (), {"resolve_guild": AsyncMock(return_value=guild)}
+        )()
+
+        result = await handle_get_guild_onboarding(
+            {"server_id": "123"}, {"gateway": gateway}
+        )
+        payload = json.loads(result[0].text)
+
+        self.assertEqual(payload["serverId"], "123")
+        self.assertEqual(payload["status"], "not_supported")
+        self.assertIn("not supported", payload["message"].lower())
+
+    async def test_update_guild_onboarding_returns_capability_error(self):
+        """Guild onboarding update is not supported in discord.py 2.4.0.
+        Handler must return a structured 'not_supported' error instead of {'updated': True}."""
+        guild = type("Guild", (), {"name": "Demo", "id": 123})()
+        gateway = type(
+            "Gateway", (), {"resolve_guild": AsyncMock(return_value=guild)}
+        )()
+
+        result = await handle_update_guild_onboarding(
+            {"server_id": "123", "onboarding": {"some": "data"}},
+            {"gateway": gateway},
+        )
+        payload = json.loads(result[0].text)
+
+        self.assertEqual(payload["serverId"], "123")
+        self.assertEqual(payload["status"], "not_supported")
+        self.assertIn("not supported", payload["message"].lower())
 
     async def test_dynamic_role_provision_returns_applied_and_skipped(self):
         member = type(

@@ -45,3 +45,24 @@ def _serialize_forum_tag(tag: Any) -> Dict[str, Any]:
         "emoji": emoji_name,
         "moderated": tag.moderated,
     }
+
+
+def _serialize_welcome_channel(wc: Any) -> Dict[str, Any]:
+    emoji = None
+    if wc.emoji:
+        emoji = getattr(wc.emoji, "name", str(wc.emoji))
+    return {
+        "channelId": str(wc.channel.id),
+        "description": wc.description,
+        "emoji": emoji,
+    }
+
+
+def _serialize_welcome_screen(screen: Any) -> Dict[str, Any]:
+    return {
+        "description": screen.description,
+        "welcomeChannels": [
+            _serialize_welcome_channel(wc) for wc in (screen.welcome_channels or [])
+        ],
+        "enabled": screen.enabled,
+    }
