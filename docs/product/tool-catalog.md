@@ -178,9 +178,11 @@ Notes:
 
 **All 15 expansion filler/utility tools (92–106) return synthetic/placeholder responses.** They validate input shapes and may use the `dry_run`/`confirm_token` safety pattern for destructive operations, but they do **not** make live Discord API calls. This preserves the full 106-tool registry contract while deeper Discord side-effect implementations continue in follow-up work.
 
-The following tool families are also gateway-independent (return structured responses without Discord API calls):
-- **Wave 9 — Incident operations (84–87):** Use `dry_run`/`confirm_token` for lockdown/rollback but no live Discord API calls.
-- **Wave 10 — AutoMod policy (88–91):** Validate ruleset shape and use `dry_run`/`confirm_token` for apply/rollback; no live Discord API calls.
+The following tool families have specific capability notes:
+
+- **Wave 7 — Onboarding & lifecycle (68–75):** Most tools require a live gateway. Two (`get_guild_onboarding`, `update_guild_onboarding`) are capability-gated and return `not_supported` due to discord.py 2.4.0 limitations. Three (`verification_gate_orchestrator`, `progressive_access_unlock`, `onboarding_friction_audit`) are gateway-independent local logic tools.
+- **Wave 9 — Incident operations (84–87):** Gateway-independent. Use `dry_run`/`confirm_token` for lockdown/rollback but no live Discord API calls.
+- **Wave 10 — AutoMod policy (88–91):** Mixed — `automod_validate_ruleset` is gateway-independent; `automod_get_ruleset` and `automod_apply_ruleset` use the live Discord API via gateway when available; `automod_rollback_ruleset` execute path returns `not_supported` (no Discord API primitive for rollback).
 - **Expansion fillers (92–106):** All 15 tools return synthetic `"applied"` or `"ok"` responses without Discord API calls.
 
 ## 106-tool contract status

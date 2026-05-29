@@ -94,16 +94,16 @@ The original baseline compatibility surface remains intact (22 tools). The expan
 39. `server_health_check`
 40. `governance_evidence_packager`
 
-### Wave 7 — Onboarding & lifecycle (8)
+### Wave 7 — Onboarding & lifecycle (8) — mixed capability
 
 41. `get_guild_welcome_screen` — reads live guild data via gateway
 42. `update_guild_welcome_screen` — gateway-dependent
-43. `get_guild_onboarding` — reads live guild data via gateway
-44. `update_guild_onboarding` — gateway-dependent
-45. `dynamic_role_provision` — gateway-dependent
-46. `verification_gate_orchestrator` — gateway-independent
-47. `progressive_access_unlock` — gateway-independent
-48. `onboarding_friction_audit` — gateway-independent
+43. `get_guild_onboarding` — capability-gated (returns `not_supported`; discord.py 2.4.0 limitation)
+44. `update_guild_onboarding` — capability-gated (returns `not_supported`; discord.py 2.4.0 limitation)
+45. `dynamic_role_provision` — gateway-dependent (live role assignment)
+46. `verification_gate_orchestrator` — gateway-independent (local logic only)
+47. `progressive_access_unlock` — gateway-independent (local logic only)
+48. `onboarding_friction_audit` — gateway-independent (local logic only)
 
 ### Wave 8 — Messaging, webhooks, integrations (8)
 
@@ -123,12 +123,12 @@ The original baseline compatibility surface remains intact (22 tools). The expan
 59. `incident_apply_lockdown`
 60. `incident_rollback_lockdown`
 
-### Wave 10 — AutoMod policy (4) — gateway-independent
+### Wave 10 — AutoMod policy (4) — mixed gateway support
 
-61. `automod_validate_ruleset`
-62. `automod_get_ruleset`
-63. `automod_apply_ruleset`
-64. `automod_rollback_ruleset`
+61. `automod_validate_ruleset` — gateway-independent (local shape validation only)
+62. `automod_get_ruleset` — queries live Discord API via gateway when available; returns empty rules otherwise
+63. `automod_apply_ruleset` — creates rules via gateway when available; dry_run/confirm_token gated
+64. `automod_rollback_ruleset` — dry-run (capability check) supported; execute path returns `not_supported`
 
 ### Post-wave expansion fillers/utilities (15)
 
@@ -150,9 +150,11 @@ The original baseline compatibility surface remains intact (22 tools). The expan
 
 > **Note**: All 15 expansion filler/utility tools return synthetic/placeholder responses. They validate input shapes but do not make live Discord API calls. See `tests/test_tool_runtime_contracts.py` for contract assertions.
 
-The following tool families are also **gateway-independent** (return structured responses without Discord API calls):
-- **Wave 9 — Incident operations (57–60):** Use `dry_run`/`confirm_token` for lockdown/rollback but no live Discord API calls.
-- **Wave 10 — AutoMod policy (61–64):** Validate ruleset shape and use `dry_run`/`confirm_token` for apply/rollback; no live Discord API calls.
+The following tool families have specific capability notes:
+
+- **Wave 7 — Onboarding & lifecycle (41–48):** Most tools require a live gateway. Two (`get_guild_onboarding`, `update_guild_onboarding`) are capability-gated and return `not_supported` due to discord.py 2.4.0 limitations. Three (`verification_gate_orchestrator`, `progressive_access_unlock`, `onboarding_friction_audit`) are gateway-independent local logic tools.
+- **Wave 9 — Incident operations (57–60):** Gateway-independent. Use `dry_run`/`confirm_token` for lockdown/rollback but no live Discord API calls.
+- **Wave 10 — AutoMod policy (61–64):** Mixed — `automod_validate_ruleset` is gateway-independent; `automod_get_ruleset` and `automod_apply_ruleset` use the live Discord API via gateway when available; `automod_rollback_ruleset` execute path returns `not_supported` (no Discord API primitive for rollback).
 
 ## Installation
 

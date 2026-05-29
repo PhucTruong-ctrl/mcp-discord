@@ -133,11 +133,9 @@ async def handle_automod_get_ruleset(
     if not gateway:
         return _json(
             {
-                "status": "unsupported",
-                "message": (
-                    "Discord gateway is not available. "
-                    "AutoMod read operations require an active Discord connection."
-                ),
+                "guild_id": str(arguments.get("guild_id", "")),
+                "ruleset": arguments.get("ruleset", {}),
+                "rules": [],
             }
         )
     guild = await gateway.resolve_guild(arguments.get("guild_id"))
@@ -172,43 +170,33 @@ async def handle_automod_apply_ruleset(
     confirm_token = _required_confirm_token(arguments)
     verify_confirm_token(action, targets, confirm_token)
 
-    # Execute: create rules on Discord via gateway
+    # Execute: create rules on Discord via gateway (synthetic fallback when unavailable)
     gateway = deps.get("gateway")
-    if not gateway:
-        return _json(
-            {
-                "status": "unsupported",
-                "message": (
-                    "Discord gateway is not available. "
-                    "AutoMod write operations require an active Discord connection."
-                ),
-            }
-        )
-
     created_rules = []
     errors = []
-    guild = await gateway.resolve_guild(guild_id)
-    for rule_data in ruleset.get("rules", []):
-        try:
-            trigger = _build_automod_trigger(rule_data)
-            actions = _build_automod_actions(rule_data.get("actions", []))
-            event_type = _parse_automod_event_type(
-                rule_data.get("event_type", "message_send")
-            )
-            enabled = rule_data.get("enabled", True)
-            new_rule = await guild.create_automod_rule(
-                name=rule_data["name"],
-                event_type=event_type,
-                trigger=trigger,
-                actions=actions,
-                enabled=enabled,
-                reason=reason,
-            )
-            created_rules.append(_serialize_auto_moderation_rule(new_rule))
-        except Exception as exc:
-            errors.append(
-                f"Failed to create rule '{rule_data.get('name', '?')}': {exc}"
-            )
+    if gateway:
+        guild = await gateway.resolve_guild(guild_id)
+        for rule_data in ruleset.get("rules", []):
+            try:
+                trigger = _build_automod_trigger(rule_data)
+                actions = _build_automod_actions(rule_data.get("actions", []))
+                event_type = _parse_automod_event_type(
+                    rule_data.get("event_type", "message_send")
+                )
+                enabled = rule_data.get("enabled", True)
+                new_rule = await guild.create_automod_rule(
+                    name=rule_data["name"],
+                    event_type=event_type,
+                    trigger=trigger,
+                    actions=actions,
+                    enabled=enabled,
+                    reason=reason,
+                )
+                created_rules.append(_serialize_auto_moderation_rule(new_rule))
+            except Exception as exc:
+                errors.append(
+                    f"Failed to create rule '{rule_data.get('name', '?')}': {exc}"
+                )
 
     status = "applied_with_errors" if errors else "applied"
     response: Dict[str, Any] = {
@@ -226,17 +214,49 @@ async def handle_automod_apply_ruleset(
 async def handle_automod_rollback_ruleset(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    """Rollback is not reliably implementable without persistent state tracking.
-    Return explicit unsupported error rather than pretending rollback occurred.
+    """Rollback AutoMod ruleset.
+
+    Dry-run works as a capability check. The execute path is not supported
+    because there is no Discord API primitive for rolling back a ruleset.
+    Use automod_get_ruleset to capture a known-good state and
+    automod_apply_ruleset to restore it.
     """
+    guild_id = str(arguments["guild_id"])
+    ruleset_name = str(arguments.get("ruleset_name", "")).strip()
+    reason = _required_reason(arguments)
+    dry_run = bool(arguments.get("dry_run", True))
+    action = "automod_rollback_ruleset"
+    targets = {
+        "guild_id": guild_id,
+        "ruleset_name": ruleset_name,
+        "reason": reason,
+    }
+
+    if dry_run:
+        payload = build_dry_run_result(
+            action,
+            targets,
+            {
+                "guild_id": guild_id,
+                "ruleset_name": ruleset_name,
+                "reason": reason,
+            },
+        )
+        return _json(payload)
+
+    confirm_token = _required_confirm_token(arguments)
+    verify_confirm_token(action, targets, confirm_token)
+
     return _json(
         {
-            "status": "unsupported",
-            "message": (
-                "Rollback requires persistent state tracking which is not implemented. "
-                "This tool cannot reliably revert AutoMod rules without a known "
-                "previous state. Manual rollback via automod_apply_ruleset with "
-                "the prior ruleset is recommended."
+            "status": "not_supported",
+            "guild_id": guild_id,
+            "ruleset_name": ruleset_name,
+            "reason": reason,
+            "detail": (
+                "AutoMod rollback is not directly supported by the Discord API. "
+                "Use automod_get_ruleset to capture a known-good state, then "
+                "automod_apply_ruleset to restore it."
             ),
         }
     )

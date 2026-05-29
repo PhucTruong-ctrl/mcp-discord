@@ -431,9 +431,12 @@ class IncidentOpsContractTests(unittest.IsolatedAsyncioTestCase):
 
 
 class AutomodPolicyContractTests(unittest.IsolatedAsyncioTestCase):
-    """Contract: AutoMod policy tools validate ruleset shape and use
-    dry_run/confirm_token for apply/rollback, but do NOT make Discord
-    API calls (gateway-independent).
+    """Contract: AutoMod policy tools.
+
+    - validate_ruleset: gateway-independent (local shape validation only)
+    - get_ruleset: uses gateway when available; returns empty rules without it
+    - apply_ruleset: uses gateway when available; dry_run/confirm_token gated
+    - rollback_ruleset: dry-run supported; execute path returns not_supported
     """
 
     async def test_validate_ruleset_rejects_missing_name(self):
@@ -447,13 +450,13 @@ class AutomodPolicyContractTests(unittest.IsolatedAsyncioTestCase):
         payload = _payload(result)
         self.assertEqual(payload["status"], "valid")
 
-    async def test_get_ruleset_echoes_ruleset(self):
+    async def test_get_ruleset_returns_empty_rules_without_gateway(self):
         result = await handle_automod_get_ruleset(
-            {"guild_id": "123", "ruleset": {"name": "baseline", "rules": []}}, {}
+            {"guild_id": "123", "ruleset_name": "baseline"}, {}
         )
         payload = _payload(result)
         self.assertEqual(payload["guild_id"], "123")
-        self.assertEqual(payload["ruleset"]["name"], "baseline")
+        self.assertEqual(payload["rules"], [])
 
     async def test_apply_ruleset_dry_run_returns_confirm_token(self):
         result = await handle_automod_apply_ruleset(
@@ -483,12 +486,38 @@ class AutomodPolicyContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["status"], "dry_run")
         self.assertIn("confirmToken", payload)
 
-    async def test_never_uses_deps_gateway(self):
-        """All automod policy handlers must complete with empty deps."""
-        result = await handle_automod_validate_ruleset(
-            {"ruleset": {"name": "test", "rules": []}}, {}
-        )
-        self.assertEqual(len(result), 1)
+    async def test_handlers_do_not_crash_with_empty_deps(self):
+        """All automod policy handlers must complete with empty deps.
+        get/apply handle missing gateway gracefully; rollback execute path
+        returns not_supported rather than crashing.
+        """
+        handlers_args = [
+            (handle_automod_validate_ruleset, {"ruleset": {"name": "t", "rules": []}}),
+            (handle_automod_get_ruleset, {"guild_id": "1", "ruleset_name": "t"}),
+            (
+                handle_automod_apply_ruleset,
+                {
+                    "guild_id": "1",
+                    "ruleset": {"name": "t", "rules": []},
+                    "reason": "test",
+                    "dry_run": True,
+                },
+            ),
+            (
+                handle_automod_rollback_ruleset,
+                {
+                    "guild_id": "1",
+                    "ruleset_name": "t",
+                    "reason": "test",
+                    "dry_run": True,
+                },
+            ),
+        ]
+        for handler, args in handlers_args:
+            with self.subTest(handler=handler.__name__):
+                result = await handler(args, {})
+                self.assertEqual(len(result), 1)
+                self.assertEqual(result[0].type, "text")
 
     async def test_apply_ruleset_non_dry_run_missing_confirm_token_raises(self):
         with self.assertRaisesRegex(ValueError, "confirm_token is required"):
@@ -540,7 +569,7 @@ class AutomodPolicyContractTests(unittest.IsolatedAsyncioTestCase):
                 {},
             )
 
-    async def test_rollback_ruleset_with_valid_confirm_token_returns_rolled_back(self):
+    async def test_rollback_ruleset_execute_returns_not_supported(self):
         dry_run = await handle_automod_rollback_ruleset(
             {
                 "guild_id": "1",
@@ -562,9 +591,10 @@ class AutomodPolicyContractTests(unittest.IsolatedAsyncioTestCase):
             {},
         )
         payload = _payload(result)
-        self.assertEqual(payload["status"], "rolled_back")
+        self.assertEqual(payload["status"], "not_supported")
         self.assertEqual(payload["guild_id"], "1")
         self.assertEqual(payload["ruleset_name"], "baseline")
+        self.assertIn("detail", payload)
 
 
 if __name__ == "__main__":
