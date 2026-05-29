@@ -115,6 +115,12 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(payload["rules"][0]["enabled"])
 
+    async def test_list_rules_gateway_unavailable_returns_unsupported(self):
+        """list should return unsupported when no gateway available."""
+        result = await handle_list_auto_moderation_rules({"server_id": "123"}, {})
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "unsupported")
+
     # --- create_auto_moderation_rule ---
 
     async def test_create_rule_calls_guild_api(self):
@@ -174,6 +180,48 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["rule"]["name"], "created-rule")
         self.assertEqual(payload["rule"]["id"], "333")
 
+    async def test_create_rule_gateway_unavailable_returns_unsupported(self):
+        """create should return unsupported when no gateway available."""
+        result = await handle_create_auto_moderation_rule(
+            {
+                "server_id": "123",
+                "rule": {"name": "test", "trigger_type": "keyword", "actions": []},
+            },
+            {},
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "unsupported")
+
+    async def test_create_rule_passes_reason_to_api(self):
+        """create should pass reason to guild.create_automod_rule()."""
+        guild = AsyncMock()
+        guild.id = 123
+        guild.create_automod_rule = AsyncMock(
+            return_value=_mock_automod_rule(name="reasoned-rule", rule_id="555")
+        )
+        gateway = AsyncMock()
+        gateway.resolve_guild = AsyncMock(return_value=guild)
+        deps = {"gateway": gateway}
+
+        result = await handle_create_auto_moderation_rule(
+            {
+                "server_id": "123",
+                "rule": {
+                    "name": "reasoned-rule",
+                    "trigger_type": "keyword",
+                    "trigger_metadata": {"keyword_filter": ["bad"]},
+                    "actions": [{"type": "block_message"}],
+                    "enabled": True,
+                },
+                "reason": "audit-reason-123",
+            },
+            deps,
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "applied")
+        call_kwargs = guild.create_automod_rule.call_args.kwargs
+        self.assertEqual(call_kwargs["reason"], "audit-reason-123")
+
     # --- update_auto_moderation_rule ---
 
     async def test_update_rule_calls_edit(self):
@@ -219,6 +267,45 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
                 deps,
             )
 
+    async def test_update_rule_gateway_unavailable_returns_unsupported(self):
+        """update should return unsupported when no gateway available."""
+        result = await handle_update_auto_moderation_rule(
+            {
+                "server_id": "123",
+                "rule_id": "111",
+                "rule": {"name": "test-rename"},
+            },
+            {},
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "unsupported")
+
+    async def test_update_rule_passes_reason_to_edit(self):
+        """update should pass reason to rule.edit()."""
+        rule_mock = AsyncMock()
+        rule_mock.id = 111
+        guild = AsyncMock()
+        guild.id = 123
+        guild.fetch_automod_rules = AsyncMock(return_value=[rule_mock])
+        gateway = AsyncMock()
+        gateway.resolve_guild = AsyncMock(return_value=guild)
+        deps = {"gateway": gateway}
+
+        result = await handle_update_auto_moderation_rule(
+            {
+                "server_id": "123",
+                "rule_id": "111",
+                "rule": {"name": "updated-name", "enabled": False},
+                "reason": "audit-reason-update",
+            },
+            deps,
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "applied")
+        rule_mock.edit.assert_awaited_once_with(
+            name="updated-name", enabled=False, reason="audit-reason-update"
+        )
+
     # --- automod_export_rules ---
 
     async def test_export_rules_returns_real_rules(self):
@@ -246,6 +333,12 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["export"]["rules"], [])
+
+    async def test_export_rules_gateway_unavailable_returns_unsupported(self):
+        """export should return unsupported when no gateway available."""
+        result = await handle_automod_export_rules({"server_id": "123"}, {})
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "unsupported")
 
 
 if __name__ == "__main__":

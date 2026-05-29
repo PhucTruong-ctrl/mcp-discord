@@ -154,6 +154,12 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
         payload = _payload(result)
         self.assertEqual(payload["rules"], [])
 
+    async def test_get_ruleset_gateway_unavailable_returns_unsupported(self):
+        """get_ruleset should return unsupported when no gateway available."""
+        result = await handle_automod_get_ruleset({"guild_id": "123"}, {})
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "unsupported")
+
     # --- automod_apply_ruleset: now creates rules via Discord API ---
 
     async def test_apply_ruleset_requires_reason(self):
@@ -261,6 +267,75 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
         payload = _payload(result)
         self.assertEqual(payload["status"], "unsupported")
         self.assertIn("Rollback", payload.get("message", ""))
+
+    async def test_apply_ruleset_partial_failure_reports_success_and_errors(self):
+        """apply should report partial success/failure when some rules fail."""
+        guild = AsyncMock()
+        guild.id = 123
+
+        async def create_rule(**kwargs):
+            if kwargs.get("name") == "fail-rule":
+                raise Exception("API error creating rule")
+            return _mock_automod_rule(name=kwargs.get("name", "rule"), rule_id="444")
+
+        guild.create_automod_rule = AsyncMock(side_effect=create_rule)
+        gateway = AsyncMock()
+        gateway.resolve_guild = AsyncMock(return_value=guild)
+        deps = {"gateway": gateway}
+
+        # Get confirm token first
+        dry_run = await handle_automod_apply_ruleset(
+            {
+                "guild_id": "1",
+                "ruleset": {"name": "baseline", "rules": []},
+                "reason": "incident",
+                "dry_run": True,
+            },
+            {},
+        )
+        token = _payload(dry_run)["confirmToken"]
+
+        # Execute with mixed success/failure rules
+        result = await handle_automod_apply_ruleset(
+            {
+                "guild_id": "1",
+                "ruleset": {
+                    "name": "baseline",
+                    "rules": [
+                        {
+                            "name": "good-rule",
+                            "trigger_type": "keyword",
+                            "trigger_metadata": {"keyword_filter": ["bad"]},
+                            "actions": [{"type": "block_message"}],
+                            "enabled": True,
+                        },
+                        {
+                            "name": "fail-rule",
+                            "trigger_type": "keyword",
+                            "trigger_metadata": {"keyword_filter": ["bad"]},
+                            "actions": [{"type": "block_message"}],
+                            "enabled": True,
+                        },
+                        {
+                            "name": "another-good",
+                            "trigger_type": "keyword",
+                            "trigger_metadata": {"keyword_filter": ["bad"]},
+                            "actions": [{"type": "block_message"}],
+                            "enabled": True,
+                        },
+                    ],
+                },
+                "reason": "incident",
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            deps,
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "applied_with_errors")
+        self.assertEqual(len(payload["rules"]), 2)
+        self.assertEqual(len(payload["errors"]), 1)
+        self.assertIn("fail-rule", payload["errors"][0])
 
 
 if __name__ == "__main__":

@@ -84,27 +84,18 @@ AUTOMOD_POLICY_TOOLS = [
     ),
     Tool(
         name="automod_rollback_ruleset",
-        description="Rollback ruleset state with reason and confirm token enforcement",
+        description="Rollback is not supported without persistent state tracking. "
+        "Returns an explicit unsupported response. "
+        "Use automod_apply_ruleset with a prior ruleset snapshot for manual rollback.",
         inputSchema={
             "type": "object",
             "properties": {
-                "guild_id": {"type": "string", "description": "Discord guild ID"},
-                "ruleset_name": {
+                "guild_id": {
                     "type": "string",
-                    "description": "Ruleset identifier to rollback",
-                },
-                "reason": {"type": "string", "description": "Required audit reason"},
-                "dry_run": {
-                    "type": "boolean",
-                    "description": "Return confirm token when true",
-                    "default": True,
-                },
-                "confirm_token": {
-                    "type": "string",
-                    "description": "Required for execute path when dry_run is false",
+                    "description": "Discord guild ID (informational only, not used)",
                 },
             },
-            "required": ["guild_id", "ruleset_name", "reason"],
+            "required": [],
         },
     ),
 ]

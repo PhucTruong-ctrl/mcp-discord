@@ -130,15 +130,23 @@ async def handle_automod_get_ruleset(
 ) -> List[TextContent]:
     """Fetch AutoMod rules for a guild from Discord API."""
     gateway = deps.get("gateway")
-    if gateway:
-        guild = await gateway.resolve_guild(arguments.get("guild_id"))
-        rules = await guild.fetch_automod_rules()
-        ruleset_name = str(arguments.get("ruleset_name", "")).strip()
-        if ruleset_name:
-            rules = [r for r in rules if r.name == ruleset_name]
-        serialized = [_serialize_auto_moderation_rule(r) for r in rules]
-        return _json({"guild_id": str(guild.id), "rules": serialized})
-    return _json({"guild_id": str(arguments.get("guild_id", "")), "rules": []})
+    if not gateway:
+        return _json(
+            {
+                "status": "unsupported",
+                "message": (
+                    "Discord gateway is not available. "
+                    "AutoMod read operations require an active Discord connection."
+                ),
+            }
+        )
+    guild = await gateway.resolve_guild(arguments.get("guild_id"))
+    rules = await guild.fetch_automod_rules()
+    ruleset_name = str(arguments.get("ruleset_name", "")).strip()
+    if ruleset_name:
+        rules = [r for r in rules if r.name == ruleset_name]
+    serialized = [_serialize_auto_moderation_rule(r) for r in rules]
+    return _json({"guild_id": str(guild.id), "rules": serialized})
 
 
 async def handle_automod_apply_ruleset(
@@ -167,34 +175,42 @@ async def handle_automod_apply_ruleset(
     # Execute: create rules on Discord via gateway
     gateway = deps.get("gateway")
     created_rules = []
+    errors = []
     if gateway:
         guild = await gateway.resolve_guild(guild_id)
         for rule_data in ruleset.get("rules", []):
-            trigger = _build_automod_trigger(rule_data)
-            actions = _build_automod_actions(rule_data.get("actions", []))
-            event_type = _parse_automod_event_type(
-                rule_data.get("event_type", "message_send")
-            )
-            enabled = rule_data.get("enabled", True)
-            new_rule = await guild.create_automod_rule(
-                name=rule_data["name"],
-                event_type=event_type,
-                trigger=trigger,
-                actions=actions,
-                enabled=enabled,
-                reason=reason,
-            )
-            created_rules.append(_serialize_auto_moderation_rule(new_rule))
+            try:
+                trigger = _build_automod_trigger(rule_data)
+                actions = _build_automod_actions(rule_data.get("actions", []))
+                event_type = _parse_automod_event_type(
+                    rule_data.get("event_type", "message_send")
+                )
+                enabled = rule_data.get("enabled", True)
+                new_rule = await guild.create_automod_rule(
+                    name=rule_data["name"],
+                    event_type=event_type,
+                    trigger=trigger,
+                    actions=actions,
+                    enabled=enabled,
+                    reason=reason,
+                )
+                created_rules.append(_serialize_auto_moderation_rule(new_rule))
+            except Exception as exc:
+                errors.append(
+                    f"Failed to create rule '{rule_data.get('name', '?')}': {exc}"
+                )
 
-    return _json(
-        {
-            "status": "applied",
-            "guild_id": guild_id,
-            "ruleset_name": ruleset_name,
-            "reason": reason,
-            "rules": created_rules,
-        }
-    )
+    status = "applied_with_errors" if errors else "applied"
+    response: Dict[str, Any] = {
+        "status": status,
+        "guild_id": guild_id,
+        "ruleset_name": ruleset_name,
+        "reason": reason,
+        "rules": created_rules,
+    }
+    if errors:
+        response["errors"] = errors
+    return _json(response)
 
 
 async def handle_automod_rollback_ruleset(
