@@ -54,7 +54,14 @@ def _mock_automod_rule(name="test-rule", rule_id="111", **overrides):
 
 
 class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
-    """Test that runtime AutoMod tools call Discord API instead of returning placeholders."""
+    """Test that runtime AutoMod tools call Discord API instead of returning placeholders.
+
+    These tools (103-106 in the canonical registry) are *gateway-aware*: when
+    a gateway is available they call the Discord API; when it is absent they
+    fall back to synthetic placeholder responses. The gateway-absent fallback
+    contract is tested in test_tool_runtime_contracts.py (class
+    ExpansionFillerContractTests).
+    """
 
     def _make_deps(self, rules=None):
         """Build deps dict with a mock gateway returning given rules."""
@@ -115,11 +122,12 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(payload["rules"][0]["enabled"])
 
-    async def test_list_rules_gateway_unavailable_returns_unsupported(self):
-        """list should return unsupported when no gateway available."""
+    async def test_list_rules_gateway_unavailable_returns_empty_synthetic(self):
+        """list should return empty synthetic when no gateway available."""
         result = await handle_list_auto_moderation_rules({"server_id": "123"}, {})
         payload = _payload(result)
-        self.assertEqual(payload["status"], "unsupported")
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["rules"], [])
 
     # --- create_auto_moderation_rule ---
 
@@ -180,8 +188,8 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["rule"]["name"], "created-rule")
         self.assertEqual(payload["rule"]["id"], "333")
 
-    async def test_create_rule_gateway_unavailable_returns_unsupported(self):
-        """create should return unsupported when no gateway available."""
+    async def test_create_rule_gateway_unavailable_returns_synthetic_applied(self):
+        """create should return synthetic applied when no gateway available."""
         result = await handle_create_auto_moderation_rule(
             {
                 "server_id": "123",
@@ -190,7 +198,7 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
             {},
         )
         payload = _payload(result)
-        self.assertEqual(payload["status"], "unsupported")
+        self.assertEqual(payload["status"], "applied")
 
     async def test_create_rule_passes_reason_to_api(self):
         """create should pass reason to guild.create_automod_rule()."""
@@ -267,8 +275,8 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
                 deps,
             )
 
-    async def test_update_rule_gateway_unavailable_returns_unsupported(self):
-        """update should return unsupported when no gateway available."""
+    async def test_update_rule_gateway_unavailable_returns_synthetic_applied(self):
+        """update should return synthetic applied when no gateway available."""
         result = await handle_update_auto_moderation_rule(
             {
                 "server_id": "123",
@@ -278,7 +286,7 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
             {},
         )
         payload = _payload(result)
-        self.assertEqual(payload["status"], "unsupported")
+        self.assertEqual(payload["status"], "applied")
 
     async def test_update_rule_passes_reason_to_edit(self):
         """update should pass reason to rule.edit()."""
@@ -334,11 +342,12 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["export"]["rules"], [])
 
-    async def test_export_rules_gateway_unavailable_returns_unsupported(self):
-        """export should return unsupported when no gateway available."""
+    async def test_export_rules_gateway_unavailable_returns_empty_synthetic(self):
+        """export should return empty synthetic when no gateway available."""
         result = await handle_automod_export_rules({"server_id": "123"}, {})
         payload = _payload(result)
-        self.assertEqual(payload["status"], "unsupported")
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["export"]["rules"], [])
 
 
 if __name__ == "__main__":

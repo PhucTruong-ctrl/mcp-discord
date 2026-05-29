@@ -1,19 +1,26 @@
 """
 Runtime contract tests for expansion filler and adjacent tool families.
 
-These tests encode the CURRENT expected behavior of tool families that return
-synthetic/placeholder responses (no real Discord API calls). If a handler is
-upgraded to make live Discord calls, these tests MUST be updated to match the
-new real-behavior contract — they serve as a regression guard against silent
-behavior drift.
+These tests encode the CURRENT expected behavior in a gateway-absent context
+(empty deps, no Discord API available). All handlers covered here must
+complete gracefully without a gateway — either returning synthetic placeholder
+responses or falling back to synthetic results when no gateway is present.
+
+If a handler is upgraded to always require a gateway and cannot fall back,
+these tests MUST be updated — they serve as a regression guard against
+silent behavior drift.
 
 The following tool families are covered here:
 
-  - Expansion fillers (15 tools, indices 92-106 in canonical registry):
+  - Expansion fillers — synthetic-only (11 tools, indices 92-102):
     bulk_ban_members, prune_inactive_members, remove_member_timeout,
     unban_member, create_category, rename_category, move_category,
     delete_category, create_incident_room, append_incident_event,
-    close_incident, list_auto_moderation_rules, create_auto_moderation_rule,
+    close_incident
+
+  - Expansion fillers — gateway-aware with synthetic fallback
+    (4 tools, indices 103-106):
+    list_auto_moderation_rules, create_auto_moderation_rule,
     update_auto_moderation_rule, automod_export_rules
 
   - Incident operations (4 tools):
@@ -23,6 +30,10 @@ The following tool families are covered here:
   - AutoMod policy tools (4 tools):
     automod_validate_ruleset, automod_get_ruleset,
     automod_apply_ruleset, automod_rollback_ruleset
+
+NOTE: Gateway-present runtime tests for tools 103-106 live in
+test_automod_runtime_tools.py, which exercises the Discord API code path
+when a mock gateway is provided.
 """
 
 import json
@@ -77,8 +88,12 @@ def _payload(result):
 
 
 class ExpansionFillerContractTests(unittest.IsolatedAsyncioTestCase):
-    """Contract: all 15 expansion filler handlers return synthetic responses.
-    They do NOT call deps['gateway'] or make Discord API calls.
+    """Contract: expansion filler handlers with empty/gateway-absent deps.
+
+    - Tools 92-102 are synthetic-only — they never call deps['gateway'].
+    - Tools 103-106 are gateway-aware — they fall back to synthetic responses
+      when gateway is absent. Gateway-present runtime tests for 103-106 are
+      in test_automod_runtime_tools.py.
     """
 
     def test_expansion_filler_tools_are_in_registry(self):
@@ -215,8 +230,13 @@ class ExpansionFillerContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["export"], {"rules": []})
 
-    async def test_never_uses_deps_gateway(self):
-        """All expansion fillers must complete successfully with empty deps."""
+    async def test_handlers_do_not_crash_with_empty_deps(self):
+        """All expansion fillers complete without crashing when gateway absent.
+
+        Synthetic-only handlers (92-102) return placeholder responses; gateway-aware
+        handlers (103-106) fall back to synthetic results. Gateway-present runtime
+        tests for 103-106 are in test_automod_runtime_tools.py.
+        """
         harmless = [
             (handle_remove_member_timeout, {"server_id": "1", "member_id": "2"}),
             (handle_unban_member, {"server_id": "1", "member_id": "2"}),
