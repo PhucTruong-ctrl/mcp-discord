@@ -268,6 +268,52 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["status"], "unsupported")
         self.assertIn("Rollback", payload.get("message", ""))
 
+    async def test_apply_ruleset_valid_token_but_no_gateway_returns_unsupported(
+        self,
+    ):
+        """apply execute with valid confirm_token but no gateway should return
+        unsupported, not synthetic applied+empty rules."""
+        # Get a valid confirm token via dry_run
+        dry_run = await handle_automod_apply_ruleset(
+            {
+                "guild_id": "1",
+                "ruleset": {"name": "baseline", "rules": []},
+                "reason": "incident",
+                "dry_run": True,
+            },
+            {},
+        )
+        token = _payload(dry_run)["confirmToken"]
+
+        # Execute with valid token but NO gateway in deps
+        result = await handle_automod_apply_ruleset(
+            {
+                "guild_id": "1",
+                "ruleset": {
+                    "name": "baseline",
+                    "rules": [
+                        {
+                            "name": "block-spam",
+                            "trigger_type": "keyword",
+                            "trigger_metadata": {"keyword_filter": ["bad"]},
+                            "actions": [{"type": "block_message"}],
+                            "enabled": True,
+                        }
+                    ],
+                },
+                "reason": "incident",
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            {},  # no gateway
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "unsupported")
+        self.assertIn("not available", payload.get("message", ""))
+        # Must NOT contain synthetic applied+empty fields
+        self.assertNotIn("rules", payload)
+        self.assertNotIn("applied", payload.get("status", ""))
+
     async def test_apply_ruleset_partial_failure_reports_success_and_errors(self):
         """apply should report partial success/failure when some rules fail."""
         guild = AsyncMock()

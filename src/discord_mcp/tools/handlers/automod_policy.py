@@ -174,31 +174,41 @@ async def handle_automod_apply_ruleset(
 
     # Execute: create rules on Discord via gateway
     gateway = deps.get("gateway")
+    if not gateway:
+        return _json(
+            {
+                "status": "unsupported",
+                "message": (
+                    "Discord gateway is not available. "
+                    "AutoMod write operations require an active Discord connection."
+                ),
+            }
+        )
+
     created_rules = []
     errors = []
-    if gateway:
-        guild = await gateway.resolve_guild(guild_id)
-        for rule_data in ruleset.get("rules", []):
-            try:
-                trigger = _build_automod_trigger(rule_data)
-                actions = _build_automod_actions(rule_data.get("actions", []))
-                event_type = _parse_automod_event_type(
-                    rule_data.get("event_type", "message_send")
-                )
-                enabled = rule_data.get("enabled", True)
-                new_rule = await guild.create_automod_rule(
-                    name=rule_data["name"],
-                    event_type=event_type,
-                    trigger=trigger,
-                    actions=actions,
-                    enabled=enabled,
-                    reason=reason,
-                )
-                created_rules.append(_serialize_auto_moderation_rule(new_rule))
-            except Exception as exc:
-                errors.append(
-                    f"Failed to create rule '{rule_data.get('name', '?')}': {exc}"
-                )
+    guild = await gateway.resolve_guild(guild_id)
+    for rule_data in ruleset.get("rules", []):
+        try:
+            trigger = _build_automod_trigger(rule_data)
+            actions = _build_automod_actions(rule_data.get("actions", []))
+            event_type = _parse_automod_event_type(
+                rule_data.get("event_type", "message_send")
+            )
+            enabled = rule_data.get("enabled", True)
+            new_rule = await guild.create_automod_rule(
+                name=rule_data["name"],
+                event_type=event_type,
+                trigger=trigger,
+                actions=actions,
+                enabled=enabled,
+                reason=reason,
+            )
+            created_rules.append(_serialize_auto_moderation_rule(new_rule))
+        except Exception as exc:
+            errors.append(
+                f"Failed to create rule '{rule_data.get('name', '?')}': {exc}"
+            )
 
     status = "applied_with_errors" if errors else "applied"
     response: Dict[str, Any] = {
