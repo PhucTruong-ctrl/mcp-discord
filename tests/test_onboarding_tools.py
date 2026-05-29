@@ -1,6 +1,17 @@
 import json
+import os
+import sys
 import unittest
 from unittest.mock import AsyncMock
+
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+SRC = os.path.join(ROOT, "src")
+if SRC not in sys.path:
+    sys.path.insert(0, SRC)
+
+os.environ.setdefault("DISCORD_TOKEN", "test-token")
+os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
 
 from discord_mcp.tools.handlers.onboarding import (
     handle_dynamic_role_provision,

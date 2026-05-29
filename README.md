@@ -9,9 +9,9 @@ A Model Context Protocol (MCP) server that provides Discord integration capabili
 
 The comprehensive expansion roadmap is documented as a phased rollout:
 
-- **Target scope**: 101 canonical tools (22 baseline + 79 expansion)
-- **Current branch registry snapshot**: 101 canonical tools
-- **Rollout model**: 10 implementation waves, with Wave 11 explicitly deferred for stateful extensions
+- **Target scope**: 106 canonical tools (22 baseline + 84 expansion)
+- **Current branch registry snapshot**: 106 canonical tools
+- **Rollout model**: 10 implementation waves (Waves 1-10), plus 15 post-wave expansion fillers, with Wave 11 explicitly deferred for stateful extensions
 
 For full details, use:
 
@@ -32,9 +32,9 @@ Channel CRUD/admin tools are exposed per channel type:
 See `docs/product/tool-catalog.md` for the field contracts.
 Note: `update_forum_channel` will reject `default_sort_order` with `field_not_supported_by_library` when that field is not supported by the runtime library.
 
-## New Tools Added (79 expansion tools)
+## New Tools Added (84 expansion tools)
 
-The original baseline compatibility surface remains intact (22 tools). The expansion adds these 79 tools:
+The original baseline compatibility surface remains intact (22 tools). The expansion adds these 84 tools:
 
 ### Wave 1 — Structured discovery & inventory (8)
 
@@ -96,14 +96,14 @@ The original baseline compatibility surface remains intact (22 tools). The expan
 
 ### Wave 7 — Onboarding & lifecycle (8)
 
-41. `get_guild_welcome_screen`
-42. `update_guild_welcome_screen`
-43. `get_guild_onboarding`
-44. `update_guild_onboarding`
-45. `dynamic_role_provision`
-46. `verification_gate_orchestrator`
-47. `progressive_access_unlock`
-48. `onboarding_friction_audit`
+41. `get_guild_welcome_screen` — reads live guild data via gateway
+42. `update_guild_welcome_screen` — gateway-dependent
+43. `get_guild_onboarding` — reads live guild data via gateway
+44. `update_guild_onboarding` — gateway-dependent
+45. `dynamic_role_provision` — gateway-dependent
+46. `verification_gate_orchestrator` — gateway-independent
+47. `progressive_access_unlock` — gateway-independent
+48. `onboarding_friction_audit` — gateway-independent
 
 ### Wave 8 — Messaging, webhooks, integrations (8)
 
@@ -116,14 +116,14 @@ The original baseline compatibility surface remains intact (22 tools). The expan
 55. `list_guild_integrations`
 56. `get_guild_vanity_url`
 
-### Wave 9 — Incident operations (4)
+### Wave 9 — Incident operations (4) — gateway-independent
 
 57. `incident_get_channel_state`
 58. `incident_set_channel_state`
 59. `incident_apply_lockdown`
 60. `incident_rollback_lockdown`
 
-### Wave 10 — AutoMod policy (4)
+### Wave 10 — AutoMod policy (4) — gateway-independent
 
 61. `automod_validate_ruleset`
 62. `automod_get_ruleset`
@@ -132,21 +132,27 @@ The original baseline compatibility surface remains intact (22 tools). The expan
 
 ### Post-wave expansion fillers/utilities (15)
 
-65. `bulk_ban_members`
-66. `prune_inactive_members`
-67. `remove_member_timeout`
-68. `unban_member`
-69. `create_category`
-70. `rename_category`
-71. `move_category`
-72. `delete_category`
-73. `create_incident_room`
-74. `append_incident_event`
-75. `close_incident`
-76. `list_auto_moderation_rules`
-77. `create_auto_moderation_rule`
-78. `update_auto_moderation_rule`
-79. `automod_export_rules`
+65. `bulk_ban_members` — synthetic (placeholder)
+66. `prune_inactive_members` — synthetic (placeholder)
+67. `remove_member_timeout` — synthetic (placeholder)
+68. `unban_member` — synthetic (placeholder)
+69. `create_category` — synthetic (placeholder)
+70. `rename_category` — synthetic (placeholder)
+71. `move_category` — synthetic (placeholder)
+72. `delete_category` — synthetic (placeholder)
+73. `create_incident_room` — synthetic (placeholder)
+74. `append_incident_event` — synthetic (placeholder)
+75. `close_incident` — synthetic (placeholder)
+76. `list_auto_moderation_rules` — synthetic (placeholder)
+77. `create_auto_moderation_rule` — synthetic (placeholder)
+78. `update_auto_moderation_rule` — synthetic (placeholder)
+79. `automod_export_rules` — synthetic (placeholder)
+
+> **Note**: All 15 expansion filler/utility tools return synthetic/placeholder responses. They validate input shapes but do not make live Discord API calls. See `tests/test_tool_runtime_contracts.py` for contract assertions.
+
+The following tool families are also **gateway-independent** (return structured responses without Discord API calls):
+- **Wave 9 — Incident operations (57–60):** Use `dry_run`/`confirm_token` for lockdown/rollback but no live Discord API calls.
+- **Wave 10 — AutoMod policy (61–64):** Validate ruleset shape and use `dry_run`/`confirm_token` for apply/rollback; no live Discord API calls.
 
 ## Installation
 
