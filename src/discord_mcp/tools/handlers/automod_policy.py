@@ -7,6 +7,7 @@ from discord_mcp.core.safety import (
     build_dry_run_result,
     verify_confirm_token,
 )
+from discord_mcp.core.serialize import _serialize_auto_moderation_rule
 
 
 def _required_reason(arguments: Dict[str, Any]) -> str:
@@ -38,6 +39,84 @@ def _validate_ruleset_shape(ruleset: Dict[str, Any]) -> None:
         raise ValueError("ruleset.rules must be an array")
 
 
+def _build_automod_trigger(rule_data: Dict[str, Any]) -> Any:
+    """Build a discord.AutoModTrigger from rule data."""
+    import discord
+
+    trigger_type = str(rule_data.get("trigger_type", "keyword")).upper()
+    trigger_metadata = rule_data.get("trigger_metadata", {}) or {}
+
+    if trigger_type == "KEYWORD":
+        return discord.AutoModTrigger(
+            keyword_filter=trigger_metadata.get("keyword_filter", [])
+        )
+    if trigger_type == "KEYWORD_PRESET":
+        presets_val = trigger_metadata.get("presets", 0)
+        return discord.AutoModTrigger(presets=presets_val)
+    if trigger_type == "MENTION_SPAM":
+        return discord.AutoModTrigger(
+            mention_limit=trigger_metadata.get("mention_limit", 10)
+        )
+    if trigger_type == "MEMBER_PROFILE":
+        return discord.AutoModTrigger(
+            keyword_filter=trigger_metadata.get("keyword_filter", [])
+        )
+
+    # Default: keyword trigger
+    return discord.AutoModTrigger(
+        keyword_filter=trigger_metadata.get("keyword_filter", [])
+    )
+
+
+def _build_automod_actions(
+    actions_data: List[Dict[str, Any]],
+) -> List[Any]:
+    """Build a list of discord.AutoModRuleAction from action data."""
+    import discord
+
+    result = []
+    for action_data in actions_data:
+        action_type = str(action_data.get("type", "block_message")).upper()
+        kwargs = {}
+        if action_type == "BLOCK_MEMBER_INTERACTION":
+            kwargs["type"] = discord.AutoModRuleActionType.block_member_interaction
+            custom = action_data.get("custom_message")
+            if custom:
+                kwargs["custom_message"] = custom
+            duration = action_data.get("duration")
+            if duration:
+                import datetime
+
+                kwargs["duration"] = datetime.timedelta(seconds=int(duration))
+        elif action_type == "SEND_ALERT_MESSAGE":
+            kwargs["type"] = discord.AutoModRuleActionType.send_alert_message
+            channel_id = action_data.get("channel_id")
+            if channel_id:
+                kwargs["channel_id"] = int(channel_id)
+            custom = action_data.get("custom_message")
+            if custom:
+                kwargs["custom_message"] = custom
+        else:
+            # BLOCK_MESSAGE
+            kwargs["type"] = discord.AutoModRuleActionType.block_message
+            custom = action_data.get("custom_message")
+            if custom:
+                kwargs["custom_message"] = custom
+        result.append(discord.AutoModRuleAction(**kwargs))
+    return result
+
+
+def _parse_automod_event_type(event_type_str: str) -> Any:
+    """Parse an event type string to discord.AutoModRuleEventType."""
+    import discord
+
+    normalized = event_type_str.upper().replace("-", "_")
+    try:
+        return discord.AutoModRuleEventType[normalized]
+    except KeyError:
+        return discord.AutoModRuleEventType.message_send
+
+
 async def handle_automod_validate_ruleset(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
@@ -49,9 +128,17 @@ async def handle_automod_validate_ruleset(
 async def handle_automod_get_ruleset(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    ruleset = arguments["ruleset"]
-    _validate_ruleset_shape(ruleset)
-    return _json({"guild_id": str(arguments["guild_id"]), "ruleset": ruleset})
+    """Fetch AutoMod rules for a guild from Discord API."""
+    gateway = deps.get("gateway")
+    if gateway:
+        guild = await gateway.resolve_guild(arguments.get("guild_id"))
+        rules = await guild.fetch_automod_rules()
+        ruleset_name = str(arguments.get("ruleset_name", "")).strip()
+        if ruleset_name:
+            rules = [r for r in rules if r.name == ruleset_name]
+        serialized = [_serialize_auto_moderation_rule(r) for r in rules]
+        return _json({"guild_id": str(guild.id), "rules": serialized})
+    return _json({"guild_id": str(arguments.get("guild_id", "")), "rules": []})
 
 
 async def handle_automod_apply_ruleset(
@@ -76,12 +163,36 @@ async def handle_automod_apply_ruleset(
 
     confirm_token = _required_confirm_token(arguments)
     verify_confirm_token(action, targets, confirm_token)
+
+    # Execute: create rules on Discord via gateway
+    gateway = deps.get("gateway")
+    created_rules = []
+    if gateway:
+        guild = await gateway.resolve_guild(guild_id)
+        for rule_data in ruleset.get("rules", []):
+            trigger = _build_automod_trigger(rule_data)
+            actions = _build_automod_actions(rule_data.get("actions", []))
+            event_type = _parse_automod_event_type(
+                rule_data.get("event_type", "message_send")
+            )
+            enabled = rule_data.get("enabled", True)
+            new_rule = await guild.create_automod_rule(
+                name=rule_data["name"],
+                event_type=event_type,
+                trigger=trigger,
+                actions=actions,
+                enabled=enabled,
+                reason=reason,
+            )
+            created_rules.append(_serialize_auto_moderation_rule(new_rule))
+
     return _json(
         {
             "status": "applied",
             "guild_id": guild_id,
             "ruleset_name": ruleset_name,
             "reason": reason,
+            "rules": created_rules,
         }
     )
 
@@ -89,28 +200,17 @@ async def handle_automod_apply_ruleset(
 async def handle_automod_rollback_ruleset(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
-    reason = _required_reason(arguments)
-    guild_id = str(arguments["guild_id"])
-    ruleset_name = str(arguments["ruleset_name"])
-    dry_run = bool(arguments.get("dry_run", True))
-    action = "automod_rollback_ruleset"
-    targets = {"guild_id": guild_id, "ruleset_name": ruleset_name, "reason": reason}
-
-    if dry_run:
-        payload = build_dry_run_result(
-            action,
-            targets,
-            {"guild_id": guild_id, "ruleset_name": ruleset_name, "reason": reason},
-        )
-        return _json(payload)
-
-    confirm_token = _required_confirm_token(arguments)
-    verify_confirm_token(action, targets, confirm_token)
+    """Rollback is not reliably implementable without persistent state tracking.
+    Return explicit unsupported error rather than pretending rollback occurred.
+    """
     return _json(
         {
-            "status": "rolled_back",
-            "guild_id": guild_id,
-            "ruleset_name": ruleset_name,
-            "reason": reason,
+            "status": "unsupported",
+            "message": (
+                "Rollback requires persistent state tracking which is not implemented. "
+                "This tool cannot reliably revert AutoMod rules without a known "
+                "previous state. Manual rollback via automod_apply_ruleset with "
+                "the prior ruleset is recommended."
+            ),
         }
     )

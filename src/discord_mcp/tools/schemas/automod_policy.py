@@ -39,22 +39,17 @@ AUTOMOD_POLICY_TOOLS = [
     ),
     Tool(
         name="automod_get_ruleset",
-        description="Return caller-supplied ruleset model for a guild",
+        description="Fetch AutoMod ruleset(s) for a guild from Discord",
         inputSchema={
             "type": "object",
             "properties": {
                 "guild_id": {"type": "string", "description": "Discord guild ID"},
-                "ruleset": {
-                    "type": "object",
-                    "description": "Caller-supplied ruleset model",
-                    "properties": {
-                        "name": {"type": "string"},
-                        "rules": {"type": "array", "items": {"type": "object"}},
-                    },
-                    "required": ["name", "rules"],
+                "ruleset_name": {
+                    "type": "string",
+                    "description": "Optional name to filter rules by",
                 },
             },
-            "required": ["guild_id", "ruleset"],
+            "required": ["guild_id"],
         },
     ),
     Tool(

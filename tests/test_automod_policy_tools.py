@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import unittest
+from unittest.mock import AsyncMock, MagicMock
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -24,6 +25,34 @@ from discord_mcp.tools.schemas import compose_tool_registry
 
 def _payload(result):
     return json.loads(result[0].text)
+
+
+def _mock_automod_rule(name="test-rule", rule_id="111", **overrides):
+    """Build a mock object with AutoModRule-like interface."""
+    rule = MagicMock()
+    rule.id = int(rule_id)
+    rule.name = name
+    rule.guild_id = 123
+    rule.event_type = "AutoModRuleEventType.message_send"
+    rule.trigger_type = "AutoModRuleTriggerType.keyword"
+    rule.trigger_metadata = {}
+    rule.enabled = overrides.get("enabled", True)
+    rule.exempt_roles = []
+    rule.exempt_channels = []
+    rule.creator_id = 456
+    rule.created_at = None
+
+    action = MagicMock()
+    action.type = "AutoModRuleActionType.block_message"
+    action.custom_message = "Blocked"
+    action.channel_id = None
+    action.duration = None
+    rule.actions = [action]
+
+    for k, v in overrides.items():
+        if k != "enabled":
+            setattr(rule, k, v)
+    return rule
 
 
 class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
@@ -66,20 +95,68 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["status"], "valid")
         self.assertEqual(payload["ruleset"]["name"], "baseline")
 
-    async def test_get_ruleset_echoes_ruleset_model(self):
-        ruleset = {
-            "name": "runtime",
-            "rules": [{"name": "caps", "trigger_type": "keyword", "actions": []}],
-        }
+    # --- automod_get_ruleset: now fetches from Discord API ---
+
+    async def test_get_ruleset_fetches_from_api(self):
+        """get_ruleset should fetch rules from Discord, not echo caller input."""
+        rule = _mock_automod_rule()
+        guild = AsyncMock()
+        guild.id = 123
+        guild.fetch_automod_rules = AsyncMock(return_value=[rule])
+        gateway = AsyncMock()
+        gateway.resolve_guild = AsyncMock(return_value=guild)
+        deps = {"gateway": gateway}
+
         result = await handle_automod_get_ruleset(
-            {"guild_id": "123", "ruleset": ruleset},
-            {},
+            {"guild_id": "123"},
+            deps,
         )
         payload = _payload(result)
-        self.assertEqual(payload["guild_id"], "123")
-        self.assertEqual(payload["ruleset"]["name"], "runtime")
 
-    async def test_apply_and_rollback_require_reason_and_confirm_token(self):
+        self.assertEqual(payload["guild_id"], "123")
+        self.assertEqual(len(payload["rules"]), 1)
+        self.assertEqual(payload["rules"][0]["name"], "test-rule")
+        guild.fetch_automod_rules.assert_awaited_once()
+
+    async def test_get_ruleset_filters_by_ruleset_name(self):
+        """get_ruleset should filter rules by name when ruleset_name provided."""
+        rule_a = _mock_automod_rule(name="alpha", rule_id="1")
+        rule_b = _mock_automod_rule(name="beta", rule_id="2")
+        guild = AsyncMock()
+        guild.id = 123
+        guild.fetch_automod_rules = AsyncMock(return_value=[rule_a, rule_b])
+        gateway = AsyncMock()
+        gateway.resolve_guild = AsyncMock(return_value=guild)
+        deps = {"gateway": gateway}
+
+        result = await handle_automod_get_ruleset(
+            {"guild_id": "123", "ruleset_name": "alpha"},
+            deps,
+        )
+        payload = _payload(result)
+
+        self.assertEqual(len(payload["rules"]), 1)
+        self.assertEqual(payload["rules"][0]["name"], "alpha")
+
+    async def test_get_ruleset_returns_empty_when_no_rules(self):
+        """get_ruleset should return empty list when no rules exist."""
+        guild = AsyncMock()
+        guild.id = 123
+        guild.fetch_automod_rules = AsyncMock(return_value=[])
+        gateway = AsyncMock()
+        gateway.resolve_guild = AsyncMock(return_value=guild)
+        deps = {"gateway": gateway}
+
+        result = await handle_automod_get_ruleset(
+            {"guild_id": "123"},
+            deps,
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["rules"], [])
+
+    # --- automod_apply_ruleset: now creates rules via Discord API ---
+
+    async def test_apply_ruleset_requires_reason(self):
         with self.assertRaisesRegex(ValueError, "reason is required"):
             await handle_automod_apply_ruleset(
                 {
@@ -90,7 +167,9 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
                 {},
             )
 
-        dry_run = await handle_automod_apply_ruleset(
+    async def test_apply_ruleset_dry_run_returns_confirm_token(self):
+        """apply dry_run should return confirm token without calling API."""
+        result = await handle_automod_apply_ruleset(
             {
                 "guild_id": "1",
                 "ruleset": {"name": "baseline", "rules": []},
@@ -99,8 +178,11 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
             },
             {},
         )
-        token = _payload(dry_run)["confirmToken"]
+        token = _payload(result)["confirmToken"]
+        self.assertIsNotNone(token)
 
+    async def test_apply_ruleset_requires_confirm_token_for_execute(self):
+        """apply without confirm_token should raise."""
         with self.assertRaisesRegex(ValueError, "confirm_token is required"):
             await handle_automod_apply_ruleset(
                 {
@@ -112,39 +194,73 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
                 {},
             )
 
-        applied = await handle_automod_apply_ruleset(
+    async def test_apply_ruleset_execute_calls_create_automod_rule(self):
+        """apply execute path should create rules via Discord API."""
+        guild = AsyncMock()
+        guild.id = 123
+        guild.create_automod_rule = AsyncMock(
+            return_value=_mock_automod_rule(name="created-rule", rule_id="444")
+        )
+        gateway = AsyncMock()
+        gateway.resolve_guild = AsyncMock(return_value=guild)
+        deps = {"gateway": gateway}
+
+        # First get a confirm token
+        dry_run = await handle_automod_apply_ruleset(
             {
                 "guild_id": "1",
                 "ruleset": {"name": "baseline", "rules": []},
                 "reason": "incident",
-                "dry_run": False,
-                "confirm_token": token,
-            },
-            {},
-        )
-        self.assertEqual(_payload(applied)["status"], "applied")
-
-        rollback_dry_run = await handle_automod_rollback_ruleset(
-            {
-                "guild_id": "1",
-                "ruleset_name": "baseline",
-                "reason": "revert",
                 "dry_run": True,
             },
             {},
         )
-        rollback_token = _payload(rollback_dry_run)["confirmToken"]
-        rolled_back = await handle_automod_rollback_ruleset(
+        token = _payload(dry_run)["confirmToken"]
+
+        # Now execute
+        result = await handle_automod_apply_ruleset(
+            {
+                "guild_id": "1",
+                "ruleset": {
+                    "name": "baseline",
+                    "rules": [
+                        {
+                            "name": "block-spam",
+                            "trigger_type": "keyword",
+                            "trigger_metadata": {"keyword_filter": ["bad"]},
+                            "actions": [{"type": "block_message"}],
+                            "enabled": True,
+                        }
+                    ],
+                },
+                "reason": "incident",
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            deps,
+        )
+        payload = _payload(result)
+
+        self.assertEqual(payload["status"], "applied")
+        guild.create_automod_rule.assert_awaited_once()
+        call_kwargs = guild.create_automod_rule.call_args.kwargs
+        self.assertEqual(call_kwargs["name"], "block-spam")
+
+    # --- automod_rollback_ruleset: returns explicit unsupported error ---
+
+    async def test_rollback_ruleset_returns_unsupported(self):
+        """rollback should return an explicit unsupported error, not pretend."""
+        result = await handle_automod_rollback_ruleset(
             {
                 "guild_id": "1",
                 "ruleset_name": "baseline",
                 "reason": "revert",
-                "dry_run": False,
-                "confirm_token": rollback_token,
             },
             {},
         )
-        self.assertEqual(_payload(rolled_back)["status"], "rolled_back")
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "unsupported")
+        self.assertIn("Rollback", payload.get("message", ""))
 
 
 if __name__ == "__main__":
