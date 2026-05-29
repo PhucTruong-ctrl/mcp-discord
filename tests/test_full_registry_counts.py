@@ -9,6 +9,7 @@ if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
 os.environ.setdefault("DISCORD_TOKEN", "test-token")
+os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
 
 from discord_mcp.tools.schemas import compose_tool_registry
 

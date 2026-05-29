@@ -252,6 +252,91 @@ class ExpansionFillerContractTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(len(result), 1)
                 self.assertEqual(result[0].type, "text")
 
+    async def test_bulk_ban_members_with_valid_confirm_token_returns_applied(self):
+        dry_run = await handle_bulk_ban_members(
+            {"server_id": "1", "member_ids": ["2", "3"], "dry_run": True}, {}
+        )
+        token = _payload(dry_run)["confirmToken"]
+        result = await handle_bulk_ban_members(
+            {
+                "server_id": "1",
+                "member_ids": ["2", "3"],
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            {},
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "applied")
+        self.assertEqual(payload["action"], "bulk_ban_members")
+
+    async def test_prune_inactive_members_with_valid_confirm_token_returns_applied(
+        self,
+    ):
+        dry_run = await handle_prune_inactive_members(
+            {"server_id": "1", "days": 30, "dry_run": True}, {}
+        )
+        token = _payload(dry_run)["confirmToken"]
+        result = await handle_prune_inactive_members(
+            {
+                "server_id": "1",
+                "days": 30,
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            {},
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "applied")
+        self.assertEqual(payload["action"], "prune_inactive_members")
+
+    async def test_delete_category_with_valid_confirm_token_returns_applied(self):
+        dry_run = await handle_delete_category(
+            {"category_id": "10", "dry_run": True}, {}
+        )
+        token = _payload(dry_run)["confirmToken"]
+        result = await handle_delete_category(
+            {
+                "category_id": "10",
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            {},
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "applied")
+        self.assertEqual(payload["action"], "delete_category")
+
+    async def test_expansion_filler_never_crashes_on_invalid_confirm_token(self):
+        """Non-dry-run with wrong token still raises ValueError (safety guard)."""
+        for handler, kwargs in [
+            (
+                handle_bulk_ban_members,
+                {
+                    "server_id": "1",
+                    "member_ids": ["2"],
+                    "dry_run": False,
+                    "confirm_token": "bad-token",
+                },
+            ),
+            (
+                handle_prune_inactive_members,
+                {
+                    "server_id": "1",
+                    "days": 30,
+                    "dry_run": False,
+                    "confirm_token": "bad-token",
+                },
+            ),
+            (
+                handle_delete_category,
+                {"category_id": "10", "dry_run": False, "confirm_token": "bad-token"},
+            ),
+        ]:
+            with self.subTest(handler=handler.__name__):
+                with self.assertRaisesRegex(ValueError, "Invalid confirm_token"):
+                    await handler(kwargs, {})
+
 
 class IncidentOpsContractTests(unittest.IsolatedAsyncioTestCase):
     """Contract: incident ops handlers return synthetic responses.
@@ -302,6 +387,40 @@ class IncidentOpsContractTests(unittest.IsolatedAsyncioTestCase):
             await handle_incident_rollback_lockdown(
                 {"channel_ids": ["10"], "reason": "resolved", "dry_run": False}, {}
             )
+
+    async def test_apply_lockdown_with_valid_confirm_token_returns_applied(self):
+        dry_run = await handle_incident_apply_lockdown(
+            {"channel_ids": ["10", "11"], "reason": "breach", "dry_run": True}, {}
+        )
+        token = _payload(dry_run)["confirmToken"]
+        result = await handle_incident_apply_lockdown(
+            {
+                "channel_ids": ["10", "11"],
+                "reason": "breach",
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            {},
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "applied")
+
+    async def test_rollback_lockdown_with_valid_confirm_token_returns_rolled_back(self):
+        dry_run = await handle_incident_rollback_lockdown(
+            {"channel_ids": ["10"], "reason": "resolved", "dry_run": True}, {}
+        )
+        token = _payload(dry_run)["confirmToken"]
+        result = await handle_incident_rollback_lockdown(
+            {
+                "channel_ids": ["10"],
+                "reason": "resolved",
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            {},
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "rolled_back")
 
     async def test_never_uses_deps_gateway(self):
         """All incident ops handlers must complete with empty deps."""
@@ -370,6 +489,82 @@ class AutomodPolicyContractTests(unittest.IsolatedAsyncioTestCase):
             {"ruleset": {"name": "test", "rules": []}}, {}
         )
         self.assertEqual(len(result), 1)
+
+    async def test_apply_ruleset_non_dry_run_missing_confirm_token_raises(self):
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_automod_apply_ruleset(
+                {
+                    "guild_id": "1",
+                    "ruleset": {"name": "baseline", "rules": []},
+                    "reason": "incident",
+                    "dry_run": False,
+                },
+                {},
+            )
+
+    async def test_apply_ruleset_with_valid_confirm_token_returns_applied(self):
+        dry_run = await handle_automod_apply_ruleset(
+            {
+                "guild_id": "1",
+                "ruleset": {"name": "baseline", "rules": []},
+                "reason": "incident",
+                "dry_run": True,
+            },
+            {},
+        )
+        token = _payload(dry_run)["confirmToken"]
+        result = await handle_automod_apply_ruleset(
+            {
+                "guild_id": "1",
+                "ruleset": {"name": "baseline", "rules": []},
+                "reason": "incident",
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            {},
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "applied")
+        self.assertEqual(payload["guild_id"], "1")
+        self.assertEqual(payload["ruleset_name"], "baseline")
+
+    async def test_rollback_ruleset_non_dry_run_missing_confirm_token_raises(self):
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_automod_rollback_ruleset(
+                {
+                    "guild_id": "1",
+                    "ruleset_name": "baseline",
+                    "reason": "revert",
+                    "dry_run": False,
+                },
+                {},
+            )
+
+    async def test_rollback_ruleset_with_valid_confirm_token_returns_rolled_back(self):
+        dry_run = await handle_automod_rollback_ruleset(
+            {
+                "guild_id": "1",
+                "ruleset_name": "baseline",
+                "reason": "revert",
+                "dry_run": True,
+            },
+            {},
+        )
+        token = _payload(dry_run)["confirmToken"]
+        result = await handle_automod_rollback_ruleset(
+            {
+                "guild_id": "1",
+                "ruleset_name": "baseline",
+                "reason": "revert",
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            {},
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "rolled_back")
+        self.assertEqual(payload["guild_id"], "1")
+        self.assertEqual(payload["ruleset_name"], "baseline")
 
 
 if __name__ == "__main__":
