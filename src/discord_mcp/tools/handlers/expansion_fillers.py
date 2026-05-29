@@ -4,6 +4,12 @@ from typing import Any, Dict, List
 from mcp.types import TextContent
 
 from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
+from discord_mcp.core.serialize import _serialize_auto_moderation_rule
+from discord_mcp.tools.handlers.automod_policy import (
+    _build_automod_actions,
+    _build_automod_trigger,
+    _parse_automod_event_type,
+)
 
 
 def _json(payload: Dict[str, Any]) -> List[TextContent]:
@@ -163,12 +169,25 @@ async def handle_close_incident(
 async def handle_list_auto_moderation_rules(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
+    gateway = deps.get("gateway")
+    if not gateway:
+        return _json(
+            {
+                "status": "unsupported",
+                "message": (
+                    "Discord gateway is not available. "
+                    "AutoMod operations require an active Discord connection."
+                ),
+            }
+        )
+    guild = await gateway.resolve_guild(arguments.get("server_id"))
+    raw_rules = await guild.fetch_automod_rules()
+    rules = [_serialize_auto_moderation_rule(r) for r in raw_rules]
     return _json(
         {
             "status": "ok",
-            "action": "list_auto_moderation_rules",
-            "server_id": str(arguments["server_id"]),
-            "rules": [],
+            "server_id": str(arguments.get("server_id", "")),
+            "rules": rules,
         }
     )
 
@@ -176,12 +195,41 @@ async def handle_list_auto_moderation_rules(
 async def handle_create_auto_moderation_rule(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
+    gateway = deps.get("gateway")
+    if not gateway:
+        return _json(
+            {
+                "status": "unsupported",
+                "message": (
+                    "Discord gateway is not available. "
+                    "AutoMod operations require an active Discord connection."
+                ),
+            }
+        )
+    guild = await gateway.resolve_guild(arguments.get("server_id"))
+    rule_data = arguments["rule"]
+    reason = str(arguments.get("reason", "")).strip() or None
+
+    trigger = _build_automod_trigger(rule_data)
+    actions = _build_automod_actions(rule_data.get("actions", []))
+    event_type = _parse_automod_event_type(rule_data.get("event_type", "message_send"))
+    enabled = rule_data.get("enabled", True)
+
+    new_rule = await guild.create_automod_rule(
+        name=rule_data["name"],
+        event_type=event_type,
+        trigger=trigger,
+        actions=actions,
+        enabled=enabled,
+        reason=reason,
+    )
+    created_rule = _serialize_auto_moderation_rule(new_rule)
+
     return _json(
         {
             "status": "applied",
-            "action": "create_auto_moderation_rule",
-            "server_id": str(arguments["server_id"]),
-            "rule": arguments["rule"],
+            "server_id": str(arguments.get("server_id", "")),
+            "rule": created_rule,
         }
     )
 
@@ -189,13 +237,47 @@ async def handle_create_auto_moderation_rule(
 async def handle_update_auto_moderation_rule(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
+    gateway = deps.get("gateway")
+    if not gateway:
+        return _json(
+            {
+                "status": "unsupported",
+                "message": (
+                    "Discord gateway is not available. "
+                    "AutoMod operations require an active Discord connection."
+                ),
+            }
+        )
+    guild = await gateway.resolve_guild(arguments.get("server_id"))
+    rule_id = int(arguments["rule_id"])
+    rules = await guild.fetch_automod_rules()
+    target = next((r for r in rules if r.id == rule_id), None)
+    if target is None:
+        raise ValueError(f"AutoMod rule '{arguments['rule_id']}' not found in guild")
+
+    reason = str(arguments.get("reason", "")).strip() or None
+    rule_data = arguments["rule"]
+    kwargs: Dict[str, Any] = {}
+    if "name" in rule_data:
+        kwargs["name"] = rule_data["name"]
+    if "enabled" in rule_data:
+        kwargs["enabled"] = rule_data["enabled"]
+    if "event_type" in rule_data:
+        kwargs["event_type"] = _parse_automod_event_type(rule_data["event_type"])
+    if "trigger_type" in rule_data or "trigger_metadata" in rule_data:
+        kwargs["trigger"] = _build_automod_trigger(rule_data)
+    if "actions" in rule_data:
+        kwargs["actions"] = _build_automod_actions(rule_data["actions"])
+    if reason:
+        kwargs["reason"] = reason
+
+    await target.edit(**kwargs)
+
     return _json(
         {
             "status": "applied",
-            "action": "update_auto_moderation_rule",
-            "server_id": str(arguments["server_id"]),
-            "rule_id": str(arguments["rule_id"]),
-            "rule": arguments["rule"],
+            "server_id": str(arguments.get("server_id", "")),
+            "rule_id": str(arguments.get("rule_id", "")),
         }
     )
 
@@ -203,11 +285,24 @@ async def handle_update_auto_moderation_rule(
 async def handle_automod_export_rules(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
+    gateway = deps.get("gateway")
+    if not gateway:
+        return _json(
+            {
+                "status": "unsupported",
+                "message": (
+                    "Discord gateway is not available. "
+                    "AutoMod operations require an active Discord connection."
+                ),
+            }
+        )
+    guild = await gateway.resolve_guild(arguments.get("server_id"))
+    raw_rules = await guild.fetch_automod_rules()
+    rules = [_serialize_auto_moderation_rule(r) for r in raw_rules]
     return _json(
         {
             "status": "ok",
-            "action": "automod_export_rules",
-            "server_id": str(arguments["server_id"]),
-            "export": {"rules": []},
+            "server_id": str(arguments.get("server_id", "")),
+            "export": {"rules": rules},
         }
     )

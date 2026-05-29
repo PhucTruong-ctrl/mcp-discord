@@ -47,6 +47,45 @@ def _serialize_forum_tag(tag: Any) -> Dict[str, Any]:
     }
 
 
+<<<<<<< HEAD
+def _serialize_auto_moderation_rule(rule: Any) -> Dict[str, Any]:
+    """Serialize an AutoModRule object to a JSON-safe dict."""
+    actions = []
+    for action in getattr(rule, "actions", []) or []:
+        action_dict = {"type": str(action.type)}
+        custom = getattr(action, "custom_message", None)
+        if custom:
+            action_dict["custom_message"] = custom
+        channel = getattr(action, "channel_id", None)
+        if channel:
+            action_dict["channel_id"] = str(channel)
+        duration = getattr(action, "duration", None)
+        if duration:
+            action_dict["duration"] = str(duration)
+        actions.append(action_dict)
+
+    return {
+        "id": str(rule.id),
+        "guild_id": str(rule.guild_id),
+        "name": rule.name,
+        "event_type": str(rule.event_type) if rule.event_type else None,
+        "trigger_type": str(rule.trigger_type) if rule.trigger_type else None,
+        "trigger_metadata": getattr(rule, "trigger_metadata", {}) or {},
+        "actions": actions,
+        "enabled": rule.enabled if hasattr(rule, "enabled") else True,
+        "exempt_roles": [str(r) for r in (getattr(rule, "exempt_roles", None) or [])],
+        "exempt_channels": [
+            str(c) for c in (getattr(rule, "exempt_channels", None) or [])
+        ],
+        "creator_id": str(rule.creator_id)
+        if getattr(rule, "creator_id", None)
+        else None,
+        "created_at": rule.created_at.isoformat()
+        if getattr(rule, "created_at", None)
+        else None,
+    }
+
+
 def _serialize_welcome_channel(wc: Any) -> Dict[str, Any]:
     emoji = None
     if wc.emoji:

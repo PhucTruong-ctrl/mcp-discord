@@ -154,22 +154,33 @@ EXPANSION_FILLER_TOOLS = [
     ),
     Tool(
         name="create_auto_moderation_rule",
-        description="Create auto moderation rule",
+        description="Create auto moderation rule with audit reason",
         inputSchema={
             "type": "object",
-            "properties": {"server_id": {"type": "string"}, "rule": {"type": "object"}},
+            "properties": {
+                "server_id": {"type": "string"},
+                "rule": {"type": "object"},
+                "reason": {
+                    "type": "string",
+                    "description": "Audit reason for the creation",
+                },
+            },
             "required": ["server_id", "rule"],
         },
     ),
     Tool(
         name="update_auto_moderation_rule",
-        description="Update auto moderation rule",
+        description="Update auto moderation rule with audit reason",
         inputSchema={
             "type": "object",
             "properties": {
                 "server_id": {"type": "string"},
                 "rule_id": {"type": "string"},
                 "rule": {"type": "object"},
+                "reason": {
+                    "type": "string",
+                    "description": "Audit reason for the update",
+                },
             },
             "required": ["server_id", "rule_id", "rule"],
         },

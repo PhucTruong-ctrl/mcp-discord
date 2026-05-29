@@ -1,7 +1,8 @@
+import json
 import os
 import sys
-import json
 import unittest
+from unittest.mock import AsyncMock, MagicMock
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -14,6 +15,51 @@ os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
 
 from discord_mcp.tools.handlers.router import TOOL_ROUTER, dispatch_tool_call
 from discord_mcp.tools.schemas.expansion_fillers import EXPANSION_FILLER_TOOLS
+
+
+class _FakeAutomodRule:
+    """Minimal AutoModRule-like object that returns serializable values."""
+
+    def __init__(self):
+        self.id = 1
+        self.guild_id = 123
+        self.name = "test-rule"
+        self.event_type = "AutoModRuleEventType.message_send"
+        self.trigger_type = "AutoModRuleTriggerType.keyword"
+        self.trigger_metadata = {}
+        self.enabled = True
+        self.exempt_roles = []
+        self.exempt_channels = []
+        self.creator_id = None
+        self.created_at = None
+        action = MagicMock()
+        action.type = "AutoModRuleActionType.block_message"
+        action.custom_message = None
+        action.channel_id = None
+        action.duration = None
+        self.actions = [action]
+
+    async def edit(self, **kwargs):
+        return self
+
+
+class _FakeGuild:
+    """Minimal guild that handles AutoMod methods for dispatch testing."""
+
+    def __init__(self):
+        self.id = 123
+        self._rule = _FakeAutomodRule()
+
+    async def fetch_automod_rules(self):
+        return [self._rule]
+
+    async def create_automod_rule(self, **kwargs):
+        return self._rule
+
+
+class _FakeGateway:
+    async def resolve_guild(self, server_id=None):
+        return _FakeGuild()
 
 
 class TestExpansionFillersRouterCoverage(unittest.IsolatedAsyncioTestCase):
@@ -58,14 +104,16 @@ class TestExpansionFillersRouterCoverage(unittest.IsolatedAsyncioTestCase):
             },
             "update_auto_moderation_rule": {
                 "server_id": "1",
-                "rule_id": "r1",
+                "rule_id": "1",
                 "rule": {"name": "spam-v2"},
             },
             "automod_export_rules": {"server_id": "1"},
         }
 
         for name, arguments in cases.items():
-            result = await dispatch_tool_call(name, arguments, {"gateway": object()})
+            result = await dispatch_tool_call(
+                name, arguments, {"gateway": _FakeGateway()}
+            )
             self.assertEqual(len(result), 1)
             self.assertEqual(result[0].type, "text")
 
