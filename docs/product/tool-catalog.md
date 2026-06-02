@@ -2,8 +2,8 @@
 
 ## Scope snapshot
 
-- Planned total: **106 canonical tools** (22 baseline + 84 expansion)
-- Current canonical registry in this branch: **106 tools**
+- Planned total: **107 canonical tools** (23 baseline + 84 expansion)
+- Current canonical registry in this branch: **107 tools**
 - Runtime is Discord-native only (Discord API + bot token), no external runtime dependency
 
 ## Channel CRUD/admin tools
@@ -27,7 +27,7 @@ Notes:
 - `update_forum_channel` does **not** support `default_sort_order`; handler returns `field_not_supported_by_library` if provided.
 - Update tools reject unknown fields with `unsupported_fields: ...`.
 
-## Baseline 22 tools (legacy compatibility surface)
+## Baseline 23 tools (legacy compatibility surface)
 
 1. `get_server_info`
 2. `get_channels`
@@ -40,17 +40,18 @@ Notes:
 9. `add_multiple_reactions`
 10. `remove_reaction`
 11. `send_message`
-12. `read_messages`
+12. `read_messages` — embed-aware (returns structured embed data alongside content/reactions)
 13. `edit_message`
-14. `read_forum_threads`
-15. `list_threads`
-16. `search_threads`
-17. `add_thread_tags`
-18. `unarchive_thread`
-19. `download_attachment`
-20. `get_user_info`
-21. `moderate_message`
-22. `list_servers`
+14. `reply_message` — reply to a specific message using Discord's inline reply threading
+15. `read_forum_threads`
+16. `list_threads`
+17. `search_threads`
+18. `add_thread_tags`
+19. `unarchive_thread`
+20. `download_attachment`
+21. `get_user_info`
+22. `moderate_message`
+23. `list_servers`
 
 ## Expansion catalog (implemented in this branch)
 
@@ -191,6 +192,6 @@ The following tool families have specific capability notes:
 - **Expansion fillers — tools 92–102 (synthetic-only):** Return `"applied"` or `"ok"` responses without Discord API calls.
 - **Expansion fillers — tools 103–106 (gateway-aware):** Use Discord API via gateway when available; fall back to synthetic `"applied"`/`"ok"` responses when gateway is absent.
 
-## 106-tool contract status
+## 107-tool contract status
 
-The canonical registry target is restored in this branch: **106 canonical tools** (22 baseline + 84 expansion). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.
+The canonical registry target is restored in this branch: **107 canonical tools** (23 baseline + 84 expansion). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.

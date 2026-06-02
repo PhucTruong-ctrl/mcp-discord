@@ -14,7 +14,7 @@ from discord_mcp.tools.handlers.router import TOOL_ROUTER
 from discord_mcp.tools.schemas import compose_tool_registry
 
 
-LEGACY_CANONICAL_22 = [
+LEGACY_CANONICAL_23 = [
     "get_server_info",
     "get_channels",
     "list_members",
@@ -28,6 +28,7 @@ LEGACY_CANONICAL_22 = [
     "send_message",
     "read_messages",
     "edit_message",
+    "reply_message",
     "read_forum_threads",
     "list_threads",
     "search_threads",
@@ -43,6 +44,7 @@ LEGACY_ALIAS_MATRIX = {
     "send_message": "send-message",
     "read_messages": "read-messages",
     "edit_message": "edit-message",
+    "reply_message": "reply-message",
     "read_forum_threads": "read-forum-threads",
     "list_threads": "list-threads",
     "search_threads": "search-threads",
@@ -52,10 +54,10 @@ LEGACY_ALIAS_MATRIX = {
 }
 
 
-class TestBackwardCompat22Tools(unittest.TestCase):
-    def test_legacy_22_canonical_order_snapshot(self):
+class TestBackwardCompat23Tools(unittest.TestCase):
+    def test_legacy_23_canonical_order_snapshot(self):
         canonical = [tool.name for tool in compose_tool_registry()]
-        self.assertEqual(canonical[:22], LEGACY_CANONICAL_22)
+        self.assertEqual(canonical[:23], LEGACY_CANONICAL_23)
 
     def test_legacy_alias_matrix_snapshot(self):
         for canonical, alias in LEGACY_ALIAS_MATRIX.items():

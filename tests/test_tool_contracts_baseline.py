@@ -32,6 +32,7 @@ EXPECTED_CANONICAL_TOOL_NAMES = [
     "send_message",
     "read_messages",
     "edit_message",
+    "reply_message",
     "read_forum_threads",
     "list_threads",
     "search_threads",
@@ -58,18 +59,19 @@ class TestToolContractsBaseline(unittest.IsolatedAsyncioTestCase):
             "server.call_tool must delegate to a router dispatch function",
         )
 
-    def test_canonical_tool_registry_is_frozen_to_22_tools(self):
+    def test_canonical_tool_registry_is_frozen_to_23_tools(self):
         tools = compose_tool_registry()
         canonical_names = [tool.name for tool in tools]
-        self.assertGreaterEqual(len(canonical_names), 22)
-        self.assertEqual(canonical_names[:22], EXPECTED_CANONICAL_TOOL_NAMES)
+        self.assertGreaterEqual(len(canonical_names), 23)
+        self.assertEqual(canonical_names[:23], EXPECTED_CANONICAL_TOOL_NAMES)
 
-    def test_router_exposes_canonical_22_and_only_expected_aliases(self):
+    def test_router_exposes_canonical_23_and_only_expected_aliases(self):
         canonical_set = set(EXPECTED_CANONICAL_TOOL_NAMES)
         alias_enabled = {
             "send_message",
             "read_messages",
             "edit_message",
+            "reply_message",
             "read_forum_threads",
             "list_threads",
             "search_threads",
@@ -81,7 +83,7 @@ class TestToolContractsBaseline(unittest.IsolatedAsyncioTestCase):
         expected_router_names = canonical_set | alias_names
 
         self.assertTrue(expected_router_names.issubset(set(TOOL_ROUTER.keys())))
-        self.assertEqual(len(alias_enabled), 9)
+        self.assertEqual(len(alias_enabled), 10)
         self.assertEqual(len(canonical_set - alias_enabled), 13)
 
     async def test_call_tool_delegates_to_router(self):

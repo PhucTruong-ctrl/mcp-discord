@@ -23,8 +23,8 @@
 | 10 | AutoMod policy-as-code | 7 | 4 |
 
 **Planned total (waves 1-10):** 79 new tools  
-**Implemented in this branch:** 79 new tools  
-**Canonical registry snapshot:** 22 baseline + 79 new = 101 tools
+**Implemented in this branch:** 84 expansion tools across all waves and fillers  
+**Canonical registry snapshot:** 23 baseline + 84 expansion = 107 tools
 
 ## Wave gating approach
 
@@ -39,7 +39,7 @@ This prevents big-bang risk and enables incremental release-readiness checks.
 
 ## Wave 11 deferral rationale (explicit)
 
-Wave 11 is intentionally deferred because it introduces **stateful orchestration surfaces** that are out of current scope for the 101-tool baseline plan. Deferred examples:
+Wave 11 is intentionally deferred because it introduces **stateful orchestration surfaces** that are out of current scope for the 107-tool baseline plan. Deferred examples:
 
 - `schedule_message`, `cancel_scheduled_message`
 - `create_runbook`, `list_runbooks`, `execute_runbook_step`
@@ -94,28 +94,28 @@ Deferral keeps waves 1-10 focused on deterministic Discord API operations and av
 - [x] Full automated unittest suite passes.
 - [x] Source compiles cleanly with `compileall`.
 - [x] Server import smoke check passes.
-- [x] 22 legacy tools preserve baseline prefix ordering and alias compatibility tests.
+- [x] 23 baseline tools preserve baseline prefix ordering and alias compatibility tests.
 - [x] Confirm-token safety behavior is covered and passing in safety-focused suites.
-- [x] Canonical registry reaches **101 tools** target.
+- [x] Canonical registry reaches **107 tools** target.
 
 ## Unresolved risks
 
 1. **Coverage depth on filler tools:**
-   - The canonical registry count and router coverage are restored to 101 tools.
+   - The canonical registry count and router coverage are restored to 107 tools.
    - Remaining risk is behavioral depth for lower-priority filler tools; keep extending behavior-level tests as implementation deepens.
 
 2. **Readiness decision:**
-   - **GO** for the 101-tool registry contract and documentation consistency gate, subject to normal regression verification.
+   - **GO** for the 107-tool registry contract and documentation consistency gate, subject to normal regression verification.
 
 ## Current state snapshot
 
-- Canonical tools: `101`
-- Router keys (including aliases): `118`
-- Baseline first 22 canonical names: preserved and verified by tests.
+- Canonical tools: `107`
+- Router keys (including aliases): `134`
+- Baseline first 23 canonical names: preserved and verified by tests (including `reply_message` as #14).
 
 ## Plan-to-implementation substitution notes
 
-To preserve the 101-tool contract without introducing out-of-scope stateful orchestration/runtime dependencies, the implementation includes substitutions from the original plan naming for selected expansion slots:
+To preserve the 107-tool contract without introducing out-of-scope stateful orchestration/runtime dependencies, the implementation includes substitutions from the original plan naming for selected expansion slots:
 
 - Wave 3 equivalents: `moderation_timeout_member`, `moderation_kick_member`, `moderation_ban_member`, `moderation_bulk_delete`.
 - Wave 4 equivalents: `topology_channel_tree`, `topology_channel_children`, `topology_role_hierarchy`, `topology_permission_matrix`.

@@ -9,9 +9,9 @@ A Model Context Protocol (MCP) server that provides Discord integration capabili
 
 The comprehensive expansion roadmap is documented as a phased rollout:
 
-- **Target scope**: 106 canonical tools (22 baseline + 84 expansion)
-- **Current branch registry snapshot**: 106 canonical tools
-- **Rollout model**: 10 implementation waves (Waves 1-10), plus 15 post-wave expansion fillers, with Wave 11 explicitly deferred for stateful extensions
+- **Target scope**: 107 canonical tools (23 baseline + 84 expansion)
+- **Current branch registry snapshot**: 107 canonical tools
+- **Rollout model**: 10 implementation waves (Waves 1-10), plus Wave 0 (channel admin) and 15 post-wave expansion fillers, with Wave 11 explicitly deferred for stateful extensions
 
 For full details, use:
 
@@ -34,7 +34,10 @@ Note: `update_forum_channel` will reject `default_sort_order` with `field_not_su
 
 ## New Tools Added (84 expansion tools)
 
-The original baseline compatibility surface remains intact (22 tools). The expansion adds these 84 tools:
+The original baseline compatibility surface of 22 tools is now **23 tools** with the addition of `reply_message`:
+- #14 (new): `reply_message` — Reply to a specific message using Discord's inline reply threading
+
+The expansion adds these 84 tools:
 
 ### Wave 1 — Structured discovery & inventory (8)
 
@@ -98,8 +101,8 @@ The original baseline compatibility surface remains intact (22 tools). The expan
 
 41. `get_guild_welcome_screen` — reads live guild data via gateway
 42. `update_guild_welcome_screen` — gateway-dependent
-43. `get_guild_onboarding` — capability-gated (returns `not_supported`; discord.py 2.4.0 limitation)
-44. `update_guild_onboarding` — capability-gated (returns `not_supported`; discord.py 2.4.0 limitation)
+43. `get_guild_onboarding` — gateway-dependent (discord.py 2.7.1+ `Guild.onboarding()`)
+44. `update_guild_onboarding` — gateway-dependent (discord.py 2.7.1+ `Guild.edit_onboarding()`)
 45. `dynamic_role_provision` — gateway-dependent (live role assignment)
 46. `verification_gate_orchestrator` — gateway-independent (local logic only)
 47. `progressive_access_unlock` — gateway-independent (local logic only)
@@ -150,11 +153,16 @@ The original baseline compatibility surface remains intact (22 tools). The expan
 
 > **Note**: All 15 expansion filler/utility tools return synthetic/placeholder responses. They validate input shapes but do not make live Discord API calls. See `tests/test_tool_runtime_contracts.py` for contract assertions.
 
+Additional baseline behavior notes:
+
+- **`read_messages`** is now embed-aware — each message response includes a structured embed section (title, description, url, image, thumbnail) as both prose text and JSON, in addition to the standard content/reactions output.
+- **`reply_message`** — new baseline tool for replying to specific messages using Discord's inline reply threading; pairs with `send_message` for the two core messaging patterns (send vs reply).
+
 The following tool families have specific capability notes:
 
-- **Wave 7 — Onboarding & lifecycle (41–48):** Most tools require a live gateway. Two (`get_guild_onboarding`, `update_guild_onboarding`) are capability-gated and return `not_supported` due to discord.py 2.4.0 limitations. Three (`verification_gate_orchestrator`, `progressive_access_unlock`, `onboarding_friction_audit`) are gateway-independent local logic tools.
+- **Wave 7 — Onboarding & lifecycle (41–48):** Most tools require a live gateway. Two (`get_guild_onboarding`, `update_guild_onboarding`) use native discord.py 2.7.1+ APIs (`Guild.onboarding()` / `Guild.edit_onboarding()`) via the live gateway. Three (`verification_gate_orchestrator`, `progressive_access_unlock`, `onboarding_friction_audit`) are gateway-independent local logic tools.
 - **Wave 9 — Incident operations (57–60):** Gateway-independent. Use `dry_run`/`confirm_token` for lockdown/rollback but no live Discord API calls.
-- **Wave 10 — AutoMod policy (61–64):** Mixed — `automod_validate_ruleset` is gateway-independent; `automod_get_ruleset` and `automod_apply_ruleset` use the live Discord API via gateway when available; `automod_rollback_ruleset` execute path returns `not_supported` (no Discord API primitive for rollback).
+- **Wave 10 — AutoMod policy (61–64):** Mixed — `automod_validate_ruleset` is gateway-independent; `automod_get_ruleset` and `automod_apply_ruleset` use the live Discord API via gateway (discord.py 2.7.1+ `Guild.fetch_automod_rules()` / `Guild.create_automod_rule()`); `automod_rollback_ruleset` execute path returns `not_supported` (no Discord API primitive for rollback).
 
 ## Installation
 
@@ -167,14 +175,14 @@ The following tool families have specific capability notes:
      - SERVER MEMBERS INTENT
    - Invite the bot to your server using OAuth2 URL Generator
 
-2. Clone and install the package:
+2. Clone and install the package (requires **Python ≥ 3.12**):
 ```bash
 # Clone the repository
 git clone https://github.com/hanweg/mcp-discord.git
 cd mcp-discord
 
 # Create and activate virtual environment
-uv venv
+uv venv --python 3.12
 .venv\Scripts\activate # On macOS/Linux, use: source .venv/bin/activate
 
 # Install the package
