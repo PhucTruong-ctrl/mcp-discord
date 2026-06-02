@@ -2,7 +2,7 @@ import json
 import os
 import sys
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -12,6 +12,8 @@ if SRC not in sys.path:
 
 os.environ.setdefault("DISCORD_TOKEN", "test-token")
 os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
+
+import discord
 
 from discord_mcp.tools.handlers.onboarding import (
     handle_dynamic_role_provision,
@@ -177,10 +179,40 @@ class OnboardingHandlerBehaviorTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(kwargs.get("enabled"), True)
         self.assertEqual(kwargs.get("reason"), "test update")
 
-    async def test_get_guild_onboarding_returns_capability_error(self):
-        """Guild.onboarding is not supported in discord.py 2.4.0.
-        Handler must return a structured 'not_supported' error instead of null."""
-        guild = type("Guild", (), {"name": "Demo", "id": 123})()
+    async def test_get_guild_onboarding_calls_api_and_serializes(self):
+        """discord.py 2.7.1+ supports Guild.onboarding() natively.
+        Handler must call guild.onboarding() and serialize the result."""
+        # Create a mock Onboarding object
+        prompt_option = MagicMock()
+        prompt_option.id = 1
+        prompt_option.title = "Read rules"
+        prompt_option.description = "Read the rules"
+        prompt_option.emoji = None
+
+        prompt = MagicMock()
+        prompt.id = 10
+        prompt.title = "Pick a role"
+        prompt.type = "OnboardingPromptType.multiple_choice"
+        prompt.single_select = True
+        prompt.required = True
+        prompt.in_onboarding = True
+        prompt.options = [prompt_option]
+
+        onboarding = MagicMock()
+        onboarding.enabled = True
+        onboarding.mode = "OnboardingMode.default"
+        onboarding.default_channels = []
+        onboarding.prompts = [prompt]
+
+        guild = type(
+            "Guild",
+            (),
+            {
+                "name": "Demo",
+                "id": 123,
+                "onboarding": AsyncMock(return_value=onboarding),
+            },
+        )()
         gateway = type(
             "Gateway", (), {"resolve_guild": AsyncMock(return_value=guild)}
         )()
@@ -191,26 +223,52 @@ class OnboardingHandlerBehaviorTests(unittest.IsolatedAsyncioTestCase):
         payload = json.loads(result[0].text)
 
         self.assertEqual(payload["serverId"], "123")
-        self.assertEqual(payload["status"], "not_supported")
-        self.assertIn("not supported", payload["message"].lower())
+        self.assertEqual(payload["serverName"], "Demo")
+        self.assertTrue(payload["onboarding"]["enabled"])
+        self.assertEqual(len(payload["onboarding"]["prompts"]), 1)
+        self.assertEqual(payload["onboarding"]["prompts"][0]["title"], "Pick a role")
+        guild.onboarding.assert_awaited_once()
 
-    async def test_update_guild_onboarding_returns_capability_error(self):
-        """Guild onboarding update is not supported in discord.py 2.4.0.
-        Handler must return a structured 'not_supported' error instead of {'updated': True}."""
-        guild = type("Guild", (), {"name": "Demo", "id": 123})()
+    async def test_update_guild_onboarding_calls_edit_api(self):
+        """discord.py 2.7.1+ supports Guild.edit_onboarding() natively.
+        Handler must call guild.edit_onboarding() with the provided parameters."""
+        updated_onboarding = MagicMock()
+        updated_onboarding.enabled = True
+        updated_onboarding.mode = "OnboardingMode.default"
+        updated_onboarding.default_channels = []
+        updated_onboarding.prompts = []
+
+        guild = type(
+            "Guild",
+            (),
+            {
+                "name": "Demo",
+                "id": 123,
+                "onboarding": AsyncMock(return_value=updated_onboarding),
+                "edit_onboarding": AsyncMock(return_value=updated_onboarding),
+            },
+        )()
         gateway = type(
             "Gateway", (), {"resolve_guild": AsyncMock(return_value=guild)}
         )()
 
         result = await handle_update_guild_onboarding(
-            {"server_id": "123", "onboarding": {"some": "data"}},
+            {
+                "server_id": "123",
+                "onboarding": {"enabled": True},
+                "reason": "test update",
+            },
             {"gateway": gateway},
         )
         payload = json.loads(result[0].text)
 
         self.assertEqual(payload["serverId"], "123")
-        self.assertEqual(payload["status"], "not_supported")
-        self.assertIn("not supported", payload["message"].lower())
+        self.assertTrue(payload["updated"])
+        self.assertTrue(payload["onboarding"]["enabled"])
+        guild.edit_onboarding.assert_awaited_once()
+        _, kwargs = guild.edit_onboarding.call_args
+        self.assertIs(kwargs.get("enabled"), True)
+        self.assertEqual(kwargs.get("reason"), "test update")
 
     async def test_dynamic_role_provision_returns_applied_and_skipped(self):
         member = type(
