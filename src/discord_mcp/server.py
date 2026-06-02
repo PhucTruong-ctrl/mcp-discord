@@ -34,10 +34,14 @@ _configure_windows_stdout_encoding()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("discord-mcp-server")
 
-# Discord bot setup
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-if not DISCORD_TOKEN:
-    raise ValueError("DISCORD_TOKEN environment variable is required")
+
+# Lazy token resolver: validated at runtime, not import time
+def _require_discord_token() -> str:
+    token = os.getenv("DISCORD_TOKEN")
+    if not token:
+        raise ValueError("DISCORD_TOKEN environment variable is required")
+    return token
+
 
 # Initialize Discord bot with necessary intents
 intents = discord.Intents.default()
@@ -86,8 +90,11 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
 
 
 async def main():
+    # Validate token at runtime (not import time)
+    token = _require_discord_token()
+
     # Start Discord bot in the background
-    asyncio.create_task(bot.start(DISCORD_TOKEN))
+    asyncio.create_task(bot.start(token))
 
     # Build explicit initialization options for the MCP server
     init_opts = InitializationOptions(
