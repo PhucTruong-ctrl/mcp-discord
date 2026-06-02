@@ -1,53 +1,10 @@
-import importlib.util
-import sys
-import types
+"""Unit tests for DiscordGateway using real discord.py types for isinstance checks."""
+
 import unittest
-from pathlib import Path
-from types import SimpleNamespace
 
+import discord
 
-MODULE_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "src"
-    / "discord_mcp"
-    / "services"
-    / "discord_gateway.py"
-)
-spec = importlib.util.spec_from_file_location("discord_gateway", MODULE_PATH)
-gateway_module = importlib.util.module_from_spec(spec)
-assert spec and spec.loader
-sys.modules.setdefault(
-    "discord",
-    SimpleNamespace(
-        ForumChannel=type("ForumChannel", (), {}),
-        TextChannel=type("TextChannel", (), {}),
-        Thread=type("Thread", (), {}),
-    ),
-)
-discord_mcp_module = types.ModuleType("discord_mcp")
-core_module = types.ModuleType("discord_mcp.core")
-resolve_module = types.ModuleType("discord_mcp.core.resolve")
-
-
-def _try_int(value):
-    try:
-        return int(str(value))
-    except (TypeError, ValueError):
-        return None
-
-
-def _normalize_name(value):
-    return value.strip().lower().removeprefix("#")
-
-
-resolve_module.try_int = _try_int
-resolve_module.normalize_name = _normalize_name
-sys.modules.setdefault("discord_mcp", discord_mcp_module)
-sys.modules.setdefault("discord_mcp.core", core_module)
-sys.modules.setdefault("discord_mcp.core.resolve", resolve_module)
-spec.loader.exec_module(gateway_module)
-DiscordGateway = gateway_module.DiscordGateway
-DiscordTypes = sys.modules["discord"]
+from discord_mcp.services.discord_gateway import DiscordGateway
 
 
 class FakeGuild:
@@ -65,23 +22,30 @@ class FakeGuild:
         return self._channels.get(channel_id)
 
 
-class FakeTextChannel(DiscordTypes.TextChannel):
+class FakeTextChannel(discord.TextChannel):
+    """Fake text channel bypassing discord.TextChannel's complex __init__."""
+
     def __init__(self, channel_id=10, name="general", guild=None):
         self.id = channel_id
         self.name = name
         self.guild = guild
 
 
-class FakeForumChannel(DiscordTypes.ForumChannel):
+class FakeForumChannel(discord.ForumChannel):
+    """Fake forum channel bypassing discord.ForumChannel's complex __init__."""
+
     def __init__(self, channel_id=20, name="forum", guild=None):
         self.id = channel_id
         self.name = name
         self.guild = guild
-        self.threads = []
+        # threads is a read-only computed property in discord.py 2.7.1,
+        # so we cannot set it directly. It is derived from guild._threads.
         self.available_tags = []
 
 
-class FakeThread(DiscordTypes.Thread):
+class FakeThread(discord.Thread):
+    """Fake thread bypassing discord.Thread's complex __init__."""
+
     def __init__(self, channel_id=30, guild=None, parent_id=None):
         self.id = channel_id
         self.guild = guild

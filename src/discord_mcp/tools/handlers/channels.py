@@ -85,11 +85,7 @@ async def handle_create_voice_channel(
     guild = await gateway.resolve_guild(arguments["server_id"])
     category = _resolve_category(guild, arguments.get("category_id"))
 
-    creator = getattr(guild, "create_voice_channel", None)
-    if creator is None:
-        raise ValueError("field_not_supported_by_library: create_voice_channel")
-
-    channel = await creator(
+    channel = await guild.create_voice_channel(
         name=arguments["name"],
         category=category,
         bitrate=arguments.get("bitrate"),
@@ -108,11 +104,7 @@ async def handle_create_forum_channel(
     guild = await gateway.resolve_guild(arguments["server_id"])
     category = _resolve_category(guild, arguments.get("category_id"))
 
-    creator = getattr(guild, "create_forum_channel", None)
-    if creator is None:
-        raise ValueError("field_not_supported_by_library: create_forum_channel")
-
-    channel = await creator(
+    channel = await guild.create_forum(
         name=arguments["name"],
         category=category,
         topic=arguments.get("topic"),
@@ -236,9 +228,6 @@ async def handle_update_forum_channel(
     if not _matches_channel_type(channel, "forum"):
         raise ValueError(f"Channel '{arguments['channel_id']}' is not a forum channel")
 
-    if "default_sort_order" in arguments:
-        raise ValueError("field_not_supported_by_library: default_sort_order")
-
     unsupported = _unsupported_fields(
         arguments,
         [
@@ -248,6 +237,7 @@ async def handle_update_forum_channel(
             "slowmode_delay",
             "default_auto_archive_duration",
             "default_reaction_emoji",
+            "default_sort_order",
             "available_tags",
             "category_id",
             "position",
@@ -264,6 +254,7 @@ async def handle_update_forum_channel(
         "slowmode_delay",
         "default_auto_archive_duration",
         "default_reaction_emoji",
+        "default_sort_order",
         "available_tags",
         "position",
     ):

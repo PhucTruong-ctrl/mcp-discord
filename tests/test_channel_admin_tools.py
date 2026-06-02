@@ -258,25 +258,24 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
                 {"gateway": gateway},
             )
 
-    async def test_update_forum_channel_rejects_library_unsupported_fields(self):
+    async def test_update_forum_channel_accepts_default_sort_order(self):
+        """default_sort_order is supported by discord.py 2.7.1+ ForumChannel.edit()."""
         handler = router.TOOL_ROUTER["update_forum_channel"]
-        guild = self._guild(
-            channels=[
-                self._channel(60, "forum", type="forum", available_tags=[]),
-            ]
-        )
+        channel = self._channel(60, "forum", type="forum", available_tags=[])
+        guild = self._guild(channels=[channel])
         gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
 
-        with self.assertRaisesRegex(ValueError, "field_not_supported_by_library"):
-            await handler(
-                {
-                    "server_id": "1",
-                    "channel_id": "60",
-                    "name": "forum",
-                    "default_sort_order": 1,
-                },
-                {"gateway": gateway},
-            )
+        result = await handler(
+            {
+                "server_id": "1",
+                "channel_id": "60",
+                "name": "forum",
+                "default_sort_order": 1,
+            },
+            {"gateway": gateway},
+        )
+
+        self.assertIn("Updated forum channel", result[0].text)
 
     async def test_create_voice_channel_uses_voice_creator(self):
         handler = router.TOOL_ROUTER["create_voice_channel"]
@@ -301,12 +300,12 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
         handler = router.TOOL_ROUTER["create_forum_channel"]
         guild = self._guild()
 
-        async def create_forum_channel(**kwargs):
+        async def create_forum(**kwargs):
             payload = dict(kwargs)
             payload.pop("name", None)
             return self._channel(81, kwargs["name"], type="forum", **payload)
 
-        guild.create_forum_channel = create_forum_channel
+        guild.create_forum = create_forum
         gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
 
         result = await handler(

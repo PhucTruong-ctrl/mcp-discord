@@ -104,3 +104,41 @@ def _serialize_welcome_screen(screen: Any) -> Dict[str, Any]:
         ],
         "enabled": screen.enabled,
     }
+
+
+def _serialize_onboarding_prompt_option(option: Any) -> Dict[str, Any]:
+    return {
+        "id": str(option.id),
+        "title": option.title,
+        "description": getattr(option, "description", None),
+        "emoji": getattr(option, "emoji", None),
+        "channel_ids": [str(c) for c in (getattr(option, "channel_ids", None) or [])],
+        "role_ids": [str(r) for r in (getattr(option, "role_ids", None) or [])],
+    }
+
+
+def _serialize_onboarding_prompt(prompt: Any) -> Dict[str, Any]:
+    return {
+        "id": str(prompt.id),
+        "type": str(prompt.type) if prompt.type else None,
+        "title": prompt.title,
+        "singleSelect": prompt.single_select,
+        "required": prompt.required,
+        "inOnboarding": prompt.in_onboarding,
+        "options": [
+            _serialize_onboarding_prompt_option(opt) for opt in (prompt.options or [])
+        ],
+    }
+
+
+def _serialize_onboarding(onboarding: Any) -> Dict[str, Any]:
+    return {
+        "enabled": onboarding.enabled,
+        "mode": str(onboarding.mode) if onboarding.mode else None,
+        "defaultChannels": [
+            str(c) for c in (getattr(onboarding, "default_channels", None) or [])
+        ],
+        "prompts": [
+            _serialize_onboarding_prompt(p) for p in (onboarding.prompts or [])
+        ],
+    }

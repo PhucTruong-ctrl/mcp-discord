@@ -3,7 +3,10 @@ from typing import Any, Dict, List
 
 from mcp.types import TextContent
 
-from discord_mcp.core.serialize import _serialize_welcome_screen
+from discord_mcp.core.serialize import (
+    _serialize_onboarding,
+    _serialize_welcome_screen,
+)
 
 
 async def handle_get_guild_welcome_screen(
@@ -56,14 +59,11 @@ async def handle_get_guild_onboarding(
     guild = await deps["gateway"].resolve_guild(
         arguments.get("server_id") or arguments.get("server")
     )
+    onboarding = await guild.onboarding()
     payload = {
         "serverId": str(guild.id),
-        "status": "not_supported",
-        "message": (
-            "Guild onboarding is not supported by discord.py 2.4.0. "
-            "The Discord API may support this via HTTP requests, "
-            "but it is not exposed in the current library version."
-        ),
+        "serverName": guild.name,
+        "onboarding": _serialize_onboarding(onboarding),
     }
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))
@@ -76,14 +76,23 @@ async def handle_update_guild_onboarding(
     guild = await deps["gateway"].resolve_guild(
         arguments.get("server_id") or arguments.get("server")
     )
+    ob_args = arguments.get("onboarding", {})
+    edit_kwargs = {}
+    if "enabled" in ob_args:
+        edit_kwargs["enabled"] = ob_args["enabled"]
+    if "prompts" in ob_args:
+        edit_kwargs["prompts"] = ob_args["prompts"]
+    if "default_channels" in ob_args:
+        edit_kwargs["default_channels"] = ob_args["default_channels"]
+    if "mode" in ob_args:
+        edit_kwargs["mode"] = ob_args["mode"]
+    if arguments.get("reason"):
+        edit_kwargs["reason"] = arguments["reason"]
+    updated_onboarding = await guild.edit_onboarding(**edit_kwargs)
     payload = {
         "serverId": str(guild.id),
-        "status": "not_supported",
-        "message": (
-            "Guild onboarding update is not supported by discord.py 2.4.0. "
-            "The Discord API may support this via HTTP requests, "
-            "but it is not exposed in the current library version."
-        ),
+        "updated": True,
+        "onboarding": _serialize_onboarding(updated_onboarding),
     }
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))
