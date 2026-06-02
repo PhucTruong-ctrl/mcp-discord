@@ -8,9 +8,11 @@ from functools import wraps
 import discord
 from discord.ext import commands
 from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.server.models import InitializationOptions
+from mcp.types import ServerCapabilities, Tool, TextContent
 from mcp.server.stdio import stdio_server
 
+from ._version import __version__
 from .composition import (
     build_tool_dependencies,
     compose_tool_registry,
@@ -87,9 +89,16 @@ async def main():
     # Start Discord bot in the background
     asyncio.create_task(bot.start(DISCORD_TOKEN))
 
+    # Build explicit initialization options for the MCP server
+    init_opts = InitializationOptions(
+        server_name="discord-server",
+        server_version=__version__,
+        capabilities=ServerCapabilities(),
+    )
+
     # Run MCP server
     async with stdio_server() as (read_stream, write_stream):
-        await app.run(read_stream, write_stream, app.create_initialization_options())
+        await app.run(read_stream, write_stream, init_opts)
 
 
 if __name__ == "__main__":

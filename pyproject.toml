@@ -30,8 +30,8 @@ packages = ["src/discord_mcp"]
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
-<<<<<<< HEAD
     "pytest-asyncio>=1.4.0",
+
 ]
 
 [project.scripts]
