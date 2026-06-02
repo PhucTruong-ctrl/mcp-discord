@@ -20,6 +20,7 @@ ALIAS_MATRIX = {
     "send_message": "send-message",
     "read_messages": "read-messages",
     "edit_message": "edit-message",
+    "reply_message": "reply-message",
     "read_forum_threads": "read-forum-threads",
     "list_threads": "list-threads",
     "search_threads": "search-threads",
@@ -131,7 +132,7 @@ NON_ALIAS_TOOLS = {
 
 class TestRouterAliasCompatibility(unittest.TestCase):
     def test_alias_enabled_tools_count(self):
-        self.assertEqual(len(ALIAS_MATRIX), 22)
+        self.assertEqual(len(ALIAS_MATRIX), 23)
         self.assertEqual(len(NON_ALIAS_TOOLS), 84)
 
     def test_alias_pairs_map_to_same_handler(self):

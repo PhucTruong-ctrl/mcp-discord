@@ -62,7 +62,12 @@ from .inventory import (
     handle_get_role_hierarchy,
     handle_list_inactive_channels,
 )
-from .messages import handle_edit_message, handle_read_messages, handle_send_message
+from .messages import (
+    handle_edit_message,
+    handle_read_messages,
+    handle_reply_message,
+    handle_send_message,
+)
 from .moderation_core import (
     handle_moderation_ban_member,
     handle_moderation_bulk_delete,
@@ -147,6 +152,8 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "read-messages": handle_read_messages,
     "edit_message": handle_edit_message,
     "edit-message": handle_edit_message,
+    "reply_message": handle_reply_message,
+    "reply-message": handle_reply_message,
     "read_forum_threads": handle_read_forum_threads,
     "read-forum-threads": handle_read_forum_threads,
     "list_threads": handle_list_threads,

@@ -30,7 +30,7 @@ Channel CRUD/admin tools are exposed per channel type:
 - Delete: `delete_channel`
 
 See `docs/product/tool-catalog.md` for the field contracts.
-Note: `update_forum_channel` will reject `default_sort_order` with `field_not_supported_by_library` when that field is not supported by the runtime library.
+Note: on discord.py 2.7.1+ the `update_forum_channel` handler passes `default_sort_order` through to `ForumChannel.edit(...)`, so the field is supported by the current runtime baseline.
 
 ## New Tools Added (84 expansion tools)
 

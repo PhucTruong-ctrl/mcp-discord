@@ -21,10 +21,10 @@ Field contracts:
 - `create_voice_channel`: `server_id`, `name`, optional `category_id`, optional `bitrate`, optional `user_limit`, optional `rtc_region`, optional `video_quality_mode`
 - `update_voice_channel`: `server_id`, `channel_id`, optional `name`, optional `category_id`, optional `bitrate`, optional `user_limit`, optional `rtc_region`, optional `video_quality_mode`, optional `position`, optional `reason`
 - `create_forum_channel`: `server_id`, `name`, optional `category_id`, optional `topic`, optional `nsfw`, optional `slowmode_delay`, optional `default_auto_archive_duration`, optional `default_reaction_emoji`, optional `default_sort_order`, optional `available_tags`
-- `update_forum_channel`: `server_id`, `channel_id`, optional `name`, optional `category_id`, optional `topic`, optional `nsfw`, optional `slowmode_delay`, optional `default_auto_archive_duration`, optional `default_reaction_emoji`, optional `available_tags`, optional `position`, optional `reason`
+- `update_forum_channel`: `server_id`, `channel_id`, optional `name`, optional `category_id`, optional `topic`, optional `nsfw`, optional `slowmode_delay`, optional `default_auto_archive_duration`, optional `default_reaction_emoji`, optional `default_sort_order`, optional `available_tags`, optional `position`, optional `reason`
 
 Notes:
-- `update_forum_channel` does **not** support `default_sort_order`; handler returns `field_not_supported_by_library` if provided.
+- `update_forum_channel` supports `default_sort_order` on the current discord.py 2.7.1+ runtime and passes it through to `ForumChannel.edit(...)`.
 - Update tools reject unknown fields with `unsupported_fields: ...`.
 
 ## Baseline 23 tools (legacy compatibility surface)
@@ -123,74 +123,74 @@ Notes:
 
 ### Wave 7 — Onboarding & lifecycle (8)
 
-68. `get_guild_welcome_screen`
-69. `update_guild_welcome_screen`
-70. `get_guild_onboarding`
-71. `update_guild_onboarding`
-72. `dynamic_role_provision`
-73. `verification_gate_orchestrator`
-74. `progressive_access_unlock`
-75. `onboarding_friction_audit`
+69. `get_guild_welcome_screen`
+70. `update_guild_welcome_screen`
+71. `get_guild_onboarding`
+72. `update_guild_onboarding`
+73. `dynamic_role_provision`
+74. `verification_gate_orchestrator`
+75. `progressive_access_unlock`
+76. `onboarding_friction_audit`
 
 ### Wave 8 — Messaging, webhooks, integrations (8)
 
-76. `send_embed_message`
-77. `send_rich_announcement`
-78. `crosspost_announcement`
-79. `create_channel_webhook`
-80. `list_channel_webhooks`
-81. `execute_channel_webhook`
-82. `list_guild_integrations`
-83. `get_guild_vanity_url`
+77. `send_embed_message`
+78. `send_rich_announcement`
+79. `crosspost_announcement`
+80. `create_channel_webhook`
+81. `list_channel_webhooks`
+82. `execute_channel_webhook`
+83. `list_guild_integrations`
+84. `get_guild_vanity_url`
 
 ### Wave 9 — Incident operations (4 implemented)
 
-84. `incident_get_channel_state`
-85. `incident_set_channel_state`
-86. `incident_apply_lockdown`
-87. `incident_rollback_lockdown`
+85. `incident_get_channel_state`
+86. `incident_set_channel_state`
+87. `incident_apply_lockdown`
+88. `incident_rollback_lockdown`
 
 ### Wave 10 — AutoMod policy (4 implemented)
 
-88. `automod_validate_ruleset`
-89. `automod_get_ruleset`
-90. `automod_apply_ruleset`
-91. `automod_rollback_ruleset`
+89. `automod_validate_ruleset`
+90. `automod_get_ruleset`
+91. `automod_apply_ruleset`
+92. `automod_rollback_ruleset`
 
 ### Post-wave expansion fillers/utilities (15)
 
-92. `bulk_ban_members`
-93. `prune_inactive_members`
-94. `remove_member_timeout`
-95. `unban_member`
-96. `create_category`
-97. `rename_category`
-98. `move_category`
-99. `delete_category`
-100. `create_incident_room`
-101. `append_incident_event`
-102. `close_incident`
-103. `list_auto_moderation_rules`
-104. `create_auto_moderation_rule`
-105. `update_auto_moderation_rule`
-106. `automod_export_rules`
+93. `bulk_ban_members`
+94. `prune_inactive_members`
+95. `remove_member_timeout`
+96. `unban_member`
+97. `create_category`
+98. `rename_category`
+99. `move_category`
+100. `delete_category`
+101. `create_incident_room`
+102. `append_incident_event`
+103. `close_incident`
+104. `list_auto_moderation_rules`
+105. `create_auto_moderation_rule`
+106. `update_auto_moderation_rule`
+107. `automod_export_rules`
 
 ## Implementation-status note
 
 The 15 expansion filler/utility tools split into two groups with different runtime behavior:
 
-- **Tools 92–102 (synthetic-only):** `bulk_ban_members`, `prune_inactive_members`, `remove_member_timeout`, `unban_member`, `create_category`, `rename_category`, `move_category`, `delete_category`, `create_incident_room`, `append_incident_event`, `close_incident` — return synthetic/placeholder responses. They validate input shapes and may use the `dry_run`/`confirm_token` safety pattern for destructive operations, but do **not** make live Discord API calls.
-- **Tools 103–106 (gateway-aware with synthetic fallback):** `list_auto_moderation_rules`, `create_auto_moderation_rule`, `update_auto_moderation_rule`, `automod_export_rules` — use the live Discord API via gateway when available; return synthetic placeholder responses when gateway is absent.
+- **Tools 93–103 (synthetic-only):** `bulk_ban_members`, `prune_inactive_members`, `remove_member_timeout`, `unban_member`, `create_category`, `rename_category`, `move_category`, `delete_category`, `create_incident_room`, `append_incident_event`, `close_incident` — return synthetic/placeholder responses. They validate input shapes and may use the `dry_run`/`confirm_token` safety pattern for destructive operations, but do **not** make live Discord API calls.
+- **Tools 104–107 (gateway-aware with synthetic fallback):** `list_auto_moderation_rules`, `create_auto_moderation_rule`, `update_auto_moderation_rule`, `automod_export_rules` — use the live Discord API via gateway when available; return synthetic placeholder responses when gateway is absent.
 
-This preserves the full 106-tool registry contract while deeper Discord side-effect implementations for the synthetic-only tools continue in follow-up work.
+This preserves the full 107-tool registry contract while deeper Discord side-effect implementations for the synthetic-only tools continue in follow-up work.
 
 The following tool families have specific capability notes:
 
-- **Wave 7 — Onboarding & lifecycle (68–75):** Most tools require a live gateway. Two (`get_guild_onboarding`, `update_guild_onboarding`) now use native discord.py 2.7.1+ Guild.onboarding() and Guild.edit_onboarding() APIs. Three (`verification_gate_orchestrator`, `progressive_access_unlock`, `onboarding_friction_audit`) are gateway-independent local logic tools.
-- **Wave 9 — Incident operations (84–87):** Gateway-independent. Use `dry_run`/`confirm_token` for lockdown/rollback but no live Discord API calls.
-- **Wave 10 — AutoMod policy (88–91):** Mixed — `automod_validate_ruleset` is gateway-independent; `automod_get_ruleset` and `automod_apply_ruleset` use the live Discord API via gateway when available; `automod_rollback_ruleset` execute path returns `not_supported` (no Discord API primitive for rollback).
-- **Expansion fillers — tools 92–102 (synthetic-only):** Return `"applied"` or `"ok"` responses without Discord API calls.
-- **Expansion fillers — tools 103–106 (gateway-aware):** Use Discord API via gateway when available; fall back to synthetic `"applied"`/`"ok"` responses when gateway is absent.
+- **Wave 7 — Onboarding & lifecycle (69–76):** Most tools require a live gateway. Two (`get_guild_onboarding`, `update_guild_onboarding`) now use native discord.py 2.7.1+ Guild.onboarding() and Guild.edit_onboarding() APIs. Three (`verification_gate_orchestrator`, `progressive_access_unlock`, `onboarding_friction_audit`) are gateway-independent local logic tools.
+- **Wave 9 — Incident operations (85–88):** Gateway-independent. Use `dry_run`/`confirm_token` for lockdown/rollback but no live Discord API calls.
+- **Wave 10 — AutoMod policy (89–92):** Mixed — `automod_validate_ruleset` is gateway-independent; `automod_get_ruleset` and `automod_apply_ruleset` use the live Discord API via gateway when available; `automod_rollback_ruleset` execute path returns `not_supported` (no Discord API primitive for rollback).
+- **Expansion fillers — tools 93–103 (synthetic-only):** Return `"applied"` or `"ok"` responses without Discord API calls.
+- **Expansion fillers — tools 104–107 (gateway-aware):** Use Discord API via gateway when available; fall back to synthetic `"applied"`/`"ok"` responses when gateway is absent.
 
 ## 107-tool contract status
 

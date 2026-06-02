@@ -141,4 +141,30 @@ MESSAGE_TOOLS = [
             "required": ["channel_id", "message_id", "content"],
         },
     ),
+    Tool(
+        name="reply_message",
+        description="Reply to a specific message in a channel. Uses Discord's inline reply threading.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "server_id": {
+                    "type": "string",
+                    "description": "Discord server (guild) ID",
+                },
+                "channel_id": {
+                    "type": "string",
+                    "description": "Discord channel ID containing the target message",
+                },
+                "message_id": {
+                    "type": "string",
+                    "description": "Message ID to reply to",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Reply message content",
+                },
+            },
+            "required": ["channel_id", "message_id", "content"],
+        },
+    ),
 ]

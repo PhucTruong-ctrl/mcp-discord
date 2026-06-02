@@ -56,7 +56,7 @@ def _mock_automod_rule(name="test-rule", rule_id="111", **overrides):
 class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
     """Test that runtime AutoMod tools call Discord API instead of returning placeholders.
 
-    These tools (103-106 in the canonical registry) are *gateway-aware*: when
+    These tools (104-107 in the canonical registry) are *gateway-aware*: when
     a gateway is available they call the Discord API; when it is absent they
     fall back to synthetic placeholder responses. The gateway-absent fallback
     contract is tested in test_tool_runtime_contracts.py (class
