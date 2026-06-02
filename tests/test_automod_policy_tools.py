@@ -32,13 +32,19 @@ def _mock_automod_rule(name="test-rule", rule_id="111", **overrides):
     rule = MagicMock()
     rule.id = int(rule_id)
     rule.name = name
-    rule.guild_id = 123
+    rule.guild = type("Guild", (), {"id": 123})()
     rule.event_type = "AutoModRuleEventType.message_send"
-    rule.trigger_type = "AutoModRuleTriggerType.keyword"
-    rule.trigger_metadata = {}
+    rule.trigger = type(
+        "Trigger",
+        (),
+        {
+            "type": "AutoModRuleTriggerType.keyword",
+            "to_metadata_dict": lambda self: {"keyword_filter": ["bad"]},
+        },
+    )()
     rule.enabled = overrides.get("enabled", True)
-    rule.exempt_roles = []
-    rule.exempt_channels = []
+    rule.exempt_role_ids = []
+    rule.exempt_channel_ids = []
     rule.creator_id = 456
     rule.created_at = None
 
@@ -116,6 +122,13 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["guild_id"], "123")
         self.assertEqual(len(payload["rules"]), 1)
         self.assertEqual(payload["rules"][0]["name"], "test-rule")
+        self.assertEqual(payload["rules"][0]["guild_id"], "123")
+        self.assertEqual(
+            payload["rules"][0]["trigger_type"], "AutoModRuleTriggerType.keyword"
+        )
+        self.assertEqual(
+            payload["rules"][0]["trigger_metadata"], {"keyword_filter": ["bad"]}
+        )
         guild.fetch_automod_rules.assert_awaited_once()
 
     async def test_get_ruleset_filters_by_ruleset_name(self):

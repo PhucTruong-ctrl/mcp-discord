@@ -229,6 +229,52 @@ class OnboardingHandlerBehaviorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["onboarding"]["prompts"][0]["title"], "Pick a role")
         guild.onboarding.assert_awaited_once()
 
+    async def test_get_guild_onboarding_serializes_prompt_option_emoji(self):
+        prompt_option = MagicMock()
+        prompt_option.id = 1
+        prompt_option.title = "Read rules"
+        prompt_option.description = "Read the rules"
+        prompt_option.emoji = discord.PartialEmoji(name="wave", id=789)
+        prompt_option.channel_ids = []
+        prompt_option.role_ids = []
+
+        prompt = MagicMock()
+        prompt.id = 10
+        prompt.title = "Pick a role"
+        prompt.type = "OnboardingPromptType.multiple_choice"
+        prompt.single_select = True
+        prompt.required = True
+        prompt.in_onboarding = True
+        prompt.options = [prompt_option]
+
+        onboarding = MagicMock()
+        onboarding.enabled = True
+        onboarding.mode = "OnboardingMode.default"
+        onboarding.default_channels = []
+        onboarding.prompts = [prompt]
+
+        guild = type(
+            "Guild",
+            (),
+            {
+                "name": "Demo",
+                "id": 123,
+                "onboarding": AsyncMock(return_value=onboarding),
+            },
+        )()
+        gateway = type(
+            "Gateway", (), {"resolve_guild": AsyncMock(return_value=guild)}
+        )()
+
+        result = await handle_get_guild_onboarding(
+            {"server_id": "123"}, {"gateway": gateway}
+        )
+        payload = json.loads(result[0].text)
+
+        self.assertEqual(
+            payload["onboarding"]["prompts"][0]["options"][0]["emoji"], "wave"
+        )
+
     async def test_update_guild_onboarding_calls_edit_api(self):
         """discord.py 2.7.1+ supports Guild.edit_onboarding() natively.
         Handler must call guild.edit_onboarding() with the provided parameters."""

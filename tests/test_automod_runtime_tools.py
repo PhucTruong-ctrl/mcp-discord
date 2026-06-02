@@ -30,13 +30,19 @@ def _mock_automod_rule(name="test-rule", rule_id="111", **overrides):
     rule = MagicMock()
     rule.id = int(rule_id)
     rule.name = name
-    rule.guild_id = 123
+    rule.guild = type("Guild", (), {"id": 123})()
     rule.event_type = "AutoModRuleEventType.message_send"
-    rule.trigger_type = "AutoModRuleTriggerType.keyword"
-    rule.trigger_metadata = {}
+    rule.trigger = type(
+        "Trigger",
+        (),
+        {
+            "type": "AutoModRuleTriggerType.keyword",
+            "to_metadata_dict": lambda self: {"keyword_filter": ["bad"]},
+        },
+    )()
     rule.enabled = overrides.get("enabled", True)
-    rule.exempt_roles = []
-    rule.exempt_channels = []
+    rule.exempt_role_ids = []
+    rule.exempt_channel_ids = []
     rule.creator_id = 456
     rule.created_at = None
 
@@ -94,6 +100,10 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(payload["rules"]), 1)
         self.assertEqual(payload["rules"][0]["name"], "test-rule")
         self.assertEqual(payload["rules"][0]["id"], "111")
+        self.assertEqual(payload["rules"][0]["guild_id"], "123")
+        self.assertEqual(
+            payload["rules"][0]["trigger_metadata"], {"keyword_filter": ["bad"]}
+        )
         deps["gateway"].resolve_guild.assert_awaited_once()
         deps[
             "gateway"

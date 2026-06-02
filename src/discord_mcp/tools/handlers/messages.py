@@ -85,6 +85,24 @@ async def handle_read_messages(
             parts.append(f"  image: {e['image']}")
         if e.get("thumbnail"):
             parts.append(f"  thumbnail: {e['thumbnail']}")
+        if e.get("author"):
+            parts.append(f"  author: {e['author']}")
+        if e.get("footer"):
+            parts.append(f"  footer: {e['footer']}")
+        if e.get("timestamp"):
+            parts.append(f"  timestamp: {e['timestamp']}")
+        if e.get("color") is not None:
+            parts.append(f"  color: {e['color']}")
+        if e.get("fields"):
+            for field in e["fields"]:
+                parts.append(
+                    f"  field: {field.get('name')} = {field.get('value')}"
+                    + (
+                        f" (inline={field.get('inline')})"
+                        if field.get("inline") is not None
+                        else ""
+                    )
+                )
         return "\n".join(parts)
 
     embed_json = json.dumps(

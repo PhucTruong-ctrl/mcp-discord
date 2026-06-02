@@ -69,12 +69,22 @@ class EmbedSerializationTests(unittest.TestCase):
             description="World",
             url="https://example.com",
         )
+        embed.set_image(url="https://example.com/image.png")
+        embed.set_thumbnail(url="https://example.com/thumb.png")
+        embed.set_author(name="Bot")
+        embed.set_footer(text="Footer")
+        embed.add_field(name="A", value="B", inline=False)
         result = _serialize_embed(embed)
         self.assertEqual(result["title"], "Hello")
         self.assertEqual(result["description"], "World")
         self.assertEqual(result["url"], "https://example.com")
-        self.assertIsNone(result["image"])
-        self.assertIsNone(result["thumbnail"])
+        self.assertEqual(result["image"], "https://example.com/image.png")
+        self.assertEqual(result["thumbnail"], "https://example.com/thumb.png")
+        self.assertEqual(result["author"], "Bot")
+        self.assertEqual(result["footer"], "Footer")
+        self.assertEqual(
+            result["fields"], [{"name": "A", "value": "B", "inline": False}]
+        )
 
     def test__serialize_embed_handles_empty_embed(self):
         embed = discord.Embed()
@@ -84,6 +94,9 @@ class EmbedSerializationTests(unittest.TestCase):
         self.assertIsNone(result["url"])
         self.assertIsNone(result["image"])
         self.assertIsNone(result["thumbnail"])
+        self.assertIsNone(result["author"])
+        self.assertIsNone(result["footer"])
+        self.assertEqual(result["fields"], [])
 
 
 class MessageHandlerReplyTests(unittest.IsolatedAsyncioTestCase):
@@ -156,6 +169,20 @@ class MessageHandlerReadEmbedsTests(unittest.IsolatedAsyncioTestCase):
                     description=e.get("description"),
                     url=e.get("url"),
                 )
+                if e.get("image"):
+                    obj.set_image(url=e["image"])
+                if e.get("thumbnail"):
+                    obj.set_thumbnail(url=e["thumbnail"])
+                if e.get("author"):
+                    obj.set_author(name=e["author"])
+                if e.get("footer"):
+                    obj.set_footer(text=e["footer"])
+                for field in e.get("fields", []):
+                    obj.add_field(
+                        name=field["name"],
+                        value=field["value"],
+                        inline=field.get("inline", True),
+                    )
                 embed_objs.append(obj)
 
         reactions_list = []
@@ -185,6 +212,9 @@ class MessageHandlerReadEmbedsTests(unittest.IsolatedAsyncioTestCase):
                         "title": "Embed Title",
                         "description": "Embed Desc",
                         "url": "https://example.com",
+                        "author": "Bot",
+                        "footer": "Footer",
+                        "fields": [{"name": "A", "value": "B", "inline": False}],
                     }
                 ],
             ),
@@ -216,6 +246,9 @@ class MessageHandlerReadEmbedsTests(unittest.IsolatedAsyncioTestCase):
         # First result should mention embed fields in prose
         self.assertIn("Embed Title", results[0].text)
         self.assertIn("Embed Desc", results[0].text)
+        self.assertIn("author: Bot", results[0].text)
+        self.assertIn("footer: Footer", results[0].text)
+        self.assertIn("field: A = B", results[0].text)
 
         # Second result contains structured JSON
         self.assertIn("Embed data:", results[1].text)
@@ -223,6 +256,7 @@ class MessageHandlerReadEmbedsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(embed_data), 1)
         self.assertEqual(embed_data[0]["id"], "1")
         self.assertEqual(embed_data[0]["embeds"][0]["title"], "Embed Title")
+        self.assertEqual(embed_data[0]["embeds"][0]["author"], "Bot")
 
     async def test_read_messages_returns_no_embeds_found_when_none(self):
         msgs = [
