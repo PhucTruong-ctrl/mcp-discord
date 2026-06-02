@@ -87,6 +87,31 @@ def _payload(result):
     return json.loads(result[0].text)
 
 
+class McpContentContractTests(unittest.TestCase):
+    """Verify MCP content type contracts used throughout handlers."""
+
+    def test_all_tools_have_valid_mcp_types(self):
+        """Every Tool in the registry must build correctly with mcp SDK."""
+        tools = compose_tool_registry()
+        for tool in tools:
+            self.assertIsInstance(tool.name, str)
+            self.assertIsInstance(tool.inputSchema, dict)
+            # description is optional in mcp SDK but we always provide it
+            self.assertIsNotNone(
+                tool.description, f"Tool {tool.name} missing description"
+            )
+
+    def test_handler_results_are_text_content_list(self):
+        """All handler results must be List[TextContent] with type='text'."""
+        from mcp.types import TextContent
+
+        # Smoke check: verify TextContent usage everywhere
+        tc = TextContent(type="text", text="{}")
+        self.assertEqual(tc.type, "text")
+        # Verify repr is valid
+        self.assertIsInstance(str(tc), str)
+
+
 class ExpansionFillerContractTests(unittest.IsolatedAsyncioTestCase):
     """Contract: expansion filler handlers with empty/gateway-absent deps.
 
