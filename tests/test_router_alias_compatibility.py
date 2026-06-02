@@ -1,4 +1,9 @@
 import os
+
+# Set env vars before any imports that trigger module-level code in discord_mcp.server
+os.environ.setdefault("DISCORD_TOKEN", "test-token")
+os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
+
 import sys
 import unittest
 

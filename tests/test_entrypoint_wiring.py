@@ -1,4 +1,9 @@
 import os
+
+# Set env vars before any imports that trigger module-level code in discord_mcp.server
+os.environ.setdefault("DISCORD_TOKEN", "test-token")
+os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
+
 import unittest
 from typing import List
 from unittest.mock import AsyncMock, patch
@@ -158,6 +163,29 @@ class ServerDecoratorContractTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNotNone(my_call)
 
+    async def test_production_init_options_construction_mirrors_server_main(self):
+        """Mirror the exact InitializationOptions construction from server.py:main().
+
+        This tests the DIRECT InitializationOptions construction path (not
+        create_initialization_options()), matching what server.py uses in production.
+        """
+        from mcp.server.models import InitializationOptions
+        from mcp.types import ServerCapabilities
+        from discord_mcp._version import __version__
+
+        opts = InitializationOptions(
+            server_name="discord-server",
+            server_version=__version__,
+            capabilities=ServerCapabilities(),
+        )
+        self.assertEqual(opts.server_name, "discord-server")
+        self.assertEqual(opts.server_version, __version__)
+        self.assertIsInstance(opts.capabilities, ServerCapabilities)
+        # Ensure no unexpected required fields are missing
+        self.assertIsNone(opts.instructions)
+        self.assertIsNone(opts.website_url)
+        self.assertIsNone(opts.icons)
+
     async def test_create_initialization_options_accepts_custom_params(self):
         from mcp.server import Server
         from mcp.server.models import InitializationOptions
@@ -272,6 +300,4 @@ class PackageEntrypointTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    os.environ.setdefault("DISCORD_TOKEN", "test-token")
-    os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
     unittest.main()
