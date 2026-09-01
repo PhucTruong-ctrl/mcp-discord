@@ -170,17 +170,20 @@ class ServerDecoratorContractTests(unittest.IsolatedAsyncioTestCase):
         create_initialization_options()), matching what server.py uses in production.
         """
         from mcp.server.models import InitializationOptions
-        from mcp.types import ServerCapabilities
+        from mcp.types import ServerCapabilities, ToolsCapability
         from discord_mcp._version import __version__
 
         opts = InitializationOptions(
             server_name="discord-server",
             server_version=__version__,
-            capabilities=ServerCapabilities(),
+            capabilities=ServerCapabilities(
+                tools=ToolsCapability(listChanged=False),
+            ),
         )
         self.assertEqual(opts.server_name, "discord-server")
         self.assertEqual(opts.server_version, __version__)
         self.assertIsInstance(opts.capabilities, ServerCapabilities)
+        self.assertIsNotNone(opts.capabilities.tools)
         # Ensure no unexpected required fields are missing
         self.assertIsNone(opts.instructions)
         self.assertIsNone(opts.website_url)

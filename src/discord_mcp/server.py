@@ -9,7 +9,7 @@ import discord
 from discord.ext import commands
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
-from mcp.types import ServerCapabilities, Tool, TextContent
+from mcp.types import ServerCapabilities, Tool, TextContent, ToolsCapability
 from mcp.server.stdio import stdio_server
 
 from ._version import __version__
@@ -100,7 +100,9 @@ async def main():
     init_opts = InitializationOptions(
         server_name="discord-server",
         server_version=__version__,
-        capabilities=ServerCapabilities(),
+        capabilities=ServerCapabilities(
+            tools=ToolsCapability(listChanged=False),
+        ),
     )
 
     # Run MCP server

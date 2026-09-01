@@ -243,6 +243,8 @@ class MessageHandlerReadEmbedsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("hello", results[0].text)
         self.assertIn("bob", results[0].text)
         self.assertIn("world", results[0].text)
+        self.assertIn("[message_id=1]", results[0].text)
+        self.assertIn("[message_id=2]", results[0].text)
         # First result should mention embed fields in prose
         self.assertIn("Embed Title", results[0].text)
         self.assertIn("Embed Desc", results[0].text)
@@ -279,6 +281,8 @@ class MessageHandlerReadEmbedsTests(unittest.IsolatedAsyncioTestCase):
         results = await handle_read_messages({"channel_id": "100", "limit": 5}, deps)
 
         self.assertEqual(len(results), 2)
+        self.assertIn("[message_id=1]", results[0].text)
+        self.assertIn("[message_id=2]", results[0].text)
         self.assertEqual(results[1].text, "No embeds found")
 
 

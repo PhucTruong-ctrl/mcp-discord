@@ -121,7 +121,7 @@ async def handle_read_messages(
             text=f"Retrieved {len(messages)} messages:\n\n"
             + "\n\n".join(
                 [
-                    f"{m['author']} ({m['timestamp']}): {m['content']}\n"
+                    f"{m['author']} ({m['timestamp']}) [message_id={m['id']}]: {m['content']}\n"
                     + f"Reactions: {', '.join([format_reaction(r) for r in m['reactions']]) if m['reactions'] else 'No reactions'}"
                     + (
                         "\nEmbeds:\n"
