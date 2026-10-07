@@ -49,7 +49,11 @@ ROLE_GOVERNANCE_TOOLS = [
     ),
     Tool(
         name="update_role",
-        description="Update role properties",
+        description=(
+            "Update role properties (name, permissions, color, secondary/tertiary gradient colour, "
+            "hoist, mentionable). Works on integration-managed roles too as long as the role sits "
+            "below the bot's highest role; only the hierarchy blocks it."
+        ),
         inputSchema={
             "type": "object",
             "properties": {

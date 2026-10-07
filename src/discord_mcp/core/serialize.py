@@ -1,10 +1,11 @@
 from typing import Any, Dict
 
+from discord_mcp.core.emoji import emoji_payload, serialize_emoji
+
 
 def _serialize_emoji(emoji: Any) -> str | None:
-    if not emoji:
-        return None
-    return getattr(emoji, "name", str(emoji))
+    """Display name only; use :func:`emoji_payload` when the value must be writable."""
+    return serialize_emoji(emoji)[0]
 
 
 def _serialize_attachment(attachment: Any) -> Dict[str, Any]:
@@ -72,11 +73,22 @@ def _serialize_message(message: Any) -> Dict[str, Any]:
 
 
 def _serialize_forum_tag(tag: Any) -> Dict[str, Any]:
+    """Tag row; also accepts an already-serialized dict so payloads can round trip."""
+    if isinstance(tag, dict):
+        name, emoji_id, animated = serialize_emoji(tag.get("emoji"))
+        return {
+            "id": str(tag["id"]) if tag.get("id") is not None else None,
+            "name": tag.get("name"),
+            "emoji": name,
+            "emojiId": tag.get("emojiId", emoji_id),
+            "emojiAnimated": bool(tag.get("emojiAnimated", animated)),
+            "moderated": bool(tag.get("moderated", False)),
+        }
     return {
         "id": str(tag.id),
         "name": tag.name,
-        "emoji": _serialize_emoji(tag.emoji),
-        "moderated": tag.moderated,
+        **emoji_payload(tag.emoji),
+        "moderated": bool(getattr(tag, "moderated", False)),
     }
 
 
@@ -151,7 +163,7 @@ def _serialize_welcome_channel(wc: Any) -> Dict[str, Any]:
         # uncached (partial) guild yields None: report it instead of crashing.
         "channelId": str(channel.id) if channel is not None else None,
         "description": wc.description,
-        "emoji": _serialize_emoji(wc.emoji),
+        **emoji_payload(wc.emoji),
     }
 
 
@@ -196,11 +208,16 @@ def _serialize_onboarding_prompt(prompt: Any) -> Dict[str, Any]:
 
 
 def _serialize_onboarding(onboarding: Any) -> Dict[str, Any]:
+    default_channels = list(getattr(onboarding, "default_channels", None) or [])
     return {
         "enabled": onboarding.enabled,
         "mode": str(onboarding.mode) if onboarding.mode else None,
+        # canonical field for a write-back: snowflakes, as the API requires
+        "defaultChannelIds": [str(getattr(c, "id", c)) for c in default_channels],
+        # display-only convenience: names resolve on write, but ids are the contract
         "defaultChannels": [
-            str(c) for c in (getattr(onboarding, "default_channels", None) or [])
+            getattr(c, "name", None) or str(getattr(c, "id", c))
+            for c in default_channels
         ],
         "prompts": [
             _serialize_onboarding_prompt(p) for p in (onboarding.prompts or [])

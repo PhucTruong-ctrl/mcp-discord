@@ -55,7 +55,9 @@ ONBOARDING_TOOLS = [
             "configuration and sent in full (the endpoint is a PUT, so omitted fields would "
             "be emptied). prompts entries take title/type/options (option: title, description, "
             "emoji, channel_ids, role_ids). Discord refuses the write with 350001 when the "
-            "server has fewer than 7 public channels or fewer than 5 writable by @everyone."
+            "server has fewer than 7 public channels or fewer than 5 writable by @everyone; the "
+            "same rule blocks the Discord client, so the remedy is to open 5 channels to "
+            "@everyone temporarily, save, then revert."
         ),
         inputSchema={
             "type": "object",

@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 import discord
 from mcp.types import TextContent
 
+from discord_mcp.core.emoji import parse_emoji, parse_welcome_emoji
 from discord_mcp.core.resolve import try_int
 from discord_mcp.core.serialize import (
     _serialize_onboarding,
@@ -20,18 +21,25 @@ def _build_welcome_channels(guild: Any, entries: Any) -> List[Any]:
 
     channels = []
     for entry in entries:
-        if not isinstance(entry, dict) or not entry.get("channel_id"):
+        if not isinstance(entry, dict):
+            raise ValueError(
+                "each welcome_channels entry needs channel_id and optional description/emoji"
+            )
+        raw_id = entry.get("channel_id", entry.get("channelId"))
+        if raw_id is None:
             raise ValueError(
                 "each welcome_channels entry needs channel_id "
                 "(optional description, emoji)"
             )
-        channel_id = int(entry["channel_id"])
+        channel_id = int(raw_id)
         channel = guild.get_channel(channel_id) or discord.Object(id=channel_id)
+        # a custom emoji must arrive as an object, or Discord gets a name without an id
+        emoji = parse_welcome_emoji(guild, entry)
         channels.append(
             discord.WelcomeChannel(
                 channel=channel,
                 description=str(entry.get("description") or ""),
-                emoji=entry.get("emoji") or None,
+                emoji=emoji,
             )
         )
     return channels
@@ -82,9 +90,12 @@ async def handle_update_guild_welcome_screen(
         edit_kwargs["description"] = ws_args["description"]
     if "enabled" in ws_args:
         edit_kwargs["enabled"] = bool(ws_args["enabled"])
-    if "welcome_channels" in ws_args:
+    raw_welcome_channels = ws_args.get(
+        "welcome_channels", ws_args.get("welcomeChannels")
+    )
+    if raw_welcome_channels is not None:
         edit_kwargs["welcome_channels"] = _build_welcome_channels(
-            guild, ws_args["welcome_channels"]
+            guild, raw_welcome_channels
         )
     if arguments.get("reason"):
         edit_kwargs["reason"] = arguments["reason"]
@@ -216,6 +227,35 @@ def _first_present(data: Dict[str, Any], *keys: str, default: bool) -> bool:
     return bool(default)
 
 
+def _channel_id_list(guild: Any, values: Any, where: str) -> List[int]:
+    """Resolve channel references (snowflakes or unique names) into ids."""
+    if values is None:
+        return []
+    if not isinstance(values, (list, tuple, set)):
+        raise ValueError(f"{where} must be an array of ids or names")
+    ids = []
+    for value in values:
+        snowflake = try_int(value)
+        if snowflake is not None:
+            ids.append(snowflake)
+            continue
+        wanted = str(value).strip().lower().removeprefix("#")
+        matches = [
+            channel
+            for channel in getattr(guild, "channels", []) or []
+            if str(getattr(channel, "name", "")).strip().lower() == wanted
+        ]
+        if len(matches) == 1:
+            ids.append(matches[0].id)
+            continue
+        if len(matches) > 1:
+            raise ValueError(
+                f"{where}: channel name '{value}' matches {len(matches)} channels; use the id"
+            )
+        raise ValueError(f"{where}: channel '{value}' not found in server {guild.id}")
+    return ids
+
+
 def _id_list(values: Any, where: str) -> List[int]:
     if values is None:
         return []
@@ -230,38 +270,20 @@ def _id_list(values: Any, where: str) -> List[int]:
     return ids
 
 
-def _emoji_token(emoji: Any, emoji_id: Any, animated: bool) -> str:
-    """Build the emoji token discord.py can parse (unicode, or <:name:id>/<a:name:id>)."""
-    name = str(emoji)
-    snowflake = try_int(emoji_id)
-    if snowflake is None:
-        return name
-    prefix = "a" if animated else ""
-    return f"<{prefix}:{name}:{snowflake}>"
-
-
-def _build_onboarding_option(data: Any, where: str) -> discord.OnboardingPromptOption:
+def _build_onboarding_option(
+    data: Any, where: str, guild: Any = None
+) -> discord.OnboardingPromptOption:
     if not isinstance(data, dict):
         raise ValueError(f"{where} must be an object")
     title = str(data.get("title") or "").strip()
     if not title:
         raise ValueError(f"{where}.title is required")
-    emoji = data.get("emoji")
-    emoji_id = data.get("emojiId")
-    animated = bool(data.get("emojiAnimated", False))
-    if isinstance(emoji, dict):
-        emoji_id = emoji.get("id", emoji_id)
-        animated = bool(emoji.get("animated", animated))
-        emoji = emoji.get("name")
-    if emoji:
-        emoji_token = _emoji_token(emoji, emoji_id, animated)
-    else:
-        emoji_token = None
+    token = parse_emoji(guild, data)
     kwargs: Dict[str, Any] = {"title": title}
     if data.get("description") is not None:
         kwargs["description"] = str(data["description"])
-    if emoji_token:
-        kwargs["emoji"] = emoji_token
+    if token:
+        kwargs["emoji"] = token
     channel_ids = _id_list(data.get("channel_ids"), f"{where}.channel_ids")
     if channel_ids:
         kwargs["channels"] = channel_ids
@@ -271,7 +293,9 @@ def _build_onboarding_option(data: Any, where: str) -> discord.OnboardingPromptO
     return discord.OnboardingPromptOption(**kwargs)
 
 
-def _build_onboarding_prompts(prompts: Any) -> List[discord.OnboardingPrompt]:
+def _build_onboarding_prompts(
+    prompts: Any, guild: Any = None
+) -> List[discord.OnboardingPrompt]:
     """Convert the JSON prompt payload into the objects discord.py expects.
 
     ``Guild.edit_onboarding`` calls ``prompt.to_dict(id=index)`` on each entry, so raw
@@ -295,7 +319,9 @@ def _build_onboarding_prompts(prompts: Any) -> List[discord.OnboardingPrompt]:
                 type=_resolve_onboarding_prompt_type(prompt.get("type"), where),
                 title=title,
                 options=[
-                    _build_onboarding_option(option, f"{where}.options[{option_index}]")
+                    _build_onboarding_option(
+                        option, f"{where}.options[{option_index}]", guild
+                    )
                     for option_index, option in enumerate(raw_options)
                 ],
                 # accept both the JSON/API spelling and the spelling our reader emits
@@ -354,22 +380,32 @@ async def handle_update_guild_onboarding(
         )
 
     prompts = (
-        _build_onboarding_prompts(ob_args["prompts"])
+        _build_onboarding_prompts(ob_args["prompts"], guild)
         if prompts_provided
-        else _build_onboarding_prompts(current.get("prompts") or [])
+        else _build_onboarding_prompts(current.get("prompts") or [], guild)
     )
     if default_channels_provided:
         raw_default_channels = next(
             ob_args[key]
-            for key in ("default_channels", "defaultChannels", "default_channel_ids")
+            for key in (
+                "default_channels",
+                "defaultChannels",
+                "default_channel_ids",
+                "defaultChannelIds",
+            )
             if key in ob_args
         )
     else:
-        raw_default_channels = current.get("default_channel_ids") or []
-    # discord.py reads .id off each entry
+        raw_default_channels = (
+            current.get("default_channel_ids") or current.get("defaultChannelIds") or []
+        )
+    # discord.py reads .id off each entry; names are accepted too so a verbatim read
+    # (which also carries display names) round trips
     default_channels = [
         discord.Object(id=channel_id)
-        for channel_id in _id_list(raw_default_channels, "onboarding.default_channels")
+        for channel_id in _channel_id_list(
+            guild, raw_default_channels, "onboarding.default_channels"
+        )
     ]
 
     try:
@@ -383,7 +419,7 @@ async def handle_update_guild_onboarding(
             ),
             mode=(
                 _resolve_onboarding_mode(ob_args["mode"])
-                if "mode" in ob_args
+                if ob_args.get("mode") is not None
                 else _resolve_onboarding_mode(current.get("mode", 0))
             ),
             reason=arguments.get("reason"),

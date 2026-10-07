@@ -2,8 +2,8 @@
 
 ## Scope snapshot
 
-- Planned total: **115 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 2 member admin)
-- Current canonical registry in this branch: **115 tools**
+- Planned total: **116 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 2 member admin + 1 emoji listing)
+- Current canonical registry in this branch: **116 tools**
 - Runtime is Discord-native only (Discord API + bot token), no external runtime dependency
 
 ## Channel CRUD/admin tools
@@ -215,6 +215,20 @@ Notes:
   `hadRoleBefore` / `hasRoleNow` / `changed` from a fresh API read (discord.py's `Member.edit`
   returns a new object and leaves the instance you called it on stale) and name MANAGE_ROLES plus
   the role-hierarchy comparison when Discord answers 403.
+- **Emoji round trips:** emoji-bearing fields now share one codec (`src/discord_mcp/core/emoji.py`).
+  Reads emit `{emoji, emojiId, emojiAnimated}` for welcome-screen channels, forum tags and onboarding
+  prompt options; writes accept unicode | `"name"` | `"<:name:id>"` | `{id, name, animated}` and resolve
+  a bare name against `guild.emojis`. Onboarding reads expose `defaultChannelIds` (snowflakes, canonical
+  for a write) with `defaultChannels` kept as display-only names. `get_channels_structured` exposes
+  `availableTags` and `defaultReactionEmoji` for forum channels. `list_guild_emojis` is the supported way
+  to obtain custom emoji ids. Forum-tag and onboarding-prompt ids are reassigned by Discord on write.
+
+### Post-wave addition — emoji listing (1)
+
+116. `list_guild_emojis` — optional `name_contains` filter, optional `include_stickers`. Returns
+     `emojis: [{id, name, animated, available, managed, requireColons, token, url, roleIds?}]` for every
+     `guild.emojis`, plus `stickers` when requested, and `emojiCount`/`stickerCount` totals.
+
 ## What `update_guild` can and cannot change
 
 `update_guild` maps the whole `discord.py Guild.edit` surface (PATCH /guilds/{id}):
@@ -315,9 +329,9 @@ serializer expose the same distinction as `mentionEveryone` / `mentions` / `role
 
 `docs/analysis/DISCORDPY_COVERAGE_GAPS.md` lists the discord.py capabilities this MCP does not expose yet.
 
-`docs/analysis/FEATURE_AUDIT.md` lists all 115 tools with their confirmation model and the verification
+`docs/analysis/FEATURE_AUDIT.md` lists all 116 tools with their confirmation model and the verification
 evidence gathered against a live server (live API run vs unit test), plus the defects that audit fixed.
 
-## 115-tool contract status
+## 116-tool contract status
 
-The canonical registry target in this branch: **115 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 2 member admin). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.
+The canonical registry target in this branch: **116 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 2 member admin + 1 emoji listing). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.

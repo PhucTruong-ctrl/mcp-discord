@@ -6,11 +6,49 @@ from typing import Any, Dict, List
 import discord
 from mcp.types import TextContent
 
+from discord_mcp.core.emoji import emoji_payload
 from discord_mcp.core.permissions import overwrite_rows, role_payload
+from discord_mcp.core.serialize import _serialize_forum_tag
 
 
 def _overwrites_map(channel: Any) -> Dict[str, Dict[str, Any]]:
     return {row["targetId"]: row for row in overwrite_rows(channel)}
+
+
+def _structured_channel(channel: Any) -> Dict[str, Any]:
+    """Channel row; forum channels also carry the fields update_forum_channel accepts."""
+    row: Dict[str, Any] = {
+        "id": str(channel.id),
+        "name": channel.name,
+        "type": str(channel.type),
+        "position": getattr(channel, "position", 0),
+        "categoryId": (
+            str(channel.category_id)
+            if getattr(channel, "category_id", None) is not None
+            else None
+        ),
+        "topic": getattr(channel, "topic", None),
+    }
+    channel_type = str(getattr(channel, "type", ""))
+    is_forum = "forum" in channel_type
+    tags = getattr(channel, "available_tags", None) if is_forum else None
+    if is_forum and tags is not None:
+        row["availableTags"] = [_serialize_forum_tag(tag) for tag in tags]
+        row["defaultReactionEmoji"] = emoji_payload(
+            getattr(channel, "default_reaction_emoji", None)
+        )
+        sort_order = getattr(channel, "default_sort_order", None)
+        row["defaultSortOrder"] = (
+            sort_order.value if hasattr(sort_order, "value") else sort_order
+        )
+        row["defaultAutoArchiveDuration"] = getattr(
+            channel, "default_auto_archive_duration", None
+        )
+        row["nsfw"] = bool(getattr(channel, "nsfw", False))
+        row["slowmodeDelay"] = getattr(channel, "slowmode_delay", None)
+        layout = getattr(channel, "default_layout", None)
+        row["defaultLayout"] = layout.value if hasattr(layout, "value") else layout
+    return row
 
 
 async def handle_get_channels_structured(
@@ -19,21 +57,7 @@ async def handle_get_channels_structured(
     guild = await deps["gateway"].resolve_guild(arguments["server_id"])
     payload = {
         "serverId": str(guild.id),
-        "channels": [
-            {
-                "id": str(channel.id),
-                "name": channel.name,
-                "type": str(channel.type),
-                "position": getattr(channel, "position", 0),
-                "categoryId": (
-                    str(channel.category_id)
-                    if getattr(channel, "category_id", None) is not None
-                    else None
-                ),
-                "topic": getattr(channel, "topic", None),
-            }
-            for channel in guild.channels
-        ],
+        "channels": [_structured_channel(channel) for channel in guild.channels],
     }
     return [TextContent(type="text", text=json.dumps(payload))]
 

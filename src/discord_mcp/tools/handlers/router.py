@@ -64,6 +64,7 @@ from .inventory import (
     handle_get_role_hierarchy,
     handle_list_inactive_channels,
 )
+from .emoji import handle_list_guild_emojis
 from .mass_mentions import handle_audit_mass_mentions
 from .member_admin import handle_set_member_nickname, handle_set_member_roles
 from .messages import (
@@ -293,6 +294,7 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "audit_mass_mentions": handle_audit_mass_mentions,
     "set_member_nickname": handle_set_member_nickname,
     "set_member_roles": handle_set_member_roles,
+    "list_guild_emojis": handle_list_guild_emojis,
 }
 
 

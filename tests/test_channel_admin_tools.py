@@ -67,6 +67,17 @@ class _Server:
 mcp_server.Server = _Server
 mcp_server_stdio = types.ModuleType("mcp.server.stdio")
 mcp_server_stdio.stdio_server = lambda: None
+# discord_mcp.server imports this; without the stub a single-file test run fails
+# with "No module named 'mcp.server.models'" when nothing else imported it first.
+mcp_server_models = types.ModuleType("mcp.server.models")
+
+
+class _InitializationOptions:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
+mcp_server_models.InitializationOptions = _InitializationOptions
 mcp_types = types.ModuleType("mcp.types")
 
 
@@ -82,9 +93,13 @@ class _TextContent:
 
 mcp_types.TextContent = _TextContent
 mcp_types.Tool = _Tool
+# discord_mcp.server builds these at import time
+mcp_types.ServerCapabilities = _Tool
+mcp_types.ToolsCapability = _Tool
 sys.modules.setdefault("mcp", mcp)
 sys.modules.setdefault("mcp.server", mcp_server)
 sys.modules.setdefault("mcp.server.stdio", mcp_server_stdio)
+sys.modules.setdefault("mcp.server.models", mcp_server_models)
 sys.modules.setdefault("mcp.types", mcp_types)
 
 aiohttp = types.ModuleType("aiohttp")

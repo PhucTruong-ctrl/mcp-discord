@@ -120,9 +120,16 @@ Columns: **gate** = confirmation model, **verified** = evidence level.
 | 112 | `compute_member_permissions` | Permission intel | direct | live |  |
 | 113 | `audit_mass_mentions` | Mass mentions | direct | live |  |
 | 114 | `set_member_roles` | Member admin | dry_run + confirm_token | live |  |
-| 115 | `set_member_nickname` | Member admin | direct | live |  |
+| 116 | `list_guild_emojis` | Emoji | direct | live |  |
 
 ## Findings fixed in this audit
+
+- Emoji round trips: the welcome screen dropped custom emoji ids, forum tags / `default_reaction_emoji`
+  were write-only, onboarding `defaultChannels` returned names where the write path needs snowflakes, and
+  nothing could list guild emojis. All emoji-bearing fields now share `core/emoji.py` (read
+  `{emoji, emojiId, emojiAnimated}`; write unicode | `"name"` | `"<:name:id>"` | `{id, name, animated}`,
+  bare names resolved against `guild.emojis`), `get_channels_structured` exposes `availableTags` /
+  `defaultReactionEmoji`, and `list_guild_emojis` (tool 116) returns the guild's custom emoji ids.
 
 - `get_server_info` read guild fields from the gateway cache, which is built from a
   truncated `GUILD_CREATE` for large guilds, so it reported `description: None` for a
@@ -155,6 +162,14 @@ Columns: **gate** = confirmation model, **verified** = evidence level.
   replacing (Discord answers 403 50013 if the request drops one - that is what made a self-edit fail).
   `update_role` / `delete_role` also take `role_name` (unique, case-insensitive) and a null colour clears
   the primary colour or a gradient stop.
+- Follow-up round-trip gaps found while testing the emoji codec: a read onboarding payload carries
+  `"mode": null`, which the writer rejected (now treated as "not provided"); the welcome-screen writer
+  only accepted `welcome_channels`/`channel_id` while the reader emits `welcomeChannels`/`channelId`
+  (both accepted now); and `discord.WelcomeChannel.to_dict()` only fills `emoji_id` for an emoji
+  *object*, so a `<:name:id>` string silently lost the id - the welcome path now passes a
+  `PartialEmoji`. `tests/test_channel_admin_tools.py` also stubbed only part of the MCP SDK, so running
+  that file alone failed with `No module named 'mcp.server.models'`; the stub now covers
+  `mcp.server.models` and the `mcp.types` names `discord_mcp.server` imports.
 - Role colours were write-only: `create_role`/`update_role` accepted `color` but no role reader
   returned it. `role_payload` now exposes `color`/`colorHex`/`secondaryColor`/`tertiaryColor`/
   `gradient`, gradient writes are supported (and their `670006` refusal explained), and
