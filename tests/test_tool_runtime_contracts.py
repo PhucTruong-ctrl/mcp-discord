@@ -50,11 +50,6 @@ if SRC not in sys.path:
 
 os.environ.setdefault("DISCORD_TOKEN", "test-token")
 os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
-# keep incident state out of the developer's real state directory
-os.environ.setdefault(
-    "DISCORD_MCP_STATE_DIR",
-    os.path.join(tempfile.mkdtemp(prefix="discord-mcp-state-"), "state"),
-)
 
 from discord_mcp.tools.handlers.expansion_fillers import (
     handle_append_incident_event,
