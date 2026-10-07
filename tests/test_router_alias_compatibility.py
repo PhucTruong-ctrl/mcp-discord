@@ -133,13 +133,14 @@ NON_ALIAS_TOOLS = {
     "update_guild",
     "set_channel_permission_overwrite",
     "remove_channel_permission_overwrite",
+    "set_member_nickname",
 }
 
 
 class TestRouterAliasCompatibility(unittest.TestCase):
     def test_alias_enabled_tools_count(self):
         self.assertEqual(len(ALIAS_MATRIX), 23)
-        self.assertEqual(len(NON_ALIAS_TOOLS), 90)
+        self.assertEqual(len(NON_ALIAS_TOOLS), 91)
 
     def test_alias_pairs_map_to_same_handler(self):
         for canonical, alias in ALIAS_MATRIX.items():

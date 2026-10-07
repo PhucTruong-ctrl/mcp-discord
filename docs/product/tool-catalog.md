@@ -2,8 +2,8 @@
 
 ## Scope snapshot
 
-- Planned total: **113 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit)
-- Current canonical registry in this branch: **113 tools**
+- Planned total: **114 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 1 member admin)
+- Current canonical registry in this branch: **114 tools**
 - Runtime is Discord-native only (Discord API + bot token), no external runtime dependency
 
 ## Channel CRUD/admin tools
@@ -195,19 +195,21 @@ Notes:
 113. `remove_channel_permission_overwrite` — `channel_id`, `target_id`, optional `target_type`,
      optional `reason`. Deletes the explicit overwrite; inherited state is untouched
 
+### Post-wave addition — member admin (1)
+
+114. `set_member_nickname`
+
 ## Implementation-status note
 
-The 15 expansion filler/utility tools split into two groups with different runtime behavior:
-
-- **Tools 93–103 (synthetic-only):** `bulk_ban_members`, `prune_inactive_members`, `remove_member_timeout`, `unban_member`, `create_category`, `rename_category`, `move_category`, `delete_category`, `create_incident_room`, `append_incident_event`, `close_incident` — return synthetic/placeholder responses. They validate input shapes and may use the `dry_run`/`confirm_token` safety pattern for destructive operations, but do **not** make live Discord API calls.
-- **Tools 104–107 (gateway-aware with synthetic fallback):** `list_auto_moderation_rules`, `create_auto_moderation_rule`, `update_auto_moderation_rule`, `automod_export_rules` — use the live Discord API via gateway when available; return synthetic placeholder responses when gateway is absent.
-
-This preserves the full registry contract while deeper Discord side-effect implementations for the remaining synthetic-only tools continue in follow-up work.
+All 15 expansion utilities (tools 93–107) make live Discord API calls — see the
+*Expansion utilities — tools 93–107* note below. There are no synthetic/placeholder handlers left in
+the registry; every tool either performs the documented Discord operation or fails with an explicit
+error.
 
 The following tool families have specific capability notes:
 
 - **Wave 7 — Onboarding & lifecycle (69–76):** Most tools require a live gateway. Two (`get_guild_onboarding`, `update_guild_onboarding`) now use native discord.py 2.7.1+ Guild.onboarding() and Guild.edit_onboarding() APIs. Three (`verification_gate_orchestrator`, `progressive_access_unlock`, `onboarding_friction_audit`) are gateway-independent local logic tools.
-- **Wave 9 — Incident operations (85–88):** Gateway-independent. Use `dry_run`/`confirm_token` for lockdown/rollback but no live Discord API calls.
+- **Wave 9 — Incident operations (85–88):** `dry_run`/`confirm_token` gated; the confirmed paths change real channel overwrites and persist state (see *Incident state* below).
 - **AutoMod exemptions (`automod_apply_ruleset`):** each rule accepts `exempt_roles` and
   `exempt_channels` as ids or names (max 20 roles / 50 channels), and keyword triggers accept
   `keyword_filter`, `regex_patterns` and `allow_list`. Practical use: block `*@everyone*` /
@@ -267,9 +269,9 @@ serializer expose the same distinction as `mentionEveryone` / `mentions` / `role
 
 ## Feature audit
 
-`docs/analysis/FEATURE_AUDIT.md` lists all 113 tools with their confirmation model and the verification
+`docs/analysis/FEATURE_AUDIT.md` lists all 114 tools with their confirmation model and the verification
 evidence gathered against a live server (live API run vs unit test), plus the defects that audit fixed.
 
-## 113-tool contract status
+## 114-tool contract status
 
-The canonical registry target is restored in this branch: **113 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.
+The canonical registry target in this branch: **114 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 1 member admin). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.

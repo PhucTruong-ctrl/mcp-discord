@@ -29,96 +29,97 @@ Columns: **gate** = confirmation model, **verified** = evidence level.
 | 21 | `get_user_info` | Misc | direct | live |  |
 | 22 | `moderate_message` | Misc | direct | live |  |
 | 23 | `list_servers` | Baseline: server/member reads | direct | live |  |
-| 24 | `create_voice_channel` | Channels | direct | unit test |  |
-| 25 | `create_forum_channel` | Channels | direct | unit test |  |
-| 26 | `update_text_channel` | Channels | direct | unit test |  |
-| 27 | `update_voice_channel` | Channels | direct | unit test |  |
-| 28 | `update_forum_channel` | Channels | direct | unit test |  |
-| 29 | `list_forum_posts` | Forum intel | direct | live |  |
-| 30 | `read_forum_post_messages` | Forum intel | direct | unit test |  |
-| 31 | `read_forum_posts_batch` | Forum intel | direct | unit test |  |
-| 32 | `get_thread_context` | Forum intel | direct | unit test |  |
-| 33 | `list_thread_participants` | Forum intel | direct | unit test |  |
-| 34 | `get_thread_activity_summary` | Forum intel | direct | live |  |
-| 35 | `tag_forum_post` | Forum intel | direct | unit test |  |
-| 36 | `retag_forum_post` | Forum intel | direct | unit test |  |
-| 37 | `get_channels_structured` | Inventory/permissions | direct | live |  |
-| 38 | `get_channel_hierarchy` | Inventory/permissions | direct | live |  |
-| 39 | `get_role_hierarchy` | Inventory/permissions | direct | live |  |
-| 40 | `get_permission_overwrites` | Inventory/permissions | direct | live |  |
-| 41 | `diff_channel_permissions` | Inventory/permissions | direct | live |  |
-| 42 | `export_server_snapshot` | Inventory/permissions | direct | live |  |
-| 43 | `get_channel_type_counts` | Inventory/permissions | direct | live |  |
-| 44 | `list_inactive_channels` | Inventory/permissions | direct | live |  |
-| 45 | `moderation_bulk_delete` | Moderation core | dry_run + confirm_token | live |  |
-| 46 | `moderation_timeout_member` | Moderation core | dry_run + confirm_token | unit test | execute needs a real member; gateway call unit-tested (member.timeout) |
-| 47 | `moderation_kick_member` | Moderation core | dry_run + confirm_token | unit test | execute needs a real member; gateway call unit-tested (member.kick) |
-| 48 | `moderation_ban_member` | Moderation core | dry_run + confirm_token | unit test | execute needs a real member; gateway call unit-tested (guild.ban) |
-| 49 | `topology_channel_tree` | Topology | direct | live |  |
-| 50 | `topology_channel_children` | Topology | direct | live |  |
-| 51 | `topology_role_hierarchy` | Topology | direct | live |  |
-| 52 | `topology_permission_matrix` | Topology | direct | live |  |
-| 53 | `create_role` | Role governance | direct | live |  |
-| 54 | `delete_role` | Role governance | direct | live |  |
-| 55 | `update_role` | Role governance | direct | live |  |
-| 56 | `add_roles_bulk` | Role governance | dry_run + confirm_token | live |  |
-| 57 | `remove_roles_bulk` | Role governance | dry_run + confirm_token | live |  |
-| 58 | `mute_member_role_based` | Role governance | direct | live |  |
-| 59 | `unmute_member_role_based` | Role governance | direct | live |  |
-| 60 | `permission_drift_check` | Role governance | direct | live |  |
-| 61 | `get_audit_log` | Audit analytics | direct | live |  |
-| 62 | `get_member_moderation_history` | Audit analytics | direct | live |  |
-| 63 | `get_channel_activity_summary` | Audit analytics | direct | live |  |
-| 64 | `get_incident_timeline` | Audit analytics | direct | live |  |
-| 65 | `get_audit_actor_summary` | Audit analytics | direct | live |  |
-| 66 | `check_audit_reason_compliance` | Audit analytics | direct | live |  |
-| 67 | `server_health_check` | Audit analytics | direct | live |  |
-| 68 | `governance_evidence_packager` | Audit analytics | direct | live |  |
-| 69 | `get_guild_welcome_screen` | Onboarding | direct | unit test |  |
-| 70 | `update_guild_welcome_screen` | Onboarding | direct | unit test |  |
-| 71 | `get_guild_onboarding` | Onboarding | direct | live |  |
-| 72 | `update_guild_onboarding` | Onboarding | direct | unit test |  |
-| 73 | `dynamic_role_provision` | Onboarding | direct | unit test |  |
-| 74 | `verification_gate_orchestrator` | Onboarding | local only | unit test |  |
-| 75 | `progressive_access_unlock` | Onboarding | local only | unit test |  |
-| 76 | `onboarding_friction_audit` | Onboarding | local only | unit test |  |
-| 77 | `send_embed_message` | Messaging/workflow | direct | unit test |  |
-| 78 | `send_rich_announcement` | Messaging/workflow | direct | unit test |  |
-| 79 | `crosspost_announcement` | Messaging/workflow | direct | unit test |  |
-| 80 | `create_channel_webhook` | Messaging/workflow | direct | unit test |  |
-| 81 | `list_channel_webhooks` | Messaging/workflow | direct | live |  |
-| 82 | `execute_channel_webhook` | Messaging/workflow | direct | unit test |  |
-| 83 | `list_guild_integrations` | Messaging/workflow | direct | live |  |
-| 84 | `get_guild_vanity_url` | Messaging/workflow | direct | live |  |
-| 85 | `incident_get_channel_state` | Incident ops | local only | live |  |
-| 86 | `incident_set_channel_state` | Incident ops | local only | live |  |
-| 87 | `incident_apply_lockdown` | Incident ops | dry_run + confirm_token | live |  |
-| 88 | `incident_rollback_lockdown` | Incident ops | dry_run + confirm_token | live |  |
-| 89 | `automod_validate_ruleset` | AutoMod policy | local only | unit test |  |
-| 90 | `automod_get_ruleset` | AutoMod policy | direct | live |  |
-| 91 | `automod_apply_ruleset` | AutoMod policy | dry_run + confirm_token | live |  |
-| 92 | `automod_rollback_ruleset` | AutoMod policy | dry_run + confirm_token | unit test | Discord has no rollback API: returns not_supported by design |
-| 93 | `remove_member_timeout` | Expansion utilities | direct | live(api reached) |  |
-| 94 | `unban_member` | Expansion utilities | direct | live(error path) |  |
-| 95 | `bulk_ban_members` | Expansion utilities | dry_run + confirm_token | unit test | would ban real users; guild.bulk_ban unit-tested + dry-run verified live |
-| 96 | `prune_inactive_members` | Expansion utilities | dry_run + confirm_token | unit test | would prune real users; guild.prune_members unit-tested + dry-run verified live |
-| 97 | `create_category` | Expansion utilities | direct | live |  |
-| 98 | `rename_category` | Expansion utilities | direct | live |  |
-| 99 | `move_category` | Expansion utilities | direct | live |  |
-| 100 | `delete_category` | Expansion utilities | dry_run + confirm_token | live |  |
-| 101 | `create_incident_room` | Expansion utilities | direct | live |  |
-| 102 | `append_incident_event` | Expansion utilities | direct | live |  |
-| 103 | `close_incident` | Expansion utilities | direct | live |  |
-| 104 | `list_auto_moderation_rules` | Expansion utilities | direct | live |  |
-| 105 | `create_auto_moderation_rule` | Expansion utilities | direct | unit test |  |
-| 106 | `update_auto_moderation_rule` | Expansion utilities | direct | unit test |  |
-| 107 | `automod_export_rules` | Expansion utilities | direct | live |  |
-| 108 | `get_role_permissions` | Permission intel | direct | live |  |
-| 109 | `compute_member_permissions` | Permission intel | direct | live |  |
-| 110 | `audit_mass_mentions` | Mass mentions | direct | live |  |
-| 111 | `update_guild` | Guild settings | direct | live | closes the description/verification-level gap |
-| 112 | `set_channel_permission_overwrite` | Channel overwrites | direct | live | closes the overwrite-write gap (parameter object required by discord.py) |
-| 113 | `remove_channel_permission_overwrite` | Channel overwrites | direct | live | deletes an explicit overwrite only |
+| 24 | `update_guild` | Guild settings | direct | live | closes the description/verification-level gap |
+| 25 | `create_voice_channel` | Channels | direct | unit test |  |
+| 26 | `create_forum_channel` | Channels | direct | unit test |  |
+| 27 | `update_text_channel` | Channels | direct | unit test |  |
+| 28 | `update_voice_channel` | Channels | direct | unit test |  |
+| 29 | `update_forum_channel` | Channels | direct | unit test |  |
+| 30 | `list_forum_posts` | Forum intel | direct | live |  |
+| 31 | `read_forum_post_messages` | Forum intel | direct | unit test |  |
+| 32 | `read_forum_posts_batch` | Forum intel | direct | unit test |  |
+| 33 | `get_thread_context` | Forum intel | direct | unit test |  |
+| 34 | `list_thread_participants` | Forum intel | direct | unit test |  |
+| 35 | `get_thread_activity_summary` | Forum intel | direct | live |  |
+| 36 | `tag_forum_post` | Forum intel | direct | unit test |  |
+| 37 | `retag_forum_post` | Forum intel | direct | unit test |  |
+| 38 | `get_channels_structured` | Inventory/permissions | direct | live |  |
+| 39 | `get_channel_hierarchy` | Inventory/permissions | direct | live |  |
+| 40 | `get_role_hierarchy` | Inventory/permissions | direct | live |  |
+| 41 | `get_permission_overwrites` | Inventory/permissions | direct | live |  |
+| 42 | `diff_channel_permissions` | Inventory/permissions | direct | live |  |
+| 43 | `export_server_snapshot` | Inventory/permissions | direct | live |  |
+| 44 | `get_channel_type_counts` | Inventory/permissions | direct | live |  |
+| 45 | `list_inactive_channels` | Inventory/permissions | direct | live |  |
+| 46 | `set_channel_permission_overwrite` | Channel overwrites | direct | live | closes the overwrite-write gap (parameter object required by discord.py) |
+| 47 | `remove_channel_permission_overwrite` | Channel overwrites | direct | live | deletes an explicit overwrite only |
+| 48 | `moderation_bulk_delete` | Moderation core | dry_run + confirm_token | live |  |
+| 49 | `moderation_timeout_member` | Moderation core | dry_run + confirm_token | unit test | execute needs a real member; gateway call unit-tested (member.timeout) |
+| 50 | `moderation_kick_member` | Moderation core | dry_run + confirm_token | unit test | execute needs a real member; gateway call unit-tested (member.kick) |
+| 51 | `moderation_ban_member` | Moderation core | dry_run + confirm_token | unit test | execute needs a real member; gateway call unit-tested (guild.ban) |
+| 52 | `topology_channel_tree` | Topology | direct | live |  |
+| 53 | `topology_channel_children` | Topology | direct | live |  |
+| 54 | `topology_role_hierarchy` | Topology | direct | live |  |
+| 55 | `topology_permission_matrix` | Topology | direct | live |  |
+| 56 | `create_role` | Role governance | direct | live |  |
+| 57 | `delete_role` | Role governance | direct | live |  |
+| 58 | `update_role` | Role governance | direct | live |  |
+| 59 | `add_roles_bulk` | Role governance | dry_run + confirm_token | live |  |
+| 60 | `remove_roles_bulk` | Role governance | dry_run + confirm_token | live |  |
+| 61 | `mute_member_role_based` | Role governance | direct | live |  |
+| 62 | `unmute_member_role_based` | Role governance | direct | live |  |
+| 63 | `permission_drift_check` | Role governance | direct | live |  |
+| 64 | `get_audit_log` | Audit analytics | direct | live |  |
+| 65 | `get_member_moderation_history` | Audit analytics | direct | live |  |
+| 66 | `get_channel_activity_summary` | Audit analytics | direct | live |  |
+| 67 | `get_incident_timeline` | Audit analytics | direct | live |  |
+| 68 | `get_audit_actor_summary` | Audit analytics | direct | live |  |
+| 69 | `check_audit_reason_compliance` | Audit analytics | direct | live |  |
+| 70 | `server_health_check` | Audit analytics | direct | live |  |
+| 71 | `governance_evidence_packager` | Audit analytics | direct | live |  |
+| 72 | `get_guild_welcome_screen` | Onboarding | direct | unit test |  |
+| 73 | `update_guild_welcome_screen` | Onboarding | direct | unit test |  |
+| 74 | `get_guild_onboarding` | Onboarding | direct | live |  |
+| 75 | `update_guild_onboarding` | Onboarding | direct | unit test |  |
+| 76 | `dynamic_role_provision` | Onboarding | direct | unit test |  |
+| 77 | `verification_gate_orchestrator` | Onboarding | local only | unit test |  |
+| 78 | `progressive_access_unlock` | Onboarding | local only | unit test |  |
+| 79 | `onboarding_friction_audit` | Onboarding | local only | unit test |  |
+| 80 | `send_embed_message` | Messaging/workflow | direct | unit test |  |
+| 81 | `send_rich_announcement` | Messaging/workflow | direct | unit test |  |
+| 82 | `crosspost_announcement` | Messaging/workflow | direct | unit test |  |
+| 83 | `create_channel_webhook` | Messaging/workflow | direct | unit test |  |
+| 84 | `list_channel_webhooks` | Messaging/workflow | direct | live |  |
+| 85 | `execute_channel_webhook` | Messaging/workflow | direct | unit test |  |
+| 86 | `list_guild_integrations` | Messaging/workflow | direct | live |  |
+| 87 | `get_guild_vanity_url` | Messaging/workflow | direct | live |  |
+| 88 | `incident_get_channel_state` | Incident ops | local only | live |  |
+| 89 | `incident_set_channel_state` | Incident ops | local only | live |  |
+| 90 | `incident_apply_lockdown` | Incident ops | dry_run + confirm_token | live |  |
+| 91 | `incident_rollback_lockdown` | Incident ops | dry_run + confirm_token | live |  |
+| 92 | `automod_validate_ruleset` | AutoMod policy | local only | unit test |  |
+| 93 | `automod_get_ruleset` | AutoMod policy | direct | live |  |
+| 94 | `automod_apply_ruleset` | AutoMod policy | dry_run + confirm_token | live |  |
+| 95 | `automod_rollback_ruleset` | AutoMod policy | dry_run + confirm_token | unit test | Discord has no rollback API: returns not_supported by design |
+| 96 | `remove_member_timeout` | Expansion utilities | direct | live(api reached) |  |
+| 97 | `unban_member` | Expansion utilities | direct | live(error path) |  |
+| 98 | `bulk_ban_members` | Expansion utilities | dry_run + confirm_token | unit test | would ban real users; guild.bulk_ban unit-tested + dry-run verified live |
+| 99 | `prune_inactive_members` | Expansion utilities | dry_run + confirm_token | unit test | would prune real users; guild.prune_members unit-tested + dry-run verified live |
+| 100 | `create_category` | Expansion utilities | direct | live |  |
+| 101 | `rename_category` | Expansion utilities | direct | live |  |
+| 102 | `move_category` | Expansion utilities | direct | live |  |
+| 103 | `delete_category` | Expansion utilities | dry_run + confirm_token | live |  |
+| 104 | `create_incident_room` | Expansion utilities | direct | live |  |
+| 105 | `append_incident_event` | Expansion utilities | direct | live |  |
+| 106 | `close_incident` | Expansion utilities | direct | live |  |
+| 107 | `list_auto_moderation_rules` | Expansion utilities | direct | live |  |
+| 108 | `create_auto_moderation_rule` | Expansion utilities | direct | unit test |  |
+| 109 | `update_auto_moderation_rule` | Expansion utilities | direct | unit test |  |
+| 110 | `automod_export_rules` | Expansion utilities | direct | live |  |
+| 111 | `get_role_permissions` | Permission intel | direct | live |  |
+| 112 | `compute_member_permissions` | Permission intel | direct | live |  |
+| 113 | `audit_mass_mentions` | Mass mentions | direct | live |  |
+| 114 | `set_member_nickname` | Member admin | direct | live |  |
 
 ## Findings fixed in this audit
 
@@ -143,6 +144,10 @@ Columns: **gate** = confirmation model, **verified** = evidence level.
   feature; they now explain what is missing.
 - `automod_apply_ruleset` did not wire `exempt_roles`/`exempt_channels`; keyword triggers now also
   accept `allow_list` / `regex_patterns`.
+- `set_member_nickname` (tool 114) was added: real `Member.edit(nick=...)` with nickname removal via an
+  empty string/null, 32-character validation, and a Forbidden error that names the required permission
+  (`MANAGE_NICKNAMES`, or `CHANGE_NICKNAME` for the bot's own record). Verified live by renaming the bot
+  and clearing it again.
 
 ## Not run against real members (by design)
 

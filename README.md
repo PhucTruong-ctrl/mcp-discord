@@ -9,8 +9,8 @@ A Model Context Protocol (MCP) server that provides Discord integration capabili
 
 The comprehensive expansion roadmap is documented as a phased rollout:
 
-- **Target scope**: 113 canonical tools (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit)
-- **Current branch registry snapshot**: 113 canonical tools
+- **Target scope**: 114 canonical tools (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 1 member admin)
+- **Current branch registry snapshot**: 114 canonical tools
 - **Rollout model**: 10 implementation waves (Waves 1-10), plus Wave 0 (channel admin), 15 post-wave expansion fillers and 3 post-wave permission/mass-mention tools, with Wave 11 explicitly deferred for stateful extensions
 
 For full details, use:
@@ -145,17 +145,17 @@ The expansion adds these 84 tools:
 
 ### Post-wave expansion fillers/utilities (15)
 
-65. `bulk_ban_members` — synthetic (placeholder)
-66. `prune_inactive_members` — synthetic (placeholder)
-67. `remove_member_timeout` — synthetic (placeholder)
-68. `unban_member` — synthetic (placeholder)
-69. `create_category` — synthetic (placeholder)
-70. `rename_category` — synthetic (placeholder)
-71. `move_category` — synthetic (placeholder)
-72. `delete_category` — synthetic (placeholder)
-73. `create_incident_room` — synthetic (placeholder)
-74. `append_incident_event` — synthetic (placeholder)
-75. `close_incident` — synthetic (placeholder)
+65. `bulk_ban_members` — live Discord API call
+66. `prune_inactive_members` — live Discord API call
+67. `remove_member_timeout` — live Discord API call
+68. `unban_member` — live Discord API call
+69. `create_category` — live Discord API call
+70. `rename_category` — live Discord API call
+71. `move_category` — live Discord API call
+72. `delete_category` — live Discord API call
+73. `create_incident_room` — live Discord API call
+74. `append_incident_event` — live Discord API call
+75. `close_incident` — live Discord API call
 76. `list_auto_moderation_rules` — live gateway read (`Guild.fetch_automod_rules()`)
 77. `create_auto_moderation_rule` — live gateway create; honors `exempt_roles`/`exempt_channels` (ids or names)
 78. `update_auto_moderation_rule` — live gateway edit; partial updates, only supplied keys are sent
