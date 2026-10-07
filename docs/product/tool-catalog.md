@@ -204,8 +204,18 @@ The following tool families have specific capability notes:
   Platform caveat verified on live Discord: AutoMod does not act on bot messages, so such a
   rule constrains members, not bots.
 - **Wave 10 — AutoMod policy (89–92):** Mixed — `automod_validate_ruleset` is gateway-independent; `automod_get_ruleset` and `automod_apply_ruleset` use the live Discord API via gateway when available; `automod_rollback_ruleset` execute path returns `not_supported` (no Discord API primitive for rollback).
-- **Expansion fillers — tools 93–103 (synthetic-only):** Return `"applied"` or `"ok"` responses without Discord API calls.
-- **Expansion fillers — tools 104–107 (gateway-aware):** Use Discord API via gateway when available; fall back to synthetic `"applied"`/`"ok"` responses when gateway is absent.
+- **Expansion utilities — tools 93–107 (live Discord API):** every one performs the real call:
+  member/category/incident-room CRUD goes through discord.py, bulk ban uses `guild.bulk_ban`, pruning uses
+  `guild.prune_members`, and the AutoMod tools read/write rules. Destructive ones keep the
+  `dry_run` + `confirm_token` gate (`bulk_ban_members`, `prune_inactive_members`, `delete_category`).
+  With no gateway configured they raise `ValueError: gateway is required ...` instead of reporting a
+  fake success.
+- **Incident state:** `incident_apply_lockdown` snapshots the channel's `@everyone` overwrite, denies
+  `send_messages` / `send_messages_in_threads` / `create_public_threads`, and records the snapshot in
+  `$DISCORD_MCP_STATE_DIR/state.json` (default `~/.local/state/discord-mcp`); `incident_rollback_lockdown`
+  restores it. `incident_get/set_channel_state` read/write the same store.
+- **Confirm-token secret:** every `dry_run`/`confirm_token` tool requires `DISCORD_MCP_CONFIRM_SECRET`
+  in the environment; without it those tools fail with a clear error and nothing is applied.
 
 ## Permission introspection (tools 108-109)
 
@@ -243,6 +253,11 @@ two things that look identical in a chat client:
 Each hit also carries the author's current permission context (`authorHasMentionEveryoneNow`,
 `authorGrantingRoles`, `channelAllowsEveryone`). `read_messages` and the forum message
 serializer expose the same distinction as `mentionEveryone` / `mentions` / `roleMentionIds`.
+
+## Feature audit
+
+`docs/analysis/FEATURE_AUDIT.md` lists all 110 tools with their confirmation model and the verification
+evidence gathered against a live server (live API run vs unit test), plus the defects that audit fixed.
 
 ## 110-tool contract status
 

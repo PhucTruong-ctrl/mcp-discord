@@ -43,23 +43,117 @@ class _FakeAutomodRule:
         return self
 
 
+class _FakeRole:
+    id = 1
+    name = "@everyone"
+
+
+class _FakeMember:
+    id = 2
+    name = "member"
+
+    def __str__(self):
+        return self.name
+
+    async def timeout(self, until, *, reason=None):
+        self.timeout_call = (until, reason)
+
+
+class _FakeChannel:
+    id = 10
+    name = "Ops"
+    type = "category"
+    category_id = None
+    overwrites = {}
+
+    def __init__(self, channel_type="category"):
+        self.type = channel_type
+        self.calls = []
+
+    async def edit(self, **kwargs):
+        self.calls.append(kwargs)
+
+    async def delete(self, *, reason=None):
+        self.calls.append({"delete": reason})
+
+    async def send(self, content):
+        self.calls.append({"send": content})
+        return type("Msg", (), {"id": 999, "created_at": _ts()})()
+
+    async def set_permissions(self, target, **kwargs):
+        self.calls.append(kwargs)
+
+
+def _ts():
+    from datetime import datetime, timezone
+
+    return datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+
 class _FakeGuild:
-    """Minimal guild that handles AutoMod methods for dispatch testing."""
+    """Guild double that supports every call the expansion fillers make."""
 
     def __init__(self):
         self.id = 123
+        self.name = "Guild"
+        self.default_role = _FakeRole()
+        self.channels = []
+        self.calls = []
         self._rule = _FakeAutomodRule()
 
     async def fetch_automod_rules(self):
         return [self._rule]
 
     async def create_automod_rule(self, **kwargs):
+        self.calls.append(("create_automod_rule", kwargs))
         return self._rule
+
+    async def fetch_member(self, member_id):
+        return _FakeMember()
+
+    async def fetch_ban(self, user):
+        return type("Ban", (), {"user": _FakeMember()})()
+
+    async def create_category(self, **kwargs):
+        self.calls.append(("create_category", kwargs))
+        channel = _FakeChannel()
+        channel.guild = self
+        return channel
+
+    async def create_text_channel(self, **kwargs):
+        self.calls.append(("create_text_channel", kwargs))
+        channel = _FakeChannel("text")
+        channel.guild = self
+        return channel
+
+    async def unban(self, user, *, reason=None):
+        self.calls.append(("unban", reason))
+
+    async def bulk_ban(self, users, *, reason=None, delete_message_seconds=0):
+        self.calls.append(("bulk_ban", len(list(users))))
+
+    async def prune_members(self, *, days, compute_prune_count=True, reason=None):
+        self.calls.append(("prune_members", days))
+        return 1
 
 
 class _FakeGateway:
+    def __init__(self):
+        self.guild = _FakeGuild()
+        self.channel = _FakeChannel()
+        self.channel.guild = self.guild
+
     async def resolve_guild(self, server_id=None):
-        return _FakeGuild()
+        return self.guild
+
+    async def fetch_channel(self, channel_id):
+        return self.channel
+
+    async def timeout_member(self, server_id, member_id, duration_minutes, reason=None):
+        self.guild.calls.append(("timeout_member", duration_minutes))
+
+    async def unban_member(self, server_id, member_id, reason=None):
+        self.guild.calls.append(("unban_member", member_id))
 
 
 class TestExpansionFillersRouterCoverage(unittest.IsolatedAsyncioTestCase):
@@ -110,12 +204,29 @@ class TestExpansionFillersRouterCoverage(unittest.IsolatedAsyncioTestCase):
             "automod_export_rules": {"server_id": "1"},
         }
 
+        mutable = {
+            "remove_member_timeout",
+            "unban_member",
+            "create_category",
+            "rename_category",
+            "move_category",
+            "create_incident_room",
+            "append_incident_event",
+            "close_incident",
+        }
         for name, arguments in cases.items():
-            result = await dispatch_tool_call(
-                name, arguments, {"gateway": _FakeGateway()}
-            )
+            gateway = _FakeGateway()
+            result = await dispatch_tool_call(name, arguments, {"gateway": gateway})
             self.assertEqual(len(result), 1)
             self.assertEqual(result[0].type, "text")
+            payload = json.loads(result[0].text)
+            with self.subTest(tool=name):
+                if name in mutable:
+                    # a mutating filler must report a real execution, not a placebo
+                    self.assertEqual(payload["status"], "executed")
+                    self.assertEqual(payload["action"], name)
+                else:
+                    self.assertIn(payload["status"], {"dry_run", "applied", "ok"})
 
     async def test_dry_run_destructive_fillers_include_confirm_token(self):
         cases = {

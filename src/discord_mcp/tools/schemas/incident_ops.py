@@ -4,22 +4,24 @@ from mcp.types import Tool
 INCIDENT_OPS_TOOLS = [
     Tool(
         name="incident_get_channel_state",
-        description="Read incident channel state model for a channel",
+        description=(
+            "Read the stored incident state for a channel (lockdown snapshot, closed flag, "
+            "logged events) from the MCP state store."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
-                "channel_id": {"type": "string", "description": "Discord channel ID"},
-                "state": {
-                    "type": "object",
-                    "description": "Optional caller-supplied state snapshot",
-                },
+                "channel_id": {"type": "string", "description": "Discord channel ID"}
             },
             "required": ["channel_id"],
         },
     ),
     Tool(
         name="incident_set_channel_state",
-        description="Set incident channel state model payload",
+        description=(
+            "Overwrite the stored incident state for a channel (persisted to the MCP "
+            "state file so it survives restarts)."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -34,7 +36,11 @@ INCIDENT_OPS_TOOLS = [
     ),
     Tool(
         name="incident_apply_lockdown",
-        description="Apply incident lockdown to channels with confirm token enforcement",
+        description=(
+            "Lock a channel down: snapshot the current @everyone overwrite, then deny "
+            "send_messages / send_messages_in_threads / create_public_threads for "
+            "@everyone. dry_run by default; confirm_token required to apply."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -59,7 +65,10 @@ INCIDENT_OPS_TOOLS = [
     ),
     Tool(
         name="incident_rollback_lockdown",
-        description="Rollback incident lockdown with reason and confirm token enforcement",
+        description=(
+            "Undo a lockdown by restoring the @everyone overwrite snapshot recorded when it "
+            "was applied (or removing the overwrite if none existed)."
+        ),
         inputSchema={
             "type": "object",
             "properties": {

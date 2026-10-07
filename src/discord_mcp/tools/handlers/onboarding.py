@@ -1,6 +1,7 @@
 import json
 from typing import Any, Dict, List
 
+import discord
 from mcp.types import TextContent
 
 from discord_mcp.core.serialize import (
@@ -15,7 +16,13 @@ async def handle_get_guild_welcome_screen(
     guild = await deps["gateway"].resolve_guild(
         arguments.get("server_id") or arguments.get("server")
     )
-    screen = await guild.welcome_screen()
+    try:
+        screen = await guild.welcome_screen()
+    except discord.NotFound:
+        raise ValueError(
+            f"Server '{guild.id}' has no welcome screen configured (unknown guild welcome "
+            "screen). Enable Community features in Server Settings to use one."
+        )
     payload = {
         "serverId": str(guild.id),
         "serverName": guild.name,
@@ -59,7 +66,12 @@ async def handle_get_guild_onboarding(
     guild = await deps["gateway"].resolve_guild(
         arguments.get("server_id") or arguments.get("server")
     )
-    onboarding = await guild.onboarding()
+    try:
+        onboarding = await guild.onboarding()
+    except discord.NotFound:
+        raise ValueError(
+            f"Server '{guild.id}' has no onboarding configured (unknown guild onboarding)."
+        )
     payload = {
         "serverId": str(guild.id),
         "serverName": guild.name,

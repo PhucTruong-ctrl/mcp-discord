@@ -132,14 +132,30 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(payload["rules"][0]["enabled"])
 
-    async def test_list_rules_gateway_unavailable_returns_empty_synthetic(self):
-        """list should return empty synthetic when no gateway available."""
-        result = await handle_list_auto_moderation_rules({"server_id": "123"}, {})
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "ok")
-        self.assertEqual(payload["rules"], [])
-
     # --- create_auto_moderation_rule ---
+
+    async def test_automod_tools_fail_loudly_without_a_gateway(self):
+        cases = [
+            (handle_list_auto_moderation_rules, {"server_id": "1"}),
+            (
+                handle_create_auto_moderation_rule,
+                {"server_id": "1", "rule": {"name": "spam"}},
+            ),
+            (
+                handle_update_auto_moderation_rule,
+                {"server_id": "1", "rule_id": "1", "rule": {"name": "spam-v2"}},
+            ),
+            (handle_automod_export_rules, {"server_id": "1"}),
+        ]
+        for handler, arguments in cases:
+            with self.subTest(handler=handler.__name__):
+                with self.assertRaisesRegex(ValueError, "gateway is required"):
+                    await handler(dict(arguments), {})
+        # an empty deps dict must not be mistaken for an empty guild
+        with self.assertRaisesRegex(ValueError, "gateway is required"):
+            await handle_list_auto_moderation_rules(
+                {"server_id": "1"}, {"gateway": None}
+            )
 
     async def test_create_rule_calls_guild_api(self):
         """create should call guild.create_automod_rule()."""
@@ -197,18 +213,6 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("rule", payload)
         self.assertEqual(payload["rule"]["name"], "created-rule")
         self.assertEqual(payload["rule"]["id"], "333")
-
-    async def test_create_rule_gateway_unavailable_returns_synthetic_applied(self):
-        """create should return synthetic applied when no gateway available."""
-        result = await handle_create_auto_moderation_rule(
-            {
-                "server_id": "123",
-                "rule": {"name": "test", "trigger_type": "keyword", "actions": []},
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
 
     async def test_create_rule_passes_reason_to_api(self):
         """create should pass reason to guild.create_automod_rule()."""
@@ -285,19 +289,6 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
                 deps,
             )
 
-    async def test_update_rule_gateway_unavailable_returns_synthetic_applied(self):
-        """update should return synthetic applied when no gateway available."""
-        result = await handle_update_auto_moderation_rule(
-            {
-                "server_id": "123",
-                "rule_id": "111",
-                "rule": {"name": "test-rename"},
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-
     async def test_update_rule_passes_reason_to_edit(self):
         """update should pass reason to rule.edit()."""
         rule_mock = AsyncMock()
@@ -349,13 +340,6 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
         result = await handle_automod_export_rules({"server_id": "123"}, deps)
         payload = _payload(result)
 
-        self.assertEqual(payload["status"], "ok")
-        self.assertEqual(payload["export"]["rules"], [])
-
-    async def test_export_rules_gateway_unavailable_returns_empty_synthetic(self):
-        """export should return empty synthetic when no gateway available."""
-        result = await handle_automod_export_rules({"server_id": "123"}, {})
-        payload = _payload(result)
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["export"]["rules"], [])
 

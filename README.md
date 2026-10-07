@@ -16,9 +16,19 @@ The comprehensive expansion roadmap is documented as a phased rollout:
 For full details, use:
 
 - [`docs/product/tool-catalog.md`](docs/product/tool-catalog.md) — canonical catalog by domain, baseline vs expansion mapping
+- [`docs/analysis/FEATURE_AUDIT.md`](docs/analysis/FEATURE_AUDIT.md) — per-tool feature audit (confirmation model + verification evidence)
 - [`docs/product/rollout/01-10-rollout.md`](docs/product/rollout/01-10-rollout.md) — wave-by-wave map and Wave 11 deferral rationale
 - [`docs/product/safety/destructive-actions-policy.md`](docs/product/safety/destructive-actions-policy.md) — destructive-action guardrails and `confirm_token` policy
 - [`docs/README.md`](docs/README.md) — consolidated docs index and navigation
+
+## Environment
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `DISCORD_TOKEN` | yes | bot token; validated at runtime, never at import |
+| `DISCORD_MCP_CONFIRM_SECRET` | yes for guarded tools | HMAC secret for the `dry_run` + `confirm_token` gate (`moderation_*`, `bulk_ban_members`, `prune_inactive_members`, `delete_category`, `incident_*_lockdown`, `automod_apply_ruleset`, `*_roles_bulk`). Without it those tools fail with `DISCORD_MCP_CONFIRM_SECRET environment variable is required ...` and apply nothing |
+| `DEFAULT_GUILD_ID` / `DISCORD_GUILD_ID` | no | default server when a tool call omits `server_id` |
+| `DISCORD_MCP_STATE_DIR` | no | where incident/tool state is stored (default `~/.local/state/discord-mcp`) |
 
 ## Channel CRUD/Admin Mapping
 

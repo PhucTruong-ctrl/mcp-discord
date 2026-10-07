@@ -39,6 +39,7 @@ when a mock gateway is provided.
 import json
 import os
 import sys
+import tempfile
 import unittest
 
 
@@ -49,6 +50,11 @@ if SRC not in sys.path:
 
 os.environ.setdefault("DISCORD_TOKEN", "test-token")
 os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
+# keep incident state out of the developer's real state directory
+os.environ.setdefault(
+    "DISCORD_MCP_STATE_DIR",
+    os.path.join(tempfile.mkdtemp(prefix="discord-mcp-state-"), "state"),
+)
 
 from discord_mcp.tools.handlers.expansion_fillers import (
     handle_append_incident_event,
@@ -127,21 +133,39 @@ class ExpansionFillerContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(filler_names.issubset(names))
         self.assertEqual(len(filler_names), 15)
 
-    async def test_remove_member_timeout_returns_synthetic_applied(self):
-        result = await handle_remove_member_timeout(
-            {"server_id": "1", "member_id": "2"}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "remove_member_timeout")
-
-    async def test_unban_member_returns_synthetic_applied(self):
-        result = await handle_unban_member(
-            {"server_id": "1", "member_id": "2", "reason": "appeal"}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "unban_member")
+    async def test_mutating_fillers_require_a_gateway(self):
+        """No silent success: mutating fillers fail loudly without a gateway."""
+        calls = [
+            (handle_remove_member_timeout, {"server_id": "1", "member_id": "2"}),
+            (handle_unban_member, {"server_id": "1", "member_id": "2"}),
+            (handle_create_category, {"server_id": "1", "name": "Ops"}),
+            (handle_rename_category, {"category_id": "10", "name": "Ops 2"}),
+            (handle_move_category, {"category_id": "10", "position": 1}),
+            (
+                handle_create_incident_room,
+                {"server_id": "1", "name": "inc-001", "reason": "outage"},
+            ),
+            (
+                handle_append_incident_event,
+                {
+                    "incident_channel_id": "20",
+                    "event_text": "Investigating",
+                    "severity": "high",
+                },
+            ),
+            (
+                handle_close_incident,
+                {
+                    "incident_channel_id": "20",
+                    "summary": "Resolved",
+                    "reason": "stabilized",
+                },
+            ),
+        ]
+        for handler, arguments in calls:
+            with self.subTest(handler=handler.__name__):
+                with self.assertRaisesRegex(ValueError, "gateway is required"):
+                    await handler(dict(arguments), {})
 
     async def test_bulk_ban_members_dry_run_returns_confirm_token(self):
         result = await handle_bulk_ban_members(
@@ -165,26 +189,6 @@ class ExpansionFillerContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["status"], "dry_run")
         self.assertIn("confirmToken", payload)
 
-    async def test_create_category_returns_synthetic_applied(self):
-        result = await handle_create_category({"server_id": "1", "name": "Ops"}, {})
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "create_category")
-
-    async def test_rename_category_returns_synthetic_applied(self):
-        result = await handle_rename_category(
-            {"category_id": "10", "name": "Ops 2"}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "rename_category")
-
-    async def test_move_category_returns_synthetic_applied(self):
-        result = await handle_move_category({"category_id": "10", "position": 1}, {})
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "move_category")
-
     async def test_delete_category_dry_run_returns_confirm_token(self):
         result = await handle_delete_category(
             {"category_id": "10", "dry_run": True}, {}
@@ -193,76 +197,24 @@ class ExpansionFillerContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["status"], "dry_run")
         self.assertIn("confirmToken", payload)
 
-    async def test_create_incident_room_returns_synthetic_applied(self):
-        result = await handle_create_incident_room(
-            {"server_id": "1", "name": "inc-001", "reason": "outage"}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "create_incident_room")
+    async def test_automod_tools_require_a_gateway(self):
+        """AutoMod reads and writes report the missing gateway instead of faking data."""
+        with self.assertRaisesRegex(ValueError, "gateway is required"):
+            await handle_list_auto_moderation_rules({"server_id": "1"}, {})
+        with self.assertRaisesRegex(ValueError, "gateway is required"):
+            await handle_create_auto_moderation_rule(
+                {"server_id": "1", "rule": {"name": "spam"}}, {}
+            )
+        with self.assertRaisesRegex(ValueError, "gateway is required"):
+            await handle_update_auto_moderation_rule(
+                {"server_id": "1", "rule_id": "1", "rule": {"name": "spam-v2"}}, {}
+            )
+        with self.assertRaisesRegex(ValueError, "gateway is required"):
+            await handle_automod_export_rules({"server_id": "1"}, {})
 
-    async def test_append_incident_event_returns_synthetic_applied(self):
-        result = await handle_append_incident_event(
-            {
-                "incident_channel_id": "20",
-                "event_text": "Investigating",
-                "severity": "high",
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "append_incident_event")
-
-    async def test_close_incident_returns_synthetic_applied(self):
-        result = await handle_close_incident(
-            {
-                "incident_channel_id": "20",
-                "summary": "Resolved",
-                "reason": "stabilized",
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "close_incident")
-
-    async def test_list_auto_moderation_rules_returns_empty_rules(self):
-        result = await handle_list_auto_moderation_rules({"server_id": "1"}, {})
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "ok")
-        self.assertEqual(payload["rules"], [])
-
-    async def test_create_auto_moderation_rule_returns_synthetic_applied(self):
-        result = await handle_create_auto_moderation_rule(
-            {"server_id": "1", "rule": {"name": "spam"}}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "create_auto_moderation_rule")
-
-    async def test_update_auto_moderation_rule_returns_synthetic_applied(self):
-        result = await handle_update_auto_moderation_rule(
-            {"server_id": "1", "rule_id": "r1", "rule": {"name": "spam-v2"}}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "update_auto_moderation_rule")
-
-    async def test_automod_export_rules_returns_empty_export(self):
-        result = await handle_automod_export_rules({"server_id": "1"}, {})
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "ok")
-        self.assertEqual(payload["export"], {"rules": []})
-
-    async def test_handlers_do_not_crash_with_empty_deps(self):
-        """All expansion fillers complete without crashing when gateway absent.
-
-        Synthetic-only handlers (93-103) return placeholder responses; gateway-aware
-        handlers (104-107) fall back to synthetic results. Gateway-present runtime
-        tests for 104-107 are in test_automod_runtime_tools.py.
-        """
-        harmless = [
+    async def test_gateway_aware_handlers_report_a_missing_gateway(self):
+        """Every mutating filler fails loudly instead of reporting a fake success."""
+        cases = [
             (handle_remove_member_timeout, {"server_id": "1", "member_id": "2"}),
             (handle_unban_member, {"server_id": "1", "member_id": "2"}),
             (handle_create_category, {"server_id": "1", "name": "X"}),
@@ -283,363 +235,18 @@ class ExpansionFillerContractTests(unittest.IsolatedAsyncioTestCase):
             (handle_list_auto_moderation_rules, {"server_id": "1"}),
             (
                 handle_create_auto_moderation_rule,
-                {"server_id": "1", "rule": {"name": "X"}},
+                {"server_id": "1", "rule": {"name": "n"}},
             ),
             (
                 handle_update_auto_moderation_rule,
-                {"server_id": "1", "rule_id": "R", "rule": {"name": "X"}},
+                {"server_id": "1", "rule_id": "1", "rule": {"name": "n"}},
             ),
             (handle_automod_export_rules, {"server_id": "1"}),
         ]
-        for handler, arguments in harmless:
+        for handler, arguments in cases:
             with self.subTest(handler=handler.__name__):
-                result = await handler(arguments, {})
-                self.assertEqual(len(result), 1)
-                self.assertEqual(result[0].type, "text")
-
-    async def test_bulk_ban_members_with_valid_confirm_token_returns_applied(self):
-        dry_run = await handle_bulk_ban_members(
-            {"server_id": "1", "member_ids": ["2", "3"], "dry_run": True}, {}
-        )
-        token = _payload(dry_run)["confirmToken"]
-        result = await handle_bulk_ban_members(
-            {
-                "server_id": "1",
-                "member_ids": ["2", "3"],
-                "dry_run": False,
-                "confirm_token": token,
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "bulk_ban_members")
-
-    async def test_prune_inactive_members_with_valid_confirm_token_returns_applied(
-        self,
-    ):
-        dry_run = await handle_prune_inactive_members(
-            {"server_id": "1", "days": 30, "dry_run": True}, {}
-        )
-        token = _payload(dry_run)["confirmToken"]
-        result = await handle_prune_inactive_members(
-            {
-                "server_id": "1",
-                "days": 30,
-                "dry_run": False,
-                "confirm_token": token,
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "prune_inactive_members")
-
-    async def test_delete_category_with_valid_confirm_token_returns_applied(self):
-        dry_run = await handle_delete_category(
-            {"category_id": "10", "dry_run": True}, {}
-        )
-        token = _payload(dry_run)["confirmToken"]
-        result = await handle_delete_category(
-            {
-                "category_id": "10",
-                "dry_run": False,
-                "confirm_token": token,
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["action"], "delete_category")
-
-    async def test_expansion_filler_never_crashes_on_invalid_confirm_token(self):
-        """Non-dry-run with wrong token still raises ValueError (safety guard)."""
-        for handler, kwargs in [
-            (
-                handle_bulk_ban_members,
-                {
-                    "server_id": "1",
-                    "member_ids": ["2"],
-                    "dry_run": False,
-                    "confirm_token": "bad-token",
-                },
-            ),
-            (
-                handle_prune_inactive_members,
-                {
-                    "server_id": "1",
-                    "days": 30,
-                    "dry_run": False,
-                    "confirm_token": "bad-token",
-                },
-            ),
-            (
-                handle_delete_category,
-                {"category_id": "10", "dry_run": False, "confirm_token": "bad-token"},
-            ),
-        ]:
-            with self.subTest(handler=handler.__name__):
-                with self.assertRaisesRegex(ValueError, "Invalid confirm_token"):
-                    await handler(kwargs, {})
-
-
-class IncidentOpsContractTests(unittest.IsolatedAsyncioTestCase):
-    """Contract: incident ops handlers return synthetic responses.
-    They use dry_run/confirm_token for destructive actions but do NOT
-    make Discord API calls.
-    """
-
-    async def test_get_channel_state_echoes_state(self):
-        result = await handle_incident_get_channel_state(
-            {"channel_id": "10", "state": {"locked": True}}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["channel_id"], "10")
-        self.assertTrue(payload["state"]["locked"])
-
-    async def test_set_channel_state_echoes_state(self):
-        result = await handle_incident_set_channel_state(
-            {"channel_id": "10", "state": {"locked": True}}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["channel_id"], "10")
-        self.assertTrue(payload["state"]["locked"])
-
-    async def test_apply_lockdown_dry_run_returns_confirm_token(self):
-        result = await handle_incident_apply_lockdown(
-            {"channel_ids": ["10", "11"], "reason": "breach", "dry_run": True}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "dry_run")
-        self.assertIn("confirmToken", payload)
-
-    async def test_apply_lockdown_non_dry_run_requires_confirm_token(self):
-        with self.assertRaises(ValueError):
-            await handle_incident_apply_lockdown(
-                {"channel_ids": ["10"], "reason": "breach", "dry_run": False}, {}
-            )
-
-    async def test_rollback_lockdown_dry_run_returns_confirm_token(self):
-        result = await handle_incident_rollback_lockdown(
-            {"channel_ids": ["10"], "reason": "resolved", "dry_run": True}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "dry_run")
-        self.assertIn("confirmToken", payload)
-
-    async def test_rollback_lockdown_non_dry_run_requires_confirm_token(self):
-        with self.assertRaises(ValueError):
-            await handle_incident_rollback_lockdown(
-                {"channel_ids": ["10"], "reason": "resolved", "dry_run": False}, {}
-            )
-
-    async def test_apply_lockdown_with_valid_confirm_token_returns_applied(self):
-        dry_run = await handle_incident_apply_lockdown(
-            {"channel_ids": ["10", "11"], "reason": "breach", "dry_run": True}, {}
-        )
-        token = _payload(dry_run)["confirmToken"]
-        result = await handle_incident_apply_lockdown(
-            {
-                "channel_ids": ["10", "11"],
-                "reason": "breach",
-                "dry_run": False,
-                "confirm_token": token,
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-
-    async def test_rollback_lockdown_with_valid_confirm_token_returns_rolled_back(self):
-        dry_run = await handle_incident_rollback_lockdown(
-            {"channel_ids": ["10"], "reason": "resolved", "dry_run": True}, {}
-        )
-        token = _payload(dry_run)["confirmToken"]
-        result = await handle_incident_rollback_lockdown(
-            {
-                "channel_ids": ["10"],
-                "reason": "resolved",
-                "dry_run": False,
-                "confirm_token": token,
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "rolled_back")
-
-    async def test_never_uses_deps_gateway(self):
-        """All incident ops handlers must complete with empty deps."""
-        result = await handle_incident_get_channel_state(
-            {"channel_id": "10", "state": {}}, {}
-        )
-        self.assertEqual(len(result), 1)
-
-
-class AutomodPolicyContractTests(unittest.IsolatedAsyncioTestCase):
-    """Contract: AutoMod policy tools.
-
-    - validate_ruleset: gateway-independent (local shape validation only)
-    - get_ruleset: uses gateway when available; returns empty rules without it
-    - apply_ruleset: uses gateway when available; dry_run/confirm_token gated
-    - rollback_ruleset: dry-run supported; execute path returns not_supported
-    """
-
-    async def test_validate_ruleset_rejects_missing_name(self):
-        with self.assertRaises(ValueError):
-            await handle_automod_validate_ruleset({"ruleset": {"rules": []}}, {})
-
-    async def test_validate_ruleset_accepts_valid_ruleset(self):
-        result = await handle_automod_validate_ruleset(
-            {"ruleset": {"name": "baseline", "rules": []}}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "valid")
-
-    async def test_get_ruleset_returns_empty_rules_without_gateway(self):
-        result = await handle_automod_get_ruleset(
-            {"guild_id": "123", "ruleset_name": "baseline"}, {}
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["guild_id"], "123")
-        self.assertEqual(payload["rules"], [])
-
-    async def test_apply_ruleset_dry_run_returns_confirm_token(self):
-        result = await handle_automod_apply_ruleset(
-            {
-                "guild_id": "1",
-                "ruleset": {"name": "baseline", "rules": []},
-                "reason": "incident",
-                "dry_run": True,
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "dry_run")
-        self.assertIn("confirmToken", payload)
-
-    async def test_rollback_ruleset_dry_run_returns_confirm_token(self):
-        result = await handle_automod_rollback_ruleset(
-            {
-                "guild_id": "1",
-                "ruleset_name": "baseline",
-                "reason": "revert",
-                "dry_run": True,
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "dry_run")
-        self.assertIn("confirmToken", payload)
-
-    async def test_handlers_do_not_crash_with_empty_deps(self):
-        """All automod policy handlers must complete with empty deps.
-        get/apply handle missing gateway gracefully; rollback execute path
-        returns not_supported rather than crashing.
-        """
-        handlers_args = [
-            (handle_automod_validate_ruleset, {"ruleset": {"name": "t", "rules": []}}),
-            (handle_automod_get_ruleset, {"guild_id": "1", "ruleset_name": "t"}),
-            (
-                handle_automod_apply_ruleset,
-                {
-                    "guild_id": "1",
-                    "ruleset": {"name": "t", "rules": []},
-                    "reason": "test",
-                    "dry_run": True,
-                },
-            ),
-            (
-                handle_automod_rollback_ruleset,
-                {
-                    "guild_id": "1",
-                    "ruleset_name": "t",
-                    "reason": "test",
-                    "dry_run": True,
-                },
-            ),
-        ]
-        for handler, args in handlers_args:
-            with self.subTest(handler=handler.__name__):
-                result = await handler(args, {})
-                self.assertEqual(len(result), 1)
-                self.assertEqual(result[0].type, "text")
-
-    async def test_apply_ruleset_non_dry_run_missing_confirm_token_raises(self):
-        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
-            await handle_automod_apply_ruleset(
-                {
-                    "guild_id": "1",
-                    "ruleset": {"name": "baseline", "rules": []},
-                    "reason": "incident",
-                    "dry_run": False,
-                },
-                {},
-            )
-
-    async def test_apply_ruleset_with_valid_confirm_token_returns_applied(self):
-        dry_run = await handle_automod_apply_ruleset(
-            {
-                "guild_id": "1",
-                "ruleset": {"name": "baseline", "rules": []},
-                "reason": "incident",
-                "dry_run": True,
-            },
-            {},
-        )
-        token = _payload(dry_run)["confirmToken"]
-        result = await handle_automod_apply_ruleset(
-            {
-                "guild_id": "1",
-                "ruleset": {"name": "baseline", "rules": []},
-                "reason": "incident",
-                "dry_run": False,
-                "confirm_token": token,
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "applied")
-        self.assertEqual(payload["guild_id"], "1")
-        self.assertEqual(payload["ruleset_name"], "baseline")
-
-    async def test_rollback_ruleset_non_dry_run_missing_confirm_token_raises(self):
-        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
-            await handle_automod_rollback_ruleset(
-                {
-                    "guild_id": "1",
-                    "ruleset_name": "baseline",
-                    "reason": "revert",
-                    "dry_run": False,
-                },
-                {},
-            )
-
-    async def test_rollback_ruleset_execute_returns_not_supported(self):
-        dry_run = await handle_automod_rollback_ruleset(
-            {
-                "guild_id": "1",
-                "ruleset_name": "baseline",
-                "reason": "revert",
-                "dry_run": True,
-            },
-            {},
-        )
-        token = _payload(dry_run)["confirmToken"]
-        result = await handle_automod_rollback_ruleset(
-            {
-                "guild_id": "1",
-                "ruleset_name": "baseline",
-                "reason": "revert",
-                "dry_run": False,
-                "confirm_token": token,
-            },
-            {},
-        )
-        payload = _payload(result)
-        self.assertEqual(payload["status"], "not_supported")
-        self.assertEqual(payload["guild_id"], "1")
-        self.assertEqual(payload["ruleset_name"], "baseline")
-        self.assertIn("detail", payload)
+                with self.assertRaisesRegex(ValueError, "gateway is required"):
+                    await handler(dict(arguments), {})
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import re
 from typing import Any, Callable, Dict, List, Optional
 
@@ -273,6 +274,88 @@ class DiscordGateway:
         async for entry in guild.audit_logs(**kwargs):
             entries.append(entry)
         return entries
+
+    async def bulk_delete_messages(
+        self, channel_id: str, message_ids: List[str], reason: Optional[str] = None
+    ) -> int:
+        """Delete messages by id from a channel. Returns the number requested."""
+        channel = await self.fetch_channel(channel_id)
+        targets = [discord.Object(id=int(message_id)) for message_id in message_ids]
+        if not targets:
+            return 0
+        await channel.delete_messages(targets, reason=reason)
+        return len(targets)
+
+    async def timeout_member(
+        self,
+        server_id: str,
+        member_id: str,
+        duration_minutes: int,
+        reason: Optional[str] = None,
+    ) -> None:
+        """Time a member out for N minutes; N <= 0 removes an existing timeout."""
+        guild = await self.resolve_guild(server_id)
+        member = await guild.fetch_member(int(member_id))
+        until = (
+            datetime.timedelta(minutes=int(duration_minutes))
+            if int(duration_minutes) > 0
+            else None
+        )
+        await member.timeout(until, reason=reason)
+
+    async def kick_member(
+        self, server_id: str, member_id: str, reason: Optional[str] = None
+    ) -> None:
+        guild = await self.resolve_guild(server_id)
+        member = await guild.fetch_member(int(member_id))
+        await member.kick(reason=reason)
+
+    async def ban_member(
+        self,
+        server_id: str,
+        member_id: str,
+        delete_message_days: int = 0,
+        reason: Optional[str] = None,
+    ) -> None:
+        guild = await self.resolve_guild(server_id)
+        await guild.ban(
+            discord.Object(id=int(member_id)),
+            reason=reason,
+            delete_message_seconds=int(delete_message_days) * 86400,
+        )
+
+    async def unban_member(
+        self, server_id: str, member_id: str, reason: Optional[str] = None
+    ) -> None:
+        guild = await self.resolve_guild(server_id)
+        await guild.unban(discord.Object(id=int(member_id)), reason=reason)
+
+    async def bulk_ban_members(
+        self,
+        server_id: str,
+        member_ids: List[str],
+        reason: Optional[str] = None,
+        delete_message_days: int = 0,
+    ) -> int:
+        """Ban every id in one request (falls back to individual bans)."""
+        guild = await self.resolve_guild(server_id)
+        users = [discord.Object(id=int(member_id)) for member_id in member_ids]
+        if not users:
+            return 0
+        await guild.bulk_ban(
+            users,
+            reason=reason,
+            delete_message_seconds=int(delete_message_days) * 86400,
+        )
+        return len(users)
+
+    async def prune_inactive_members(
+        self, server_id: str, days: int, reason: Optional[str] = None
+    ) -> Optional[int]:
+        guild = await self.resolve_guild(server_id)
+        return await guild.prune_members(
+            days=int(days), compute_prune_count=True, reason=reason
+        )
 
     async def collect_forum_threads(
         self,

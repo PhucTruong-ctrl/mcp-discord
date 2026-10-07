@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import tempfile
 import unittest
 
 
@@ -10,6 +11,10 @@ if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
 os.environ.setdefault("DISCORD_TOKEN", "test-token")
+os.environ.setdefault(
+    "DISCORD_MCP_STATE_DIR",
+    os.path.join(tempfile.mkdtemp(prefix="discord-mcp-state-"), "state"),
+)
 os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
 
 from discord_mcp.tools.handlers.incident_ops import (
@@ -116,6 +121,29 @@ class IncidentOpsToolTests(unittest.IsolatedAsyncioTestCase):
                 {},
             )
 
+        class FakeRole:
+            id = 1
+            name = "@everyone"
+
+        class FakeChannel:
+            id = 10
+            name = "incident"
+            guild = type("G", (), {})()
+            overwrites = {}
+
+            def __init__(self):
+                self.calls = []
+
+            async def set_permissions(self, target, **kwargs):
+                self.calls.append(kwargs)
+
+        channel = FakeChannel()
+        channel.guild = type("G", (), {"default_role": FakeRole()})()
+
+        class FakeGateway:
+            async def fetch_channel(self, channel_id):
+                return channel
+
         executed = await handle_incident_apply_lockdown(
             {
                 "channel_ids": ["10"],
@@ -123,9 +151,10 @@ class IncidentOpsToolTests(unittest.IsolatedAsyncioTestCase):
                 "dry_run": False,
                 "confirm_token": token,
             },
-            {},
+            {"gateway": FakeGateway()},
         )
-        self.assertEqual(_payload(executed)["status"], "applied")
+        self.assertEqual(_payload(executed)["status"], "executed")
+        self.assertFalse(channel.calls[0]["send_messages"])
 
     async def test_rollback_requires_reason_and_confirm_token(self):
         with self.assertRaisesRegex(ValueError, "reason is required"):
