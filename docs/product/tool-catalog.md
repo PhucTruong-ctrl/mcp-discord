@@ -199,6 +199,16 @@ Notes:
 
 114. `set_member_nickname`
 
+- **Role colours and role assignment:** every role-emitting tool (`get_role_permissions`,
+  `get_role_hierarchy`, `topology_role_hierarchy`, `topology_permission_matrix`,
+  `export_server_snapshot`, `permission_drift_check`) now reports `color` (int), `colorHex`,
+  `secondaryColor`/`tertiaryColor` and `gradient`. `create_role` / `update_role` accept `color`
+  plus `secondary_color`/`tertiary_color` as int, `#rrggbb` or `0xrrggbb`; gradient colours need a
+  Discord guild feature, and the tool explains the `670006 Missing guild feature` refusal.
+  `add_role` / `remove_role` resolve uncached roles, take an optional `reason`, report
+  `hadRoleBefore` / `hasRoleNow` / `changed` from a fresh API read (discord.py's `Member.edit`
+  returns a new object and leaves the instance you called it on stale) and name MANAGE_ROLES plus
+  the role-hierarchy comparison when Discord answers 403.
 ## Implementation-status note
 
 All 15 expansion utilities (tools 93–107) make live Discord API calls — see the

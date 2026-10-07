@@ -275,6 +275,17 @@ class DiscordGateway:
             entries.append(entry)
         return entries
 
+    async def fetch_member_role_ids(self, server_id: str, member_id: str) -> List[int]:
+        """Role ids Discord currently reports for a member (bypasses the local cache).
+
+        discord.py's ``Member.edit`` returns a new Member object and does not refresh the
+        instance it was called on, so cached ``member.roles`` can be stale right after a
+        role change.
+        """
+        guild = await self.resolve_guild(server_id)
+        payload = await self.client.http.get_member(guild.id, int(member_id))
+        return [int(role_id) for role_id in payload.get("roles", [])]
+
     async def fetch_onboarding_payload(self, server_id: str) -> Dict[str, Any]:
         """Raw onboarding payload (keeps field order and emoji/animated detail)."""
         guild = await self.resolve_guild(server_id)

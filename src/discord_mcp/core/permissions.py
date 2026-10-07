@@ -35,15 +35,39 @@ def permission_names(bits: Any) -> List[str]:
     ]
 
 
+def colour_value(value: Any) -> Optional[int]:
+    """Coerce a discord.Colour, int or None into a raw colour int."""
+    if value is None:
+        return None
+    inner = getattr(value, "value", value)
+    try:
+        return int(inner)
+    except (TypeError, ValueError):
+        return None
+
+
+def colour_hex(value: Any) -> Optional[str]:
+    raw = colour_value(value)
+    return f"#{raw:06x}" if raw is not None else None
+
+
 def role_payload(role: Any) -> Dict[str, Any]:
     """Role row shared by every role-emitting tool."""
     bits = as_permission_bits(getattr(role, "permissions", 0))
+    primary = colour_value(getattr(role, "color", None))
+    secondary = colour_value(getattr(role, "secondary_color", None))
+    tertiary = colour_value(getattr(role, "tertiary_color", None))
     return {
         "id": str(role.id),
         "name": getattr(role, "name", None) or str(role.id),
         "position": int(getattr(role, "position", 0)),
         "permissions": bits,
         "permissionNames": permission_names(bits),
+        "color": primary if primary is not None else 0,
+        "colorHex": colour_hex(primary if primary is not None else 0),
+        "secondaryColor": secondary,
+        "tertiaryColor": tertiary,
+        "gradient": secondary is not None or tertiary is not None,
         "hoist": bool(getattr(role, "hoist", False)),
         "mentionable": bool(getattr(role, "mentionable", False)),
         "managed": bool(getattr(role, "managed", False)),

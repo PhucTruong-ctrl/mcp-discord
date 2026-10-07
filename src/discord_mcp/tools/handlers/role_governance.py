@@ -12,6 +12,41 @@ from discord_mcp.core.permissions import (
 from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 
 
+def _resolve_colour(value: Any, where: str) -> Any:
+    """Accept an int, "0xrrggbb", "#rrggbb" or "rrggbb" and return a discord.Colour."""
+    if isinstance(value, discord.Colour):
+        return value
+    if isinstance(value, int):
+        return discord.Colour(value)
+    text = str(value).strip()
+    try:
+        return discord.Colour.from_str(text)
+    except ValueError:
+        try:
+            return discord.Colour(int(text, 16) if not text.isdigit() else int(text))
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"{where} must be a colour int, '#rrggbb' or '0xrrggbb', got {value!r}"
+            )
+
+
+def _role_edit_error(exc: Exception, role_id: Any = None) -> Optional[ValueError]:
+    """Turn Discord's role-colour failures into something actionable."""
+    code = getattr(exc, "code", None)
+    if code == 670006:
+        return ValueError(
+            "Discord rejected the role colours: gradient colours (secondary_color / "
+            "tertiary_color) need a guild feature this server does not have "
+            "(error 670006 Missing guild feature). Only the primary color can be set here."
+        )
+    if code == 50013:
+        return ValueError(
+            f"Cannot edit role '{role_id}': missing MANAGE_ROLES, or the bot's highest role "
+            f"is below the target role ({exc})."
+        )
+    return None
+
+
 def _resolve_role(guild: Any, role_id: str):
     role = guild.get_role(int(role_id))
     if role is None:
@@ -28,7 +63,15 @@ async def handle_create_role(
     if arguments.get("permissions") is not None:
         kwargs["permissions"] = discord.Permissions(int(arguments["permissions"]))
     if arguments.get("color") is not None:
-        kwargs["colour"] = int(arguments["color"])
+        kwargs["colour"] = _resolve_colour(arguments["color"], "color")
+    if arguments.get("secondary_color") is not None:
+        kwargs["secondary_colour"] = _resolve_colour(
+            arguments["secondary_color"], "secondary_color"
+        )
+    if arguments.get("tertiary_color") is not None:
+        kwargs["tertiary_colour"] = _resolve_colour(
+            arguments["tertiary_color"], "tertiary_color"
+        )
     if "hoist" in arguments:
         kwargs["hoist"] = bool(arguments["hoist"])
     if "mentionable" in arguments:
@@ -36,8 +79,19 @@ async def handle_create_role(
     if arguments.get("reason") is not None:
         kwargs["reason"] = str(arguments["reason"])
 
-    role = await guild.create_role(**kwargs)
-    payload = {"roleId": str(role.id), "roleName": role.name, "serverId": str(guild.id)}
+    try:
+        role = await guild.create_role(**kwargs)
+    except discord.Forbidden as exc:
+        raise _role_edit_error(exc) or exc
+    except discord.HTTPException as exc:
+        raise _role_edit_error(exc) or exc
+    payload = {
+        "roleId": str(role.id),
+        "roleName": role.name,
+        "serverId": str(guild.id),
+        "color": role_payload(role)["color"],
+        "colorHex": role_payload(role)["colorHex"],
+    }
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))
     ]
@@ -66,7 +120,15 @@ async def handle_update_role(
     if "permissions" in arguments and arguments["permissions"] is not None:
         updates["permissions"] = discord.Permissions(int(arguments["permissions"]))
     if "color" in arguments and arguments["color"] is not None:
-        updates["colour"] = int(arguments["color"])
+        updates["colour"] = _resolve_colour(arguments["color"], "color")
+    if "secondary_color" in arguments and arguments["secondary_color"] is not None:
+        updates["secondary_colour"] = _resolve_colour(
+            arguments["secondary_color"], "secondary_color"
+        )
+    if "tertiary_color" in arguments and arguments["tertiary_color"] is not None:
+        updates["tertiary_colour"] = _resolve_colour(
+            arguments["tertiary_color"], "tertiary_color"
+        )
     if "hoist" in arguments and arguments["hoist"] is not None:
         updates["hoist"] = bool(arguments["hoist"])
     if "mentionable" in arguments and arguments["mentionable"] is not None:
@@ -74,8 +136,28 @@ async def handle_update_role(
     if "reason" in arguments and arguments["reason"] is not None:
         updates["reason"] = str(arguments["reason"])
 
-    await role.edit(**updates)
-    return [TextContent(type="text", text=f"Role '{role.id}' updated.")]
+    if not updates:
+        raise ValueError(
+            "update_role needs at least one of: name, permissions, color, "
+            "secondary_color, tertiary_color, hoist, mentionable, reason"
+        )
+    try:
+        await role.edit(**updates)
+    except discord.Forbidden as exc:
+        raise _role_edit_error(exc, role.id) or exc
+    except discord.HTTPException as exc:
+        raise _role_edit_error(exc, role.id) or exc
+    row = role_payload(role)
+    return [
+        TextContent(
+            type="text",
+            text=(
+                f"Role '{role.id}' updated: name={row['name']!r} color={row['colorHex']} "
+                f"gradient={row['gradient']} hoist={row['hoist']} "
+                f"mentionable={row['mentionable']} permissions={row['permissions']}"
+            ),
+        )
+    ]
 
 
 async def handle_add_roles_bulk(

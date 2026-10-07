@@ -11,7 +11,18 @@ ROLE_GOVERNANCE_TOOLS = [
                 "server_id": {"type": "string"},
                 "name": {"type": "string"},
                 "permissions": {"type": "number"},
-                "color": {"type": "number"},
+                "color": {
+                    "type": ["number", "string"],
+                    "description": "Primary colour: int, '#rrggbb' or '0xrrggbb'",
+                },
+                "secondary_color": {
+                    "type": ["number", "string"],
+                    "description": "Gradient colour 2 (int or hex)",
+                },
+                "tertiary_color": {
+                    "type": ["number", "string"],
+                    "description": "Gradient colour 3 (int or hex)",
+                },
                 "hoist": {"type": "boolean"},
                 "mentionable": {"type": "boolean"},
                 "reason": {"type": "string"},
@@ -42,7 +53,18 @@ ROLE_GOVERNANCE_TOOLS = [
                 "role_id": {"type": "string"},
                 "name": {"type": "string"},
                 "permissions": {"type": "number"},
-                "color": {"type": "number"},
+                "color": {
+                    "type": ["number", "string"],
+                    "description": "Primary colour: int, '#rrggbb' or '0xrrggbb'",
+                },
+                "secondary_color": {
+                    "type": ["number", "string"],
+                    "description": "Gradient colour 2 (int or hex)",
+                },
+                "tertiary_color": {
+                    "type": ["number", "string"],
+                    "description": "Gradient colour 3 (int or hex)",
+                },
                 "hoist": {"type": "boolean"},
                 "mentionable": {"type": "boolean"},
                 "reason": {"type": "string"},

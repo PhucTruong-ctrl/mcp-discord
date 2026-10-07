@@ -144,6 +144,11 @@ Columns: **gate** = confirmation model, **verified** = evidence level.
   feature; they now explain what is missing.
 - `automod_apply_ruleset` did not wire `exempt_roles`/`exempt_channels`; keyword triggers now also
   accept `allow_list` / `regex_patterns`.
+- Role colours were write-only: `create_role`/`update_role` accepted `color` but no role reader
+  returned it. `role_payload` now exposes `color`/`colorHex`/`secondaryColor`/`tertiaryColor`/
+  `gradient`, gradient writes are supported (and their `670006` refusal explained), and
+  `add_role`/`remove_role` no longer crash on an uncached role, accept a `reason`, and report
+  before/after state from a fresh API read instead of a stale local cache.
 - `update_guild_onboarding` crashed before any API call (`'dict' object has no attribute 'to_dict'`)
   because raw JSON prompts were passed to `Guild.edit_onboarding`, which calls `prompt.to_dict(id=i)`;
   it also sent partial PUTs. It now builds real `OnboardingPrompt` objects and merges onto the current
