@@ -313,6 +313,8 @@ serializer expose the same distinction as `mentionEveryone` / `mentions` / `role
 
 ## Feature audit
 
+`docs/analysis/DISCORDPY_COVERAGE_GAPS.md` lists the discord.py capabilities this MCP does not expose yet.
+
 `docs/analysis/FEATURE_AUDIT.md` lists all 115 tools with their confirmation model and the verification
 evidence gathered against a live server (live API run vs unit test), plus the defects that audit fixed.
 

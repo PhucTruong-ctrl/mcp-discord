@@ -16,7 +16,8 @@ The comprehensive expansion roadmap is documented as a phased rollout:
 For full details, use:
 
 - [`docs/product/tool-catalog.md`](docs/product/tool-catalog.md) — canonical catalog by domain, baseline vs expansion mapping
-- [`docs/analysis/FEATURE_AUDIT.md`](docs/analysis/FEATURE_AUDIT.md) — per-tool feature audit (confirmation model + verification evidence)
+- [`docs/analysis/FEATURE_AUDIT.md`](docs/analysis/FEATURE_AUDIT.md)
+- [`docs/analysis/DISCORDPY_COVERAGE_GAPS.md`](docs/analysis/DISCORDPY_COVERAGE_GAPS.md) — what discord.py can do that this MCP does not expose yet (list only) — per-tool feature audit (confirmation model + verification evidence)
 - [`docs/product/rollout/01-10-rollout.md`](docs/product/rollout/01-10-rollout.md) — wave-by-wave map and Wave 11 deferral rationale
 - [`docs/product/safety/destructive-actions-policy.md`](docs/product/safety/destructive-actions-policy.md) — destructive-action guardrails and `confirm_token` policy
 - [`docs/README.md`](docs/README.md) — consolidated docs index and navigation
