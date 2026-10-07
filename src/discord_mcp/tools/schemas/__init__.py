@@ -32,6 +32,7 @@ def compose_tool_registry() -> List[Tool]:
         *FORUM_TOOLS,
         *MISC_TOOLS,
         SERVER_INFO_TOOLS[3],
+        *SERVER_INFO_TOOLS[4:],
         *CHANNEL_ADMIN_TOOLS,
         *FORUM_INTEL_TOOLS,
         *INVENTORY_TOOLS,

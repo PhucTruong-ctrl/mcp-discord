@@ -10,6 +10,32 @@ from discord_mcp.core.serialize import (
 )
 
 
+def _build_welcome_channels(guild: Any, entries: Any) -> List[Any]:
+    """Build discord.WelcomeChannel objects from a JSON payload."""
+    if entries is None:
+        return []
+    if not isinstance(entries, list):
+        raise ValueError("welcome_channels must be an array")
+
+    channels = []
+    for entry in entries:
+        if not isinstance(entry, dict) or not entry.get("channel_id"):
+            raise ValueError(
+                "each welcome_channels entry needs channel_id "
+                "(optional description, emoji)"
+            )
+        channel_id = int(entry["channel_id"])
+        channel = guild.get_channel(channel_id) or discord.Object(id=channel_id)
+        channels.append(
+            discord.WelcomeChannel(
+                channel=channel,
+                description=str(entry.get("description") or ""),
+                emoji=entry.get("emoji") or None,
+            )
+        )
+    return channels
+
+
 async def handle_get_guild_welcome_screen(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
@@ -19,14 +45,19 @@ async def handle_get_guild_welcome_screen(
     try:
         screen = await guild.welcome_screen()
     except discord.NotFound:
-        raise ValueError(
-            f"Server '{guild.id}' has no welcome screen configured (unknown guild welcome "
-            "screen). Enable Community features in Server Settings to use one."
-        )
+        # 10069 Unknown Guild Welcome Screen means "not configured", not a failure.
+        screen = None
     payload = {
         "serverId": str(guild.id),
         "serverName": guild.name,
+        "configured": screen is not None,
         "welcomeScreen": _serialize_welcome_screen(screen) if screen else None,
+        "hint": (
+            None
+            if screen is not None
+            else "No welcome screen configured yet; create one with "
+            "update_guild_welcome_screen (the guild must have the COMMUNITY feature)."
+        ),
     }
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))
@@ -39,21 +70,35 @@ async def handle_update_guild_welcome_screen(
     guild = await deps["gateway"].resolve_guild(
         arguments.get("server_id") or arguments.get("server")
     )
-    screen = await guild.welcome_screen()
-    ws_args = arguments.get("welcome_screen", {})
-    edit_kwargs = {}
+    ws_args = arguments.get("welcome_screen") or {}
+    if not isinstance(ws_args, dict):
+        raise ValueError("welcome_screen must be an object")
+
+    # Guild.edit_welcome_screen() works without a pre-existing screen, which
+    # WelcomeScreen.edit() cannot do (fetching an unset screen raises NotFound).
+    edit_kwargs: Dict[str, Any] = {}
     if "description" in ws_args:
         edit_kwargs["description"] = ws_args["description"]
     if "enabled" in ws_args:
-        edit_kwargs["enabled"] = ws_args["enabled"]
+        edit_kwargs["enabled"] = bool(ws_args["enabled"])
+    if "welcome_channels" in ws_args:
+        edit_kwargs["welcome_channels"] = _build_welcome_channels(
+            guild, ws_args["welcome_channels"]
+        )
     if arguments.get("reason"):
         edit_kwargs["reason"] = arguments["reason"]
-    # edit() returns a new WelcomeScreen with the updated data
-    updated_screen = await screen.edit(**edit_kwargs)
+
+    if not edit_kwargs or set(edit_kwargs) == {"reason"}:
+        raise ValueError(
+            "nothing to update: pass welcome_screen.description, enabled or welcome_channels"
+        )
+
+    updated_screen = await guild.edit_welcome_screen(**edit_kwargs)
     payload = {
         "serverId": str(guild.id),
         "updated": True,
-        "welcomeScreen": _serialize_welcome_screen(updated_screen or screen),
+        "configured": True,
+        "welcomeScreen": _serialize_welcome_screen(updated_screen),
     }
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))

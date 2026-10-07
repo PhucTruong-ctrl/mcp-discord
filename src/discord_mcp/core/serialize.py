@@ -145,8 +145,11 @@ def _serialize_auto_moderation_rule(rule: Any) -> Dict[str, Any]:
 
 
 def _serialize_welcome_channel(wc: Any) -> Dict[str, Any]:
+    channel = getattr(wc, "channel", None)
     return {
-        "channelId": str(wc.channel.id),
+        # discord.py resolves the channel through the guild cache, so an
+        # uncached (partial) guild yields None: report it instead of crashing.
+        "channelId": str(channel.id) if channel is not None else None,
         "description": wc.description,
         "emoji": _serialize_emoji(wc.emoji),
     }

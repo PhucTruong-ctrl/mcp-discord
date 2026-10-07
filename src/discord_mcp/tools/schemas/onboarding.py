@@ -4,7 +4,10 @@ from mcp.types import Tool
 ONBOARDING_TOOLS = [
     Tool(
         name="get_guild_welcome_screen",
-        description="Get the guild welcome screen configuration",
+        description=(
+            "Get the guild welcome screen configuration; returns configured=false "
+            "instead of an error when the screen is unset."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -22,7 +25,12 @@ ONBOARDING_TOOLS = [
                 "server_id": {"type": "string", "description": "Discord server ID"},
                 "welcome_screen": {
                     "type": "object",
-                    "description": "Welcome screen payload",
+                    "description": (
+                        "Welcome screen payload: optional description (string), "
+                        "enabled (bool) and welcome_channels "
+                        "(array of {channel_id, description, emoji}). "
+                        "Creates the screen when none exists yet."
+                    ),
                 },
                 "reason": {"type": "string", "description": "Audit log reason"},
             },

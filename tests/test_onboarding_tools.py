@@ -123,9 +123,37 @@ class OnboardingHandlerBehaviorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["serverId"], "123")
         self.assertIsNone(payload["welcomeScreen"])
 
-    async def test_update_guild_welcome_screen_calls_edit_api(self):
-        """Update welcome screen must actually call welcome_screen.edit() with the
-        provided parameters instead of just returning {'updated': True}."""
+    async def test_get_guild_welcome_screen_reports_unset_instead_of_raising(self):
+        """An unset welcome screen (10069) is a state, not a tool error."""
+        guild = type(
+            "Guild",
+            (),
+            {
+                "name": "Demo",
+                "id": 123,
+                "welcome_screen": AsyncMock(
+                    side_effect=discord.NotFound(
+                        MagicMock(status=404), "Unknown Guild Welcome Screen"
+                    )
+                ),
+            },
+        )()
+        gateway = type(
+            "Gateway", (), {"resolve_guild": AsyncMock(return_value=guild)}
+        )()
+
+        result = await handle_get_guild_welcome_screen(
+            {"server_id": "123"}, {"gateway": gateway}
+        )
+        payload = json.loads(result[0].text)
+
+        self.assertFalse(payload["configured"])
+        self.assertIsNone(payload["welcomeScreen"])
+        self.assertIn("update_guild_welcome_screen", payload["hint"])
+
+    async def test_update_guild_welcome_screen_creates_screen_when_unset(self):
+        """Update must go through Guild.edit_welcome_screen so an unset screen can be
+        created (WelcomeScreen.edit needs a screen that does not exist yet)."""
         updated_screen = type(
             "WelcomeScreen",
             (),
@@ -136,23 +164,19 @@ class OnboardingHandlerBehaviorTests(unittest.IsolatedAsyncioTestCase):
             },
         )()
         edit_mock = AsyncMock(return_value=updated_screen)
-        welcome_screen = type(
-            "WelcomeScreen",
-            (),
-            {
-                "description": "Old desc",
-                "welcome_channels": [],
-                "enabled": True,
-                "edit": edit_mock,
-            },
-        )()
         guild = type(
             "Guild",
             (),
             {
                 "name": "Demo",
                 "id": 123,
-                "welcome_screen": AsyncMock(return_value=welcome_screen),
+                "get_channel": MagicMock(return_value=None),
+                "welcome_screen": AsyncMock(
+                    side_effect=discord.NotFound(
+                        MagicMock(status=404), "Unknown Guild Welcome Screen"
+                    )
+                ),
+                "edit_welcome_screen": edit_mock,
             },
         )()
         gateway = type(
@@ -162,22 +186,57 @@ class OnboardingHandlerBehaviorTests(unittest.IsolatedAsyncioTestCase):
         result = await handle_update_guild_welcome_screen(
             {
                 "server_id": "123",
-                "welcome_screen": {"description": "New desc", "enabled": True},
+                "welcome_screen": {
+                    "description": "New desc",
+                    "enabled": True,
+                    "welcome_channels": [
+                        {
+                            "channel_id": "456",
+                            "description": "Read me",
+                            "emoji": "\U0001f44b",
+                        }
+                    ],
+                },
                 "reason": "test update",
             },
             {"gateway": gateway},
         )
         payload = json.loads(result[0].text)
 
-        self.assertEqual(payload["serverId"], "123")
         self.assertTrue(payload["updated"])
+        self.assertTrue(payload["configured"])
         self.assertEqual(payload["welcomeScreen"]["description"], "New desc")
-        self.assertTrue(payload["welcomeScreen"]["enabled"])
         edit_mock.assert_awaited_once()
         _, kwargs = edit_mock.call_args
         self.assertEqual(kwargs.get("description"), "New desc")
         self.assertIs(kwargs.get("enabled"), True)
         self.assertEqual(kwargs.get("reason"), "test update")
+        (welcome_channel,) = kwargs["welcome_channels"]
+        self.assertEqual(welcome_channel.channel.id, 456)
+        self.assertEqual(welcome_channel.description, "Read me")
+        self.assertEqual(welcome_channel.emoji, "\U0001f44b")
+
+    async def test_update_guild_welcome_screen_requires_changes(self):
+        guild = type(
+            "Guild",
+            (),
+            {
+                "name": "Demo",
+                "id": 123,
+                "get_channel": MagicMock(return_value=None),
+                "welcome_screen": AsyncMock(return_value=None),
+                "edit_welcome_screen": AsyncMock(),
+            },
+        )()
+        gateway = type(
+            "Gateway", (), {"resolve_guild": AsyncMock(return_value=guild)}
+        )()
+
+        with self.assertRaisesRegex(ValueError, "nothing to update"):
+            await handle_update_guild_welcome_screen(
+                {"server_id": "123", "welcome_screen": {}, "reason": "only reason"},
+                {"gateway": gateway},
+            )
 
     async def test_get_guild_onboarding_calls_api_and_serializes(self):
         """discord.py 2.7.1+ supports Guild.onboarding() natively.

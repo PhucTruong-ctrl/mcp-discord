@@ -40,6 +40,93 @@ def _validate_ruleset_shape(ruleset: Dict[str, Any]) -> None:
         raise ValueError("ruleset.rules must be an array")
 
 
+_PRESET_ALIASES = {
+    "1": 1,
+    "PROFANITY": 1,
+    "2": 2,
+    "SEXUAL_CONTENT": 2,
+    "3": 3,
+    "SLURS": 3,
+}
+
+_MAX_PRESET_ID = 3
+_MAX_TIMEOUT_SECONDS = 2419200  # 4 weeks, Discord's AutoMod TIMEOUT ceiling
+_MAX_MENTION_LIMIT = 50
+
+_ACTION_TYPE_ALIASES = {
+    "1": "BLOCK_MESSAGE",
+    "BLOCK": "BLOCK_MESSAGE",
+    "BLOCK_MESSAGE": "BLOCK_MESSAGE",
+    "2": "SEND_ALERT_MESSAGE",
+    "ALERT": "SEND_ALERT_MESSAGE",
+    "SEND_ALERT_MESSAGE": "SEND_ALERT_MESSAGE",
+    "3": "TIMEOUT",
+    "TIMEOUT": "TIMEOUT",
+    "4": "BLOCK_MEMBER_INTERACTION",
+    "BLOCK_MEMBER_INTERACTION": "BLOCK_MEMBER_INTERACTION",
+    "BLOCK_MEMBER_INTERACTIONS": "BLOCK_MEMBER_INTERACTION",
+}
+
+
+def _first_present(data: Dict[str, Any], *keys: str) -> Any:
+    """Return the first key that is present, so API and discord.py names both work."""
+    for key in keys:
+        if key in data:
+            return data[key]
+    return None
+
+
+def _build_keyword_presets(value: Any) -> Any:
+    """Build a discord.AutoModPresets from API-style values.
+
+    Accepts a bitmask int, or a list of names / API ids
+    (1 = profanity, 2 = sexual_content, 3 = slurs).
+    """
+    import discord
+
+    if value is None:
+        raise ValueError(
+            "trigger_metadata.presets is required for keyword_preset rules"
+        )
+    if isinstance(value, bool) or not isinstance(value, (int, str, list, tuple, set)):
+        raise ValueError(
+            "presets must be a bitmask int or a list of "
+            "profanity/sexual_content/slurs (or 1/2/3)"
+        )
+
+    if isinstance(value, (int, str)):
+        items = [value]
+        bitmask = True
+    else:
+        items = list(value)
+        bitmask = False
+
+    preset_ids: List[int] = []
+    for item in items:
+        key = str(item).strip().upper().replace("-", "_")
+        if bitmask:
+            raw = try_int(key)
+            if raw is None:
+                raise ValueError(f"presets bitmask '{item}' is not an integer")
+            preset_ids.extend(
+                index + 1 for index in range(_MAX_PRESET_ID) if raw & (1 << index)
+            )
+            continue
+        if key not in _PRESET_ALIASES:
+            raise ValueError(
+                f"unknown preset '{item}'; expected profanity/sexual_content/slurs "
+                "or 1/2/3"
+            )
+        preset_ids.append(_PRESET_ALIASES[key])
+
+    preset_ids = sorted(set(preset_ids))
+    if not preset_ids:
+        raise ValueError(
+            "presets must select at least one of profanity(1), sexual_content(2), slurs(3)"
+        )
+    return discord.AutoModPresets._from_value(preset_ids)
+
+
 def _build_automod_trigger(rule_data: Dict[str, Any]) -> Any:
     """Build a discord.AutoModTrigger from rule data."""
     import discord
@@ -54,11 +141,32 @@ def _build_automod_trigger(rule_data: Dict[str, Any]) -> Any:
             allow_list=trigger_metadata.get("allow_list", []),
         )
     if trigger_type == "KEYWORD_PRESET":
-        presets_val = trigger_metadata.get("presets", 0)
-        return discord.AutoModTrigger(presets=presets_val)
-    if trigger_type == "MENTION_SPAM":
         return discord.AutoModTrigger(
-            mention_limit=trigger_metadata.get("mention_limit", 10)
+            presets=_build_keyword_presets(trigger_metadata.get("presets")),
+            allow_list=trigger_metadata.get("allow_list", []),
+        )
+    if trigger_type == "MENTION_SPAM":
+        limit = _first_present(trigger_metadata, "mention_limit", "mention_total_limit")
+        if limit is None:
+            raise ValueError(
+                "mention_limit (or mention_total_limit) is required for mention_spam rules"
+            )
+        limit = int(limit)
+        if not 1 <= limit <= _MAX_MENTION_LIMIT:
+            raise ValueError(
+                f"mention_limit must be between 1 and {_MAX_MENTION_LIMIT}"
+            )
+        raid_protection = _first_present(
+            trigger_metadata,
+            "mention_raid_protection",
+            "mention_raid_protection_enabled",
+            "raid_protection",
+        )
+        return discord.AutoModTrigger(
+            mention_limit=limit,
+            mention_raid_protection=(
+                bool(raid_protection) if raid_protection is not None else None
+            ),
         )
     if trigger_type == "MEMBER_PROFILE":
         return discord.AutoModTrigger(
@@ -66,6 +174,8 @@ def _build_automod_trigger(rule_data: Dict[str, Any]) -> Any:
             regex_patterns=trigger_metadata.get("regex_patterns", []),
             allow_list=trigger_metadata.get("allow_list", []),
         )
+    if trigger_type == "SPAM":
+        return discord.AutoModTrigger(type=discord.AutoModRuleTriggerType.spam)
 
     # Default: keyword trigger
     return discord.AutoModTrigger(
@@ -110,40 +220,72 @@ def _resolve_automod_exemptions(guild: Any, values: Any, attribute: str) -> List
     return resolved
 
 
+def _automod_exempt_kwargs(guild: Any, rule_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Resolve exempt role/channel kwargs for AutoMod create/edit calls.
+
+    Accepts ``exempt_roles``/``exempt_role_ids`` and
+    ``exempt_channels``/``exempt_channel_ids`` given as ids or names.
+    """
+    kwargs: Dict[str, Any] = {}
+    roles = _first_present(rule_data, "exempt_roles", "exempt_role_ids")
+    if roles is not None:
+        kwargs["exempt_roles"] = _resolve_automod_exemptions(guild, roles, "roles")
+    channels = _first_present(rule_data, "exempt_channels", "exempt_channel_ids")
+    if channels is not None:
+        kwargs["exempt_channels"] = _resolve_automod_exemptions(
+            guild, channels, "channels"
+        )
+    return kwargs
+
+
 def _build_automod_actions(
     actions_data: List[Dict[str, Any]],
 ) -> List[Any]:
     """Build a list of discord.AutoModRuleAction from action data."""
+    import datetime
+
     import discord
 
     result = []
     for action_data in actions_data:
-        action_type = str(action_data.get("type", "block_message")).upper()
-        kwargs = {}
-        if action_type == "BLOCK_MEMBER_INTERACTION":
-            kwargs["type"] = discord.AutoModRuleActionType.block_member_interaction
-            custom = action_data.get("custom_message")
+        raw_type = (
+            str(action_data.get("type", "block_message"))
+            .strip()
+            .upper()
+            .replace("-", "_")
+        )
+        action_type = _ACTION_TYPE_ALIASES.get(raw_type, raw_type)
+        custom = action_data.get("custom_message")
+        kwargs: Dict[str, Any] = {}
+
+        if action_type == "BLOCK_MESSAGE":
+            kwargs["type"] = discord.AutoModRuleActionType.block_message
             if custom:
                 kwargs["custom_message"] = custom
-            duration = action_data.get("duration")
-            if duration:
-                import datetime
-
-                kwargs["duration"] = datetime.timedelta(seconds=int(duration))
         elif action_type == "SEND_ALERT_MESSAGE":
-            kwargs["type"] = discord.AutoModRuleActionType.send_alert_message
             channel_id = action_data.get("channel_id")
-            if channel_id:
-                kwargs["channel_id"] = int(channel_id)
-            custom = action_data.get("custom_message")
+            if not channel_id:
+                raise ValueError("send_alert_message requires channel_id")
+            kwargs["type"] = discord.AutoModRuleActionType.send_alert_message
+            kwargs["channel_id"] = int(channel_id)
+        elif action_type == "TIMEOUT":
+            seconds = _first_present(action_data, "duration", "duration_seconds")
+            if not seconds:
+                raise ValueError("timeout requires duration (seconds)")
+            seconds = int(seconds)
+            if not 1 <= seconds <= _MAX_TIMEOUT_SECONDS:
+                raise ValueError(
+                    f"timeout duration must be between 1 and {_MAX_TIMEOUT_SECONDS} seconds"
+                )
+            kwargs["type"] = discord.AutoModRuleActionType.timeout
+            kwargs["duration"] = datetime.timedelta(seconds=seconds)
+        elif action_type == "BLOCK_MEMBER_INTERACTION":
+            kwargs["type"] = discord.AutoModRuleActionType.block_member_interaction
             if custom:
                 kwargs["custom_message"] = custom
         else:
-            # BLOCK_MESSAGE
-            kwargs["type"] = discord.AutoModRuleActionType.block_message
-            custom = action_data.get("custom_message")
-            if custom:
-                kwargs["custom_message"] = custom
+            raise ValueError(f"unknown automod action type '{action_data.get('type')}'")
+
         result.append(discord.AutoModRuleAction(**kwargs))
     return result
 
@@ -226,17 +368,7 @@ async def handle_automod_apply_ruleset(
                     rule_data.get("event_type", "message_send")
                 )
                 enabled = rule_data.get("enabled", True)
-                create_kwargs: Dict[str, Any] = {}
-                exempt_roles = _resolve_automod_exemptions(
-                    guild, rule_data.get("exempt_roles"), "roles"
-                )
-                if exempt_roles:
-                    create_kwargs["exempt_roles"] = exempt_roles
-                exempt_channels = _resolve_automod_exemptions(
-                    guild, rule_data.get("exempt_channels"), "channels"
-                )
-                if exempt_channels:
-                    create_kwargs["exempt_channels"] = exempt_channels
+                create_kwargs: Dict[str, Any] = _automod_exempt_kwargs(guild, rule_data)
                 new_rule = await guild.create_automod_rule(
                     name=rule_data["name"],
                     event_type=event_type,

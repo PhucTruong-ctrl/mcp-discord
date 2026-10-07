@@ -11,6 +11,7 @@ from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 from discord_mcp.core.state import get_channel_state, set_channel_state
 from discord_mcp.core.serialize import _serialize_auto_moderation_rule
 from discord_mcp.tools.handlers.automod_policy import (
+    _automod_exempt_kwargs,
     _build_automod_actions,
     _build_automod_trigger,
     _parse_automod_event_type,
@@ -490,6 +491,7 @@ async def handle_create_auto_moderation_rule(
         actions=actions,
         enabled=enabled,
         reason=reason,
+        **_automod_exempt_kwargs(guild, rule_data),
     )
     created_rule = _serialize_auto_moderation_rule(new_rule)
 
@@ -528,6 +530,7 @@ async def handle_update_auto_moderation_rule(
         kwargs["trigger"] = _build_automod_trigger(rule_data)
     if "actions" in rule_data:
         kwargs["actions"] = _build_automod_actions(rule_data["actions"])
+    kwargs.update(_automod_exempt_kwargs(guild, rule_data))
     if reason:
         kwargs["reason"] = reason
 

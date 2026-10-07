@@ -1,4 +1,4 @@
-# Feature audit - all 110 MCP tools
+# Feature audit - all 113 MCP tools
 
 Audit date: 2026-10-07. Target server: `1424116735782682778` (live Discord API, discord.py 2.7.1).
 
@@ -116,8 +116,17 @@ Columns: **gate** = confirmation model, **verified** = evidence level.
 | 108 | `get_role_permissions` | Permission intel | direct | live |  |
 | 109 | `compute_member_permissions` | Permission intel | direct | live |  |
 | 110 | `audit_mass_mentions` | Mass mentions | direct | live |  |
+| 111 | `update_guild` | Guild settings | direct | live | closes the description/verification-level gap |
+| 112 | `set_channel_permission_overwrite` | Channel overwrites | direct | live | closes the overwrite-write gap (parameter object required by discord.py) |
+| 113 | `remove_channel_permission_overwrite` | Channel overwrites | direct | live | deletes an explicit overwrite only |
 
 ## Findings fixed in this audit
+
+- `get_server_info` read guild fields from the gateway cache, which is built from a
+  truncated `GUILD_CREATE` for large guilds, so it reported `description: None` for a
+  guild whose description was set. It now fetches the guild fresh and also reports
+  `verification_level` (falling back to `approximate_member_count` when `member_count`
+  is absent from the fetch payload).
 
 - 11 expansion utilities reported `{"status": "applied"}` without calling Discord at all;
   3 of them lied again after a valid `confirm_token`. All 11 now perform the real API call

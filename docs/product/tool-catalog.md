@@ -2,8 +2,8 @@
 
 ## Scope snapshot
 
-- Planned total: **110 canonical tools** (23 baseline + 84 expansion + 2 permission introspection + 1 mass-mention audit)
-- Current canonical registry in this branch: **110 tools**
+- Planned total: **113 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit)
+- Current canonical registry in this branch: **113 tools**
 - Runtime is Discord-native only (Discord API + bot token), no external runtime dependency
 
 ## Channel CRUD/admin tools
@@ -184,6 +184,17 @@ Notes:
 
 110. `audit_mass_mentions`
 
+### Post-wave addendum — guild settings & channel overwrites (3)
+
+111. `update_guild` — `description` (null clears), `verification_level`
+     (none/low/medium/high/highest or 0-4), `explicit_content_filter`
+     (disabled/no_role/all_members or 0-2), optional `reason`
+112. `set_channel_permission_overwrite` — `channel_id`, `target_id`, optional `target_type`
+     (role|member, auto-detected from cache when omitted), optional `allow`/`deny` arrays of
+     permission names or raw bit values, optional `reason`. Replaces the overwrite for that target
+113. `remove_channel_permission_overwrite` — `channel_id`, `target_id`, optional `target_type`,
+     optional `reason`. Deletes the explicit overwrite; inherited state is untouched
+
 ## Implementation-status note
 
 The 15 expansion filler/utility tools split into two groups with different runtime behavior:
@@ -191,7 +202,7 @@ The 15 expansion filler/utility tools split into two groups with different runti
 - **Tools 93–103 (synthetic-only):** `bulk_ban_members`, `prune_inactive_members`, `remove_member_timeout`, `unban_member`, `create_category`, `rename_category`, `move_category`, `delete_category`, `create_incident_room`, `append_incident_event`, `close_incident` — return synthetic/placeholder responses. They validate input shapes and may use the `dry_run`/`confirm_token` safety pattern for destructive operations, but do **not** make live Discord API calls.
 - **Tools 104–107 (gateway-aware with synthetic fallback):** `list_auto_moderation_rules`, `create_auto_moderation_rule`, `update_auto_moderation_rule`, `automod_export_rules` — use the live Discord API via gateway when available; return synthetic placeholder responses when gateway is absent.
 
-This preserves the full 107-tool registry contract while deeper Discord side-effect implementations for the synthetic-only tools continue in follow-up work.
+This preserves the full registry contract while deeper Discord side-effect implementations for the remaining synthetic-only tools continue in follow-up work.
 
 The following tool families have specific capability notes:
 
@@ -256,9 +267,9 @@ serializer expose the same distinction as `mentionEveryone` / `mentions` / `role
 
 ## Feature audit
 
-`docs/analysis/FEATURE_AUDIT.md` lists all 110 tools with their confirmation model and the verification
+`docs/analysis/FEATURE_AUDIT.md` lists all 113 tools with their confirmation model and the verification
 evidence gathered against a live server (live API run vs unit test), plus the defects that audit fixed.
 
-## 110-tool contract status
+## 113-tool contract status
 
-The canonical registry target is restored in this branch: **110 canonical tools** (23 baseline + 84 expansion + 2 permission introspection + 1 mass-mention audit). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.
+The canonical registry target is restored in this branch: **113 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.

@@ -9,7 +9,8 @@ def _require_secret() -> str:
     secret = os.getenv("DISCORD_MCP_CONFIRM_SECRET")
     if not secret:
         raise ValueError(
-            "DISCORD_MCP_CONFIRM_SECRET environment variable is required for confirm-token validation"
+            "DISCORD_MCP_CONFIRM_SECRET environment variable is required for confirm-token validation "
+            "(set it in the MCP server environment, e.g. the .env sourced by the launcher script)"
         )
     return secret
 

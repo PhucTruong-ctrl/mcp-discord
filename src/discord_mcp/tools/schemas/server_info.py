@@ -55,4 +55,38 @@ SERVER_INFO_TOOLS = [
         description="Get a list of all Discord servers the bot has access to with their details such as name, id, member count, and creation date.",
         inputSchema={"type": "object", "properties": {}, "required": []},
     ),
+    Tool(
+        name="update_guild",
+        description=(
+            "Update guild-level settings: description, verification_level "
+            "(none/low/medium/high/highest or 0-4), explicit_content_filter "
+            "(disabled/no_role/all_members or 0-2)."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "server_id": {
+                    "type": "string",
+                    "description": "Discord server (guild) ID",
+                },
+                "description": {
+                    "type": ["string", "null"],
+                    "description": "Server description; null clears it",
+                },
+                "verification_level": {
+                    "type": ["string", "number"],
+                    "description": "none/low/medium/high/highest or 0-4",
+                },
+                "explicit_content_filter": {
+                    "type": ["string", "number"],
+                    "description": "disabled/no_role/all_members or 0-2",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Audit log reason",
+                },
+            },
+            "required": ["server_id"],
+        },
+    ),
 ]

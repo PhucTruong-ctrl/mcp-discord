@@ -59,6 +59,8 @@ from .inventory import (
     handle_get_channel_type_counts,
     handle_get_channels_structured,
     handle_get_permission_overwrites,
+    handle_remove_channel_permission_overwrite,
+    handle_set_channel_permission_overwrite,
     handle_get_role_hierarchy,
     handle_list_inactive_channels,
 )
@@ -136,6 +138,7 @@ from .audit_analytics import (
 )
 from .server_info import (
     handle_get_server_info,
+    handle_update_guild,
     handle_list_members,
     handle_list_servers,
 )
@@ -190,6 +193,7 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "get_user_info": handle_get_user_info,
     "moderate_message": handle_moderate_message,
     "get_server_info": handle_get_server_info,
+    "update_guild": handle_update_guild,
     "get_channels": handle_get_channels,
     "list_members": handle_list_members,
     "add_role": handle_add_role,
@@ -230,6 +234,8 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "get_channel_hierarchy": handle_get_channel_hierarchy,
     "get_role_hierarchy": handle_get_role_hierarchy,
     "get_permission_overwrites": handle_get_permission_overwrites,
+    "set_channel_permission_overwrite": handle_set_channel_permission_overwrite,
+    "remove_channel_permission_overwrite": handle_remove_channel_permission_overwrite,
     "diff_channel_permissions": handle_diff_channel_permissions,
     "export_server_snapshot": handle_export_server_snapshot,
     "get_channel_type_counts": handle_get_channel_type_counts,

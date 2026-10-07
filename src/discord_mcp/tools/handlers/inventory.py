@@ -3,6 +3,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
+import discord
 from mcp.types import TextContent
 
 from discord_mcp.core.permissions import overwrite_rows, role_payload
@@ -215,3 +216,144 @@ async def handle_list_inactive_channels(
         "inactive": inactive,
     }
     return [TextContent(type="text", text=json.dumps(payload))]
+
+
+def _permission_mask(values: Any, label: str) -> int:
+    """Coerce a list of permission names (or raw bit values) into a bitfield."""
+    if values is None:
+        return 0
+    if isinstance(values, (str, int, bool)) or not isinstance(
+        values, (list, tuple, set)
+    ):
+        raise ValueError(f"{label} must be an array of permission names or bit values")
+
+    mask = 0
+    unknown = []
+    for item in values:
+        if isinstance(item, bool):
+            raise ValueError(f"{label} entries must be permission names or bit values")
+        if isinstance(item, int) or str(item).strip().isdigit():
+            mask |= int(item)
+            continue
+        key = str(item).strip().lower().replace("-", "_").replace(" ", "_")
+        bit = discord.Permissions.VALID_FLAGS.get(key)
+        if bit is None:
+            unknown.append(str(item))
+            continue
+        mask |= bit
+
+    if unknown:
+        raise ValueError(f"unknown {label} permission(s): {', '.join(sorted(unknown))}")
+    return mask
+
+
+async def _role_target(guild: Any, role_id: int) -> Any:
+    if role_id == guild.id:
+        return guild.default_role
+    role = guild.get_role(role_id)
+    if role is None:
+        role = next((r for r in await guild.fetch_roles() if r.id == role_id), None)
+    if role is None:
+        raise ValueError(f"role '{role_id}' not found in '{guild.name}'")
+    return role
+
+
+async def _member_target(guild: Any, member_id: int) -> Any:
+    member = guild.get_member(member_id)
+    if member is None:
+        member = await guild.fetch_member(member_id)
+    return member
+
+
+async def _resolve_overwrite_target(
+    guild: Any, target_id: Any, target_type: Any = None
+) -> Any:
+    """Resolve a role/member object for a channel permission overwrite."""
+    entity_id = int(target_id)
+    kind = str(target_type).strip().lower() if target_type else None
+
+    if kind in ("role", "r"):
+        return await _role_target(guild, entity_id)
+    if kind in ("member", "user", "m"):
+        return await _member_target(guild, entity_id)
+    if kind is not None:
+        raise ValueError("target_type must be 'role' or 'member'")
+
+    if entity_id == guild.id:
+        return guild.default_role
+    role = guild.get_role(entity_id)
+    if role is not None:
+        return role
+    member = guild.get_member(entity_id)
+    if member is not None:
+        return member
+    raise ValueError(
+        f"target '{target_id}' is not a cached role or member; pass target_type to fetch it"
+    )
+
+
+async def _overwrite_channel(arguments: Dict[str, Any], deps: Dict[str, Any]):
+    channel = await deps["gateway"].fetch_channel(arguments["channel_id"])
+    guild = getattr(channel, "guild", None)
+    if guild is None:
+        raise ValueError(
+            f"could not resolve the guild for channel '{arguments['channel_id']}'"
+        )
+    return channel, guild
+
+
+async def handle_set_channel_permission_overwrite(
+    arguments: Dict[str, Any], deps: Dict[str, Any]
+) -> List[TextContent]:
+    channel, guild = await _overwrite_channel(arguments, deps)
+    target = await _resolve_overwrite_target(
+        guild, arguments["target_id"], arguments.get("target_type")
+    )
+
+    allow = _permission_mask(arguments.get("allow"), "allow")
+    deny = _permission_mask(arguments.get("deny"), "deny")
+    if allow == 0 and deny == 0:
+        raise ValueError(
+            "allow and deny are both empty; use remove_channel_permission_overwrite "
+            "to delete an existing overwrite"
+        )
+
+    overwrite = discord.PermissionOverwrite.from_pair(
+        discord.Permissions(allow), discord.Permissions(deny)
+    )
+    reason = arguments.get("reason")
+    await channel.set_permissions(target, overwrite=overwrite, reason=reason)
+
+    refreshed = await deps["gateway"].fetch_channel(arguments["channel_id"])
+    payload = {
+        "status": "applied",
+        "channelId": str(channel.id),
+        "channelName": getattr(channel, "name", None),
+        "targetId": str(target.id),
+        "targetName": getattr(target, "name", None),
+        "overwrites": list(_overwrites_map(refreshed).values()),
+        "reason": reason,
+    }
+    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]
+
+
+async def handle_remove_channel_permission_overwrite(
+    arguments: Dict[str, Any], deps: Dict[str, Any]
+) -> List[TextContent]:
+    channel, guild = await _overwrite_channel(arguments, deps)
+    target = await _resolve_overwrite_target(
+        guild, arguments["target_id"], arguments.get("target_type")
+    )
+
+    reason = arguments.get("reason")
+    await channel.set_permissions(target, overwrite=None, reason=reason)
+
+    refreshed = await deps["gateway"].fetch_channel(arguments["channel_id"])
+    payload = {
+        "status": "applied",
+        "channelId": str(channel.id),
+        "targetId": str(target.id),
+        "overwrites": list(_overwrites_map(refreshed).values()),
+        "reason": reason,
+    }
+    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]

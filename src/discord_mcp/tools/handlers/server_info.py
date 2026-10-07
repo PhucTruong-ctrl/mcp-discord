@@ -1,5 +1,7 @@
+import json
 from typing import Any, Dict, List
 
+import discord
 from mcp.types import TextContent
 
 
@@ -7,14 +9,19 @@ async def handle_get_server_info(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    guild = await gateway.resolve_guild(arguments["server_id"])
+    # Fetch fresh instead of reading the cached guild object: the gateway cache is
+    # built from GUILD_CREATE, which omits fields for large guilds, so cached reads
+    # can report a stale/empty description and verification level.
+    guild = await gateway.fetch_guild(arguments["server_id"])
     info = {
         "name": guild.name,
         "id": str(guild.id),
         "owner_id": str(guild.owner_id),
-        "member_count": guild.member_count,
+        "member_count": guild.member_count
+        or getattr(guild, "approximate_member_count", None),
         "created_at": guild.created_at.isoformat(),
         "description": guild.description,
+        "verification_level": str(guild.verification_level),
         "premium_tier": guild.premium_tier,
         "explicit_content_filter": str(guild.explicit_content_filter),
     }
@@ -104,3 +111,83 @@ async def handle_list_servers(
             ),
         )
     ]
+
+
+_VERIFICATION_LEVELS = {
+    "0": 0,
+    "none": 0,
+    "1": 1,
+    "low": 1,
+    "2": 2,
+    "medium": 2,
+    "3": 3,
+    "high": 3,
+    "4": 4,
+    "highest": 4,
+    "very_high": 4,
+}
+
+_EXPLICIT_CONTENT_FILTERS = {
+    "0": 0,
+    "disabled": 0,
+    "1": 1,
+    "no_role": 1,
+    "members_without_roles": 1,
+    "2": 2,
+    "all_members": 2,
+}
+
+
+def _coerce_enum(mapping: Dict[str, int], value: Any, label: str) -> int:
+    key = str(value).strip().lower().replace("-", "_").replace(" ", "_")
+    if key not in mapping:
+        raise ValueError(
+            f"unknown {label} '{value}'; expected one of {', '.join(sorted(mapping))}"
+        )
+    return mapping[key]
+
+
+async def handle_update_guild(
+    arguments: Dict[str, Any], deps: Dict[str, Any]
+) -> List[TextContent]:
+    gateway = deps["gateway"]
+    guild = await gateway.resolve_guild(arguments["server_id"])
+
+    updates: Dict[str, Any] = {}
+    if "description" in arguments:
+        description = arguments["description"]
+        updates["description"] = None if description is None else str(description)
+    if arguments.get("verification_level") is not None:
+        updates["verification_level"] = discord.VerificationLevel(
+            _coerce_enum(
+                _VERIFICATION_LEVELS,
+                arguments["verification_level"],
+                "verification_level",
+            )
+        )
+    if arguments.get("explicit_content_filter") is not None:
+        updates["explicit_content_filter"] = discord.ContentFilter(
+            _coerce_enum(
+                _EXPLICIT_CONTENT_FILTERS,
+                arguments["explicit_content_filter"],
+                "explicit_content_filter",
+            )
+        )
+    if not updates:
+        raise ValueError(
+            "nothing to update: pass description, verification_level or explicit_content_filter"
+        )
+
+    reason = arguments.get("reason")
+    await guild.edit(reason=reason, **updates)
+
+    payload = {
+        "status": "applied",
+        "server_id": str(guild.id),
+        "name": guild.name,
+        "description": guild.description,
+        "verification_level": str(guild.verification_level),
+        "explicit_content_filter": str(guild.explicit_content_filter),
+        "reason": reason,
+    }
+    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]

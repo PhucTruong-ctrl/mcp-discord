@@ -9,8 +9,8 @@ A Model Context Protocol (MCP) server that provides Discord integration capabili
 
 The comprehensive expansion roadmap is documented as a phased rollout:
 
-- **Target scope**: 110 canonical tools (23 baseline + 84 expansion + 2 permission introspection + 1 mass-mention audit)
-- **Current branch registry snapshot**: 110 canonical tools
+- **Target scope**: 113 canonical tools (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit)
+- **Current branch registry snapshot**: 113 canonical tools
 - **Rollout model**: 10 implementation waves (Waves 1-10), plus Wave 0 (channel admin), 15 post-wave expansion fillers and 3 post-wave permission/mass-mention tools, with Wave 11 explicitly deferred for stateful extensions
 
 For full details, use:
@@ -156,12 +156,12 @@ The expansion adds these 84 tools:
 73. `create_incident_room` — synthetic (placeholder)
 74. `append_incident_event` — synthetic (placeholder)
 75. `close_incident` — synthetic (placeholder)
-76. `list_auto_moderation_rules` — synthetic (placeholder)
-77. `create_auto_moderation_rule` — synthetic (placeholder)
-78. `update_auto_moderation_rule` — synthetic (placeholder)
-79. `automod_export_rules` — synthetic (placeholder)
+76. `list_auto_moderation_rules` — live gateway read (`Guild.fetch_automod_rules()`)
+77. `create_auto_moderation_rule` — live gateway create; honors `exempt_roles`/`exempt_channels` (ids or names)
+78. `update_auto_moderation_rule` — live gateway edit; partial updates, only supplied keys are sent
+79. `automod_export_rules` — live gateway read
 
-> **Note**: All 15 expansion filler/utility tools return synthetic/placeholder responses. They validate input shapes but do not make live Discord API calls. See `tests/test_tool_runtime_contracts.py` for contract assertions.
+> **Note**: The remaining expansion filler/utility tools validate input shapes and either perform the real Discord call (when a gateway is configured) or fail loudly; see `docs/analysis/FEATURE_AUDIT.md` and `tests/test_tool_runtime_contracts.py` for the per-tool contract.
 
 Additional baseline behavior notes:
 
@@ -173,6 +173,10 @@ The following tool families have specific capability notes:
 - **Wave 7 — Onboarding & lifecycle (41–48):** Most tools require a live gateway. Two (`get_guild_onboarding`, `update_guild_onboarding`) use native discord.py 2.7.1+ APIs (`Guild.onboarding()` / `Guild.edit_onboarding()`) via the live gateway. Three (`verification_gate_orchestrator`, `progressive_access_unlock`, `onboarding_friction_audit`) are gateway-independent local logic tools.
 - **Wave 9 — Incident operations (57–60):** Gateway-independent. Use `dry_run`/`confirm_token` for lockdown/rollback but no live Discord API calls.
 - **Wave 10 — AutoMod policy (61–64):** Mixed — `automod_validate_ruleset` is gateway-independent; `automod_get_ruleset` and `automod_apply_ruleset` use the live Discord API via gateway (discord.py 2.7.1+ `Guild.fetch_automod_rules()` / `Guild.create_automod_rule()`); `automod_rollback_ruleset` execute path returns `not_supported` (no Discord API primitive for rollback).
+- **AutoMod field surface** (shared by `automod_apply_ruleset`, `create_auto_moderation_rule` and `update_auto_moderation_rule`):
+  - triggers: `keyword` (`keyword_filter` / `regex_patterns` / `allow_list`), `keyword_preset` (`presets` as bitmask int, names, or API ids `1=profanity, 2=sexual_content, 3=slurs`), `spam`, `mention_spam` (`mention_limit` or the API alias `mention_total_limit`, plus `mention_raid_protection` / `mention_raid_protection_enabled`), `member_profile`.
+  - actions: `block_message` (+`custom_message`), `send_alert_message` (requires `channel_id`), `timeout` (`duration` or `duration_seconds`, max 2419200), `block_member_interaction`.
+  - exemptions: `exempt_roles` / `exempt_role_ids` and `exempt_channels` / `exempt_channel_ids`, given as ids or names; on update only the supplied keys are sent.
 
 ## Installation
 

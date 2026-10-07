@@ -106,4 +106,61 @@ INVENTORY_TOOLS = [
             "required": ["server_id"],
         },
     ),
+    Tool(
+        name="set_channel_permission_overwrite",
+        description=(
+            "Create or replace a channel permission overwrite for a role or member. "
+            "allow/deny accept permission names (e.g. send_messages) or raw bit values; "
+            "omitted allow/deny default to 0."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "channel_id": {"type": "string", "description": "Channel ID"},
+                "target_id": {
+                    "type": "string",
+                    "description": "Role or member ID",
+                },
+                "target_type": {
+                    "type": "string",
+                    "description": "role|member; auto-detected from cache when omitted",
+                },
+                "allow": {
+                    "type": "array",
+                    "items": {"type": ["string", "number"]},
+                    "description": "Permission names or bit values to allow",
+                },
+                "deny": {
+                    "type": "array",
+                    "items": {"type": ["string", "number"]},
+                    "description": "Permission names or bit values to deny",
+                },
+                "reason": {"type": "string", "description": "Audit log reason"},
+            },
+            "required": ["channel_id", "target_id"],
+        },
+    ),
+    Tool(
+        name="remove_channel_permission_overwrite",
+        description=(
+            "Delete a channel permission overwrite for a role or member "
+            "(explicit overwrite only, inherited state is untouched)."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "channel_id": {"type": "string", "description": "Channel ID"},
+                "target_id": {
+                    "type": "string",
+                    "description": "Role or member ID",
+                },
+                "target_type": {
+                    "type": "string",
+                    "description": "role|member; auto-detected from cache when omitted",
+                },
+                "reason": {"type": "string", "description": "Audit log reason"},
+            },
+            "required": ["channel_id", "target_id"],
+        },
+    ),
 ]
