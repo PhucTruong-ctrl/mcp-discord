@@ -20,6 +20,7 @@ os.environ.setdefault(
 )
 
 import discord  # noqa: E402
+from discord_mcp.core.emoji import parse_emoji  # noqa: E402
 from discord_mcp.core.serialize import (  # noqa: E402
     _serialize_forum_tag,
     _serialize_onboarding,
@@ -103,6 +104,52 @@ class FakeGateway:
 
 def _deps(guild, onboarding_payload=None):
     return {"gateway": FakeGateway(guild, onboarding_payload)}
+
+
+class ParseEmojiShapeTests(unittest.TestCase):
+    """A client that hands a tool's own read payload back must not lose the emoji."""
+
+    ANIMATED = {"emoji": "Donowall", "emojiId": "1447515480079335554", "emojiAnimated": True}
+    STATIC = {"emoji": "joecool", "emojiId": "1425049288240529468", "emojiAnimated": False}
+
+    def test_nested_read_shape_resolves(self):
+        self.assertEqual(
+            parse_emoji(None, {"emoji": self.ANIMATED}),
+            "<a:Donowall:1447515480079335554>",
+        )
+        self.assertEqual(
+            parse_emoji(None, {"emoji": self.STATIC}),
+            "<:joecool:1425049288240529468>",
+        )
+
+    def test_flat_read_shape_still_resolves(self):
+        self.assertEqual(parse_emoji(None, self.ANIMATED), "<a:Donowall:1447515480079335554>")
+        self.assertEqual(parse_emoji(None, self.STATIC), "<:joecool:1425049288240529468>")
+
+    def test_raw_api_shape_still_resolves(self):
+        self.assertEqual(
+            parse_emoji(
+                None, {"emoji": {"id": "1447515480079335554", "name": "Donowall", "animated": True}}
+            ),
+            "<a:Donowall:1447515480079335554>",
+        )
+        self.assertEqual(
+            parse_emoji(
+                None, {"emoji": {"id": "1425049288240529468", "name": "joecool", "animated": False}}
+            ),
+            "<:joecool:1425049288240529468>",
+        )
+
+    def test_unusable_emoji_dict_raises(self):
+        with self.assertRaisesRegex(ValueError, "emojiId"):
+            parse_emoji(None, {"emoji": {"emojiId": "1447515480079335554"}})
+        with self.assertRaisesRegex(ValueError, "emoji"):
+            parse_emoji(None, {"emojiId": "1447515480079335554"})
+
+    def test_absent_emoji_stays_none(self):
+        for value in (None, {}, "", "   "):
+            with self.subTest(value=value):
+                self.assertIsNone(parse_emoji(None, value))
 
 
 class P1OnboardingDefaultChannels(unittest.TestCase):

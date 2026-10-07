@@ -55,7 +55,8 @@ def parse_emoji(guild: Any, value: Any) -> Optional[str]:
 
     Accepts ``None``, a unicode emoji, a bare custom-emoji name (resolved against
     ``guild.emojis``), an explicit ``<:name:id>`` / ``<a:name:id>`` token, a dict
-    ``{name, id, animated}``, or the read shape ``{emoji, emojiId, emojiAnimated}``.
+    ``{name, id, animated}``, or the read shape ``{emoji, emojiId, emojiAnimated}`` —
+    either shape may nest one level deeper under ``emoji`` / ``name``.
     """
     if value is None:
         return None
@@ -72,21 +73,34 @@ def parse_emoji(guild: Any, value: Any) -> Optional[str]:
         return text  # unicode emoji or unknown name: hand it to Discord as-is
 
     if isinstance(value, dict):
+        if not value:
+            return None
         name = value.get("emoji", value.get("name"))
+        # a nested dict carries its own name/id/animated: the read shape one level deep
+        # ({"emoji": {"emoji", "emojiId", "emojiAnimated"}}) and the raw API shape
+        # ({"emoji": {"name", "id", "animated"}}) both resolve by recursing
+        if isinstance(name, dict):
+            return parse_emoji(guild, name)
         emoji_id = value.get("emojiId", value.get("id"))
         animated = bool(value.get("emojiAnimated", value.get("animated", False)))
-        # the raw API shape nests the emoji object: {"emoji": {"id", "name", "animated"}}
-        if isinstance(name, dict):
-            emoji_id = name.get("id", emoji_id)
-            animated = bool(name.get("animated", animated))
-            name = name.get("name")
         if isinstance(name, str) and name.startswith("<") and name.endswith(">"):
             return name  # already a token
         if not name and emoji_id is None:
-            return None
+            return None  # payload simply carries no emoji
         if emoji_id is None:
-            return parse_emoji(guild, name)
-        return emoji_token(name, emoji_id, animated)
+            token = parse_emoji(guild, name)
+        else:
+            token = emoji_token(name, emoji_id, animated)
+        if token is None:
+            keys = ", ".join(
+                sorted(
+                    k
+                    for k in ("emoji", "name", "emojiId", "id", "emojiAnimated", "animated")
+                    if k in value
+                )
+            )
+            raise ValueError(f"emoji: unusable emoji payload (keys: {keys})")
+        return token
 
     # discord.py emoji object
     name, emoji_id, animated = serialize_emoji(value)
