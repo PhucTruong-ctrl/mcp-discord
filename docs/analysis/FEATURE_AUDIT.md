@@ -119,7 +119,8 @@ Columns: **gate** = confirmation model, **verified** = evidence level.
 | 111 | `get_role_permissions` | Permission intel | direct | live |  |
 | 112 | `compute_member_permissions` | Permission intel | direct | live |  |
 | 113 | `audit_mass_mentions` | Mass mentions | direct | live |  |
-| 114 | `set_member_nickname` | Member admin | direct | live |  |
+| 114 | `set_member_roles` | Member admin | dry_run + confirm_token | live |  |
+| 115 | `set_member_nickname` | Member admin | direct | live |  |
 
 ## Findings fixed in this audit
 
@@ -144,6 +145,11 @@ Columns: **gate** = confirmation model, **verified** = evidence level.
   feature; they now explain what is missing.
 - `automod_apply_ruleset` did not wire `exempt_roles`/`exempt_channels`; keyword triggers now also
   accept `allow_list` / `regex_patterns`.
+- `set_member_roles` (tool 114) added: replaces a member's whole role set in one gated call, ignoring
+  @everyone, rejecting integration-managed roles when *assigning* and auto-preserving them when
+  replacing (Discord answers 403 50013 if the request drops one - that is what made a self-edit fail).
+  `update_role` / `delete_role` also take `role_name` (unique, case-insensitive) and a null colour clears
+  the primary colour or a gradient stop.
 - Role colours were write-only: `create_role`/`update_role` accepted `color` but no role reader
   returned it. `role_payload` now exposes `color`/`colorHex`/`secondaryColor`/`tertiaryColor`/
   `gradient`, gradient writes are supported (and their `670006` refusal explained), and

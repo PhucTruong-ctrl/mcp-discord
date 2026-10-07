@@ -17,8 +17,12 @@ from discord_mcp.tools.handlers.roles import (  # noqa: E402
     handle_add_role,
     handle_remove_role,
 )
+from discord_mcp.tools.handlers.member_admin import (  # noqa: E402
+    handle_set_member_roles,
+)
 from discord_mcp.tools.handlers.role_governance import (  # noqa: E402
     handle_create_role,
+    handle_delete_role,
     handle_update_role,
 )
 
@@ -207,6 +211,271 @@ class RoleColourWriteTests(unittest.IsolatedAsyncioTestCase):
             await handle_update_role(
                 {"server_id": "1", "role_id": "7"}, {"gateway": FakeGateway(guild)}
             )
+
+
+class SetMemberRolesTests(unittest.IsolatedAsyncioTestCase):
+    def _deps(self, roles, held=(), member=None):
+        member = member or FakeMember([r for r in roles if r.id in held])
+
+        async def edit(*, roles, reason=None):
+            member.calls.append(("edit", [r.id for r in roles], reason))
+            member._roles = list(roles)
+
+        member.edit = edit
+        guild = FakeGuild(roles=roles, member=member)
+        return {"gateway": FakeGateway(guild)}, guild, member
+
+    async def test_dry_run_reports_plan_and_requires_token(self):
+        roles = [FakeRole(role_id=7, name="A"), FakeRole(role_id=8, name="B")]
+        deps, guild, member = self._deps(roles, held=(7,))
+
+        plan = json.loads(
+            (
+                await handle_set_member_roles(
+                    {
+                        "server_id": "1",
+                        "member_id": "42",
+                        "role_ids": ["8"],
+                        "dry_run": True,
+                    },
+                    deps,
+                )
+            )[0].text
+        )
+        self.assertEqual(plan["status"], "dry_run")
+        self.assertEqual(plan["details"]["added"], ["8"])
+        self.assertEqual(plan["details"]["removed"], ["7"])
+        self.assertEqual(member.calls, [])  # nothing applied
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_set_member_roles(
+                {
+                    "server_id": "1",
+                    "member_id": "42",
+                    "role_ids": ["8"],
+                    "dry_run": False,
+                },
+                deps,
+            )
+
+    async def test_execute_replaces_role_set_and_verifies(self):
+        roles = [FakeRole(role_id=7, name="A"), FakeRole(role_id=8, name="B")]
+        deps, guild, member = self._deps(roles, held=(7,))
+        plan = json.loads(
+            (
+                await handle_set_member_roles(
+                    {
+                        "server_id": "1",
+                        "member_id": "42",
+                        "role_ids": ["8"],
+                        "dry_run": True,
+                    },
+                    deps,
+                )
+            )[0].text
+        )
+        payload = json.loads(
+            (
+                await handle_set_member_roles(
+                    {
+                        "server_id": "1",
+                        "member_id": "42",
+                        "role_ids": ["8"],
+                        "reason": "rank change",
+                        "dry_run": False,
+                        "confirm_token": plan["confirmToken"],
+                    },
+                    deps,
+                )
+            )[0].text
+        )
+        self.assertEqual(payload["status"], "executed")
+        self.assertEqual(payload["finalRoleIds"], ["8"])
+        self.assertEqual(payload["added"], ["8"])
+        self.assertEqual(payload["removed"], ["7"])
+        self.assertTrue(payload["matchesRequest"])
+        self.assertEqual(member.calls, [("edit", [8], "rank change")])
+
+    async def test_empty_role_ids_clears_roles(self):
+        roles = [FakeRole(role_id=7, name="A")]
+        deps, guild, member = self._deps(roles, held=(7,))
+        plan = json.loads(
+            (
+                await handle_set_member_roles(
+                    {
+                        "server_id": "1",
+                        "member_id": "42",
+                        "role_ids": [],
+                        "dry_run": True,
+                    },
+                    deps,
+                )
+            )[0].text
+        )
+        payload = json.loads(
+            (
+                await handle_set_member_roles(
+                    {
+                        "server_id": "1",
+                        "member_id": "42",
+                        "role_ids": [],
+                        "dry_run": False,
+                        "confirm_token": plan["confirmToken"],
+                    },
+                    deps,
+                )
+            )[0].text
+        )
+        self.assertEqual(payload["finalRoleIds"], [])
+        self.assertEqual(payload["removed"], ["7"])
+
+    async def test_everyone_is_ignored_and_managed_roles_rejected(self):
+        managed = FakeRole(role_id=9, name="BotRole")
+        managed.managed = True
+        roles = [FakeRole(role_id=7, name="A"), managed]
+        deps, guild, member = self._deps(roles, held=())
+
+        plan = json.loads(
+            (
+                await handle_set_member_roles(
+                    {
+                        "server_id": "1",
+                        "member_id": "42",
+                        "role_ids": ["1", "7"],
+                        "dry_run": True,
+                    },
+                    deps,
+                )
+            )[0].text
+        )
+        self.assertEqual(plan["details"]["ignoredRoleIds"], ["1"])
+        self.assertEqual(plan["details"]["roleIds"], ["7"])
+
+        with self.assertRaisesRegex(ValueError, "managed by an integration"):
+            await handle_set_member_roles(
+                {
+                    "server_id": "1",
+                    "member_id": "42",
+                    "role_ids": ["9"],
+                    "dry_run": True,
+                },
+                deps,
+            )
+
+    async def test_integration_managed_roles_are_preserved(self):
+        """Discord refuses to drop a managed role (403 50013), so keep it in the request."""
+        managed = FakeRole(role_id=9, name="BotRole")
+        managed.managed = True
+        roles = [FakeRole(role_id=7, name="A"), managed]
+        deps, guild, member = self._deps(roles, held=(9,))
+
+        plan = json.loads(
+            (
+                await handle_set_member_roles(
+                    {
+                        "server_id": "1",
+                        "member_id": "42",
+                        "role_ids": ["7"],
+                        "dry_run": True,
+                    },
+                    deps,
+                )
+            )[0].text
+        )
+        self.assertEqual(plan["details"]["preservedManagedRoleIds"], ["9"])
+        self.assertEqual(plan["details"]["roleIds"], ["7", "9"])
+        self.assertEqual(plan["details"]["removed"], [])
+
+        payload = json.loads(
+            (
+                await handle_set_member_roles(
+                    {
+                        "server_id": "1",
+                        "member_id": "42",
+                        "role_ids": ["7"],
+                        "dry_run": False,
+                        "confirm_token": plan["confirmToken"],
+                    },
+                    deps,
+                )
+            )[0].text
+        )
+        self.assertEqual(payload["finalRoleIds"], ["7", "9"])
+        self.assertTrue(payload["matchesRequest"])
+
+    async def test_unknown_member_is_reported(self):
+        deps = {"gateway": FakeGateway(FakeGuild(roles=[], member=None))}
+        with self.assertRaisesRegex(ValueError, "Member '42' not found"):
+            await handle_set_member_roles(
+                {"server_id": "1", "member_id": "42", "role_ids": []}, deps
+            )
+
+
+class RoleByNameAndColourClearTests(unittest.IsolatedAsyncioTestCase):
+    async def test_update_role_by_unique_name(self):
+        role = FakeRole(role_id=7, name="🍀 Thành viên", color=0)
+        guild = FakeGuild(roles=[role, FakeRole(role_id=8, name="Other")])
+        text = (
+            await handle_update_role(
+                {"server_id": "1", "role_name": "🍀 thành viên", "color": "#00ff00"},
+                {"gateway": FakeGateway(guild)},
+            )
+        )[0].text
+        self.assertIn("#00ff00", text)
+        self.assertEqual(role.edits[0]["colour"].value, 0x00FF00)
+
+    async def test_ambiguous_role_name_is_rejected(self):
+        guild = FakeGuild(
+            roles=[FakeRole(role_id=7, name="Dup"), FakeRole(role_id=8, name="dup")]
+        )
+        with self.assertRaisesRegex(ValueError, "matches 2 roles"):
+            await handle_update_role(
+                {"server_id": "1", "role_name": "Dup", "color": 1},
+                {"gateway": FakeGateway(guild)},
+            )
+
+    async def test_missing_role_reference_is_rejected(self):
+        guild = FakeGuild(roles=[FakeRole(role_id=7, name="A")])
+        with self.assertRaisesRegex(ValueError, "role_id or role_name is required"):
+            await handle_update_role(
+                {"server_id": "1", "color": 1}, {"gateway": FakeGateway(guild)}
+            )
+
+    async def test_null_clears_primary_and_gradient_colours(self):
+        role = FakeRole(role_id=7, name="Grad", color=0x112233, secondary=0x445566)
+        guild = FakeGuild(roles=[role])
+        await handle_update_role(
+            {
+                "server_id": "1",
+                "role_id": "7",
+                "color": None,
+                "secondary_color": None,
+                "tertiary_color": None,
+            },
+            {"gateway": FakeGateway(guild)},
+        )
+        edits = role.edits[0]
+        self.assertEqual(edits["colour"].value, 0)
+        self.assertIsNone(edits["secondary_colour"])
+        self.assertIsNone(edits["tertiary_colour"])
+
+    async def test_delete_role_by_name(self):
+        role = FakeRole(role_id=7, name="Temp")
+        deleted = []
+
+        async def delete(*, reason=None):
+            deleted.append(reason)
+
+        role.delete = delete
+        guild = FakeGuild(roles=[role])
+        text = (
+            await handle_delete_role(
+                {"server_id": "1", "role_name": "temp", "reason": "cleanup"},
+                {"gateway": FakeGateway(guild)},
+            )
+        )[0].text
+        self.assertIn("deleted", text)
+        self.assertEqual(deleted, ["cleanup"])
 
 
 class RoleAssignmentTests(unittest.IsolatedAsyncioTestCase):

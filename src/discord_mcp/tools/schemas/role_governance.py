@@ -32,15 +32,19 @@ ROLE_GOVERNANCE_TOOLS = [
     ),
     Tool(
         name="delete_role",
-        description="Delete a guild role",
+        description="Delete a guild role (by role_id or unique role_name)",
         inputSchema={
             "type": "object",
             "properties": {
                 "server_id": {"type": "string"},
                 "role_id": {"type": "string"},
+                "role_name": {
+                    "type": "string",
+                    "description": "Role name, case-insensitive; must match exactly one role",
+                },
                 "reason": {"type": "string"},
             },
-            "required": ["server_id", "role_id"],
+            "required": ["server_id"],
         },
     ),
     Tool(
@@ -50,26 +54,33 @@ ROLE_GOVERNANCE_TOOLS = [
             "type": "object",
             "properties": {
                 "server_id": {"type": "string"},
-                "role_id": {"type": "string"},
-                "name": {"type": "string"},
+                "role_id": {
+                    "type": "string",
+                    "description": "Role ID (or use role_name)",
+                },
+                "role_name": {
+                    "type": "string",
+                    "description": "Role name, case-insensitive; must match exactly one role",
+                },
+                "name": {"type": "string", "description": "New role name"},
                 "permissions": {"type": "number"},
                 "color": {
                     "type": ["number", "string"],
-                    "description": "Primary colour: int, '#rrggbb' or '0xrrggbb'",
+                    "description": "Primary colour: int, '#rrggbb', '0xrrggbb' or null to clear",
                 },
                 "secondary_color": {
-                    "type": ["number", "string"],
-                    "description": "Gradient colour 2 (int or hex)",
+                    "type": ["number", "string", "null"],
+                    "description": "Gradient colour 2 (int/hex) or null to clear the gradient stop",
                 },
                 "tertiary_color": {
-                    "type": ["number", "string"],
-                    "description": "Gradient colour 3 (int or hex)",
+                    "type": ["number", "string", "null"],
+                    "description": "Gradient colour 3 (int/hex) or null to clear the gradient stop",
                 },
                 "hoist": {"type": "boolean"},
                 "mentionable": {"type": "boolean"},
                 "reason": {"type": "string"},
             },
-            "required": ["server_id", "role_id"],
+            "required": ["server_id"],
         },
     ),
     Tool(

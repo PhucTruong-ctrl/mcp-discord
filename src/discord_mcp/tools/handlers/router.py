@@ -65,7 +65,7 @@ from .inventory import (
     handle_list_inactive_channels,
 )
 from .mass_mentions import handle_audit_mass_mentions
-from .member_admin import handle_set_member_nickname
+from .member_admin import handle_set_member_nickname, handle_set_member_roles
 from .messages import (
     handle_edit_message,
     handle_read_messages,
@@ -292,6 +292,7 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "compute_member_permissions": handle_compute_member_permissions,
     "audit_mass_mentions": handle_audit_mass_mentions,
     "set_member_nickname": handle_set_member_nickname,
+    "set_member_roles": handle_set_member_roles,
 }
 
 

@@ -2,8 +2,8 @@
 
 ## Scope snapshot
 
-- Planned total: **114 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 1 member admin)
-- Current canonical registry in this branch: **114 tools**
+- Planned total: **115 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 2 member admin)
+- Current canonical registry in this branch: **115 tools**
 - Runtime is Discord-native only (Discord API + bot token), no external runtime dependency
 
 ## Channel CRUD/admin tools
@@ -195,10 +195,16 @@ Notes:
 113. `remove_channel_permission_overwrite` — `channel_id`, `target_id`, optional `target_type`,
      optional `reason`. Deletes the explicit overwrite; inherited state is untouched
 
-### Post-wave addition — member admin (1)
+### Post-wave addition — member admin (2)
 
-114. `set_member_nickname`
+114. `set_member_roles`
+115. `set_member_nickname`
 
+- **Role sets and role references:** `set_member_roles(member_id, role_ids)` replaces a member's whole role set
+  in one `dry_run` + `confirm_token` call (empty array clears roles; @everyone is ignored; integration-managed
+  roles are rejected when assigning and preserved when replacing, because Discord refuses a request that drops
+  them). `update_role` / `delete_role` accept `role_name` as an alternative to `role_id` (unique, case-insensitive),
+  and a null `color` / `secondary_color` / `tertiary_color` clears that colour.
 - **Role colours and role assignment:** every role-emitting tool (`get_role_permissions`,
   `get_role_hierarchy`, `topology_role_hierarchy`, `topology_permission_matrix`,
   `export_server_snapshot`, `permission_drift_check`) now reports `color` (int), `colorHex`,
@@ -286,9 +292,9 @@ serializer expose the same distinction as `mentionEveryone` / `mentions` / `role
 
 ## Feature audit
 
-`docs/analysis/FEATURE_AUDIT.md` lists all 114 tools with their confirmation model and the verification
+`docs/analysis/FEATURE_AUDIT.md` lists all 115 tools with their confirmation model and the verification
 evidence gathered against a live server (live API run vs unit test), plus the defects that audit fixed.
 
-## 114-tool contract status
+## 115-tool contract status
 
-The canonical registry target in this branch: **114 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 1 member admin). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.
+The canonical registry target in this branch: **115 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 2 member admin). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.

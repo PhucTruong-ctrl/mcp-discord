@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from mcp.types import TextContent
 import discord
 
+from discord_mcp.core.resolve import try_int
 from discord_mcp.core.permissions import (
     as_permission_bits,
     permission_names,
@@ -47,11 +48,48 @@ def _role_edit_error(exc: Exception, role_id: Any = None) -> Optional[ValueError
     return None
 
 
-def _resolve_role(guild: Any, role_id: str):
-    role = guild.get_role(int(role_id))
-    if role is None:
+def _resolve_role(
+    guild: Any,
+    role_id: Any = None,
+    role_name: Any = None,
+    *,
+    allow_missing: bool = False,
+):
+    """Resolve a role by id or by name (case-insensitive, unique match required)."""
+    if role_id in (None, "") and role_name in (None, ""):
+        raise ValueError("role_id or role_name is required")
+
+    if role_id not in (None, ""):
+        parsed = try_int(role_id)
+        if parsed is None:
+            raise ValueError(f"role_id must be a snowflake id, got {role_id!r}")
+        role = guild.get_role(parsed)
+        if role is not None:
+            return role
+        if allow_missing:
+            return None
         raise ValueError(f"Role '{role_id}' not found")
-    return role
+
+    wanted = str(role_name).strip().lower()
+    matches = [
+        role
+        for role in list(getattr(guild, "roles", []) or [])
+        if str(getattr(role, "name", "")).strip().lower() == wanted
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        ids = ", ".join(f"{role.name} ({role.id})" for role in matches)
+        raise ValueError(
+            f"Role name '{role_name}' matches {len(matches)} roles: {ids}. Use role_id."
+        )
+    if allow_missing:
+        return None
+    available = ", ".join(
+        f"{getattr(role, 'name', '?')} ({role.id})"
+        for role in list(getattr(guild, "roles", []) or [])[:15]
+    )
+    raise ValueError(f"Role named '{role_name}' not found. Known roles: {available}")
 
 
 async def handle_create_role(
@@ -102,7 +140,7 @@ async def handle_delete_role(
 ) -> List[TextContent]:
     gateway = deps["gateway"]
     guild = await gateway.resolve_guild(arguments["server_id"])
-    role = _resolve_role(guild, arguments["role_id"])
+    role = _resolve_role(guild, arguments.get("role_id"), arguments.get("role_name"))
     await role.delete(reason=arguments.get("reason"))
     return [TextContent(type="text", text=f"Role '{role.name}' ({role.id}) deleted.")]
 
@@ -112,22 +150,32 @@ async def handle_update_role(
 ) -> List[TextContent]:
     gateway = deps["gateway"]
     guild = await gateway.resolve_guild(arguments["server_id"])
-    role = _resolve_role(guild, arguments["role_id"])
+    role = _resolve_role(guild, arguments.get("role_id"), arguments.get("role_name"))
 
     updates: Dict[str, Any] = {}
     if "name" in arguments and arguments["name"] is not None:
         updates["name"] = str(arguments["name"])
     if "permissions" in arguments and arguments["permissions"] is not None:
         updates["permissions"] = discord.Permissions(int(arguments["permissions"]))
-    if "color" in arguments and arguments["color"] is not None:
-        updates["colour"] = _resolve_colour(arguments["color"], "color")
-    if "secondary_color" in arguments and arguments["secondary_color"] is not None:
-        updates["secondary_colour"] = _resolve_colour(
-            arguments["secondary_color"], "secondary_color"
+    # a colour key that is present but null clears that colour (0 = no primary colour,
+    # null gradient stops remove the gradient)
+    if "color" in arguments:
+        updates["colour"] = (
+            _resolve_colour(arguments["color"], "color")
+            if arguments["color"] is not None
+            else discord.Colour(0)
         )
-    if "tertiary_color" in arguments and arguments["tertiary_color"] is not None:
-        updates["tertiary_colour"] = _resolve_colour(
-            arguments["tertiary_color"], "tertiary_color"
+    if "secondary_color" in arguments:
+        updates["secondary_colour"] = (
+            _resolve_colour(arguments["secondary_color"], "secondary_color")
+            if arguments["secondary_color"] is not None
+            else None
+        )
+    if "tertiary_color" in arguments:
+        updates["tertiary_colour"] = (
+            _resolve_colour(arguments["tertiary_color"], "tertiary_color")
+            if arguments["tertiary_color"] is not None
+            else None
         )
     if "hoist" in arguments and arguments["hoist"] is not None:
         updates["hoist"] = bool(arguments["hoist"])
