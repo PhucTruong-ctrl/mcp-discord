@@ -50,7 +50,13 @@ ONBOARDING_TOOLS = [
     ),
     Tool(
         name="update_guild_onboarding",
-        description="Update guild onboarding configuration",
+        description=(
+            "Update guild onboarding: partial payloads are merged onto the current "
+            "configuration and sent in full (the endpoint is a PUT, so omitted fields would "
+            "be emptied). prompts entries take title/type/options (option: title, description, "
+            "emoji, channel_ids, role_ids). Discord refuses the write with 350001 when the "
+            "server has fewer than 7 public channels or fewer than 5 writable by @everyone."
+        ),
         inputSchema={
             "type": "object",
             "properties": {

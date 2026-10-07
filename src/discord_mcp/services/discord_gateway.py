@@ -275,6 +275,11 @@ class DiscordGateway:
             entries.append(entry)
         return entries
 
+    async def fetch_onboarding_payload(self, server_id: str) -> Dict[str, Any]:
+        """Raw onboarding payload (keeps field order and emoji/animated detail)."""
+        guild = await self.resolve_guild(server_id)
+        return await self.client.http.get_guild_onboarding(guild.id)
+
     async def bulk_delete_messages(
         self, channel_id: str, message_ids: List[str], reason: Optional[str] = None
     ) -> int:

@@ -166,11 +166,16 @@ def _serialize_welcome_screen(screen: Any) -> Dict[str, Any]:
 
 
 def _serialize_onboarding_prompt_option(option: Any) -> Dict[str, Any]:
+    emoji = getattr(option, "emoji", None)
+    emoji_id = getattr(emoji, "id", None)
     return {
         "id": str(option.id),
         "title": option.title,
         "description": getattr(option, "description", None),
-        "emoji": _serialize_emoji(getattr(option, "emoji", None)),
+        "emoji": _serialize_emoji(emoji),
+        # custom emoji need the id (and animated flag) to survive a write-back
+        "emojiId": str(emoji_id) if emoji_id else None,
+        "emojiAnimated": bool(getattr(emoji, "animated", False)),
         "channel_ids": [str(c) for c in (getattr(option, "channel_ids", None) or [])],
         "role_ids": [str(r) for r in (getattr(option, "role_ids", None) or [])],
     }

@@ -208,6 +208,13 @@ error.
 
 The following tool families have specific capability notes:
 
+- **Onboarding writes (`update_guild_onboarding`):** the payload is converted into
+  `discord.OnboardingPrompt`/`OnboardingPromptOption` objects (raw JSON used to raise
+  `'dict' object has no attribute 'to_dict'`) and merged onto the current configuration, because the
+  endpoint is a PUT that empties any omitted field. Discord itself rejects the write with
+  `350001 Cannot update onboarding while below requirements` unless the server has at least 7 public
+  channels and at least 5 of them writable by `@everyone`; the tool reports the guild's own counts in
+  that error, and the Discord client is blocked by the same rule.
 - **Wave 7 — Onboarding & lifecycle (69–76):** Most tools require a live gateway. Two (`get_guild_onboarding`, `update_guild_onboarding`) now use native discord.py 2.7.1+ Guild.onboarding() and Guild.edit_onboarding() APIs. Three (`verification_gate_orchestrator`, `progressive_access_unlock`, `onboarding_friction_audit`) are gateway-independent local logic tools.
 - **Wave 9 — Incident operations (85–88):** `dry_run`/`confirm_token` gated; the confirmed paths change real channel overwrites and persist state (see *Incident state* below).
 - **AutoMod exemptions (`automod_apply_ruleset`):** each rule accepts `exempt_roles` and

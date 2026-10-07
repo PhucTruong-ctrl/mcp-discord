@@ -354,7 +354,20 @@ class OnboardingHandlerBehaviorTests(unittest.IsolatedAsyncioTestCase):
             },
         )()
         gateway = type(
-            "Gateway", (), {"resolve_guild": AsyncMock(return_value=guild)}
+            "Gateway",
+            (),
+            {
+                "resolve_guild": AsyncMock(return_value=guild),
+                "fetch_onboarding_payload": AsyncMock(
+                    return_value={
+                        "guild_id": "123",
+                        "prompts": [],
+                        "default_channel_ids": [],
+                        "enabled": False,
+                        "mode": 0,
+                    }
+                ),
+            },
         )()
 
         result = await handle_update_guild_onboarding(

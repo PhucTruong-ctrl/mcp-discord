@@ -144,6 +144,11 @@ Columns: **gate** = confirmation model, **verified** = evidence level.
   feature; they now explain what is missing.
 - `automod_apply_ruleset` did not wire `exempt_roles`/`exempt_channels`; keyword triggers now also
   accept `allow_list` / `regex_patterns`.
+- `update_guild_onboarding` crashed before any API call (`'dict' object has no attribute 'to_dict'`)
+  because raw JSON prompts were passed to `Guild.edit_onboarding`, which calls `prompt.to_dict(id=i)`;
+  it also sent partial PUTs. It now builds real `OnboardingPrompt` objects and merges onto the current
+  configuration, and explains Discord's onboarding requirements (>= 7 public channels, >= 5 writable by
+  `@everyone`) instead of surfacing a bare `400 350001`.
 - `set_member_nickname` (tool 114) was added: real `Member.edit(nick=...)` with nickname removal via an
   empty string/null, 32-character validation, and a Forbidden error that names the required permission
   (`MANAGE_NICKNAMES`, or `CHANGE_NICKNAME` for the bot's own record). Verified live by renaming the bot
