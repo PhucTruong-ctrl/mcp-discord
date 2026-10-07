@@ -26,7 +26,10 @@ INVENTORY_TOOLS = [
     ),
     Tool(
         name="get_role_hierarchy",
-        description="Return roles sorted by hierarchy",
+        description=(
+            "Return roles sorted by hierarchy with permission bitfields and decoded "
+            "permission names (supports the permission_drift_check baseline shape)."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -63,7 +66,11 @@ INVENTORY_TOOLS = [
     ),
     Tool(
         name="export_server_snapshot",
-        description="Export a compact structural snapshot for a server",
+        description=(
+            "Export a structural snapshot for a server (channels plus role permission "
+            "bitfields, hoist and mentionable). The payload is a valid "
+            "permission_drift_check baseline_snapshot."
+        ),
         inputSchema={
             "type": "object",
             "properties": {

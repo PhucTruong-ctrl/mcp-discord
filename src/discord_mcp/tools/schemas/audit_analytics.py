@@ -4,13 +4,22 @@ from mcp.types import Tool
 AUDIT_ANALYTICS_TOOLS = [
     Tool(
         name="get_audit_log",
-        description="Fetch server audit log entries",
+        description=(
+            "Fetch server audit log entries with actor, target, reason and before/after "
+            "changes (permission changes are decoded into added/removed permission names)."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
                 "server_id": {"type": "string"},
                 "limit": {"type": "number", "minimum": 1, "maximum": 1000},
-                "action_type": {"type": "string"},
+                "action_type": {
+                    "type": "string",
+                    "description": (
+                        "Optional AuditLogAction filter: name (role_update), alias "
+                        "(ROLE_UPDATE, roleUpdate) or numeric value (31). Omit for all actions."
+                    ),
+                },
             },
             "required": ["server_id"],
         },
@@ -30,7 +39,10 @@ AUDIT_ANALYTICS_TOOLS = [
     ),
     Tool(
         name="get_channel_activity_summary",
-        description="Summarize audit events for a channel",
+        description=(
+            "Summarize audit events for a channel. Requires both server_id and channel_id "
+            "(the channel is looked up inside that server's audit log)."
+        ),
         inputSchema={
             "type": "object",
             "properties": {

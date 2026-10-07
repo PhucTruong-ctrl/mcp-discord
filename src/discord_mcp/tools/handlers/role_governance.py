@@ -1,9 +1,14 @@
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from mcp.types import TextContent
 import discord
 
+from discord_mcp.core.permissions import (
+    as_permission_bits,
+    permission_names,
+    role_payload,
+)
 from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 
 
@@ -209,45 +214,157 @@ async def handle_unmute_member_role_based(
     ]
 
 
+BASELINE_SCHEMA_NOTE = (
+    "baseline_snapshot accepts the payload of export_server_snapshot, the baseline "
+    "returned by this tool, or any object with a 'roles' list whose entries carry "
+    "'id' (or 'role_id') and 'permissions'."
+)
+
+
+def _baseline_entries(baseline_snapshot: Any) -> Optional[List[Dict[str, Any]]]:
+    """Role rows from a snapshot, tolerating the 'roles' wrapper or a bare list."""
+    if baseline_snapshot is None:
+        return None
+    if isinstance(baseline_snapshot, list):
+        roles = baseline_snapshot
+    elif isinstance(baseline_snapshot, dict):
+        roles = baseline_snapshot.get("roles")
+    else:
+        raise ValueError(
+            f"baseline_snapshot must be an object or list. {BASELINE_SCHEMA_NOTE}"
+        )
+    if roles is None:
+        return None
+    if not isinstance(roles, list):
+        raise ValueError(
+            f"baseline_snapshot.roles must be a list. {BASELINE_SCHEMA_NOTE}"
+        )
+    return roles
+
+
+def _baseline_role_id(item: Dict[str, Any], index: int) -> str:
+    role_id = item.get("id") or item.get("role_id")
+    if role_id in (None, "", "None"):
+        raise ValueError(
+            f"baseline_snapshot.roles[{index}] has no 'id'/'role_id'. {BASELINE_SCHEMA_NOTE}"
+        )
+    return str(role_id)
+
+
+def _baseline_permissions(item: Dict[str, Any], index: int) -> int:
+    if item.get("permissions") is None:
+        raise ValueError(
+            f"baseline_snapshot.roles[{index}] has no 'permissions' bitfield. "
+            f"{BASELINE_SCHEMA_NOTE}"
+        )
+    return as_permission_bits(item["permissions"])
+
+
 async def handle_permission_drift_check(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
     guild = await gateway.resolve_guild(arguments["server_id"])
-    baseline_snapshot = arguments.get("baseline_snapshot") or {}
-    baseline_roles = baseline_snapshot.get("roles") or []
+    baseline_entries = _baseline_entries(arguments.get("baseline_snapshot"))
 
-    role_map = {str(role.id): role for role in guild.roles}
+    current = {
+        str(role.id): role_payload(role)
+        for role in sorted(guild.roles, key=lambda role: role.position, reverse=True)
+    }
+
+    if not baseline_entries:
+        payload = {
+            "serverId": str(guild.id),
+            "mode": "baseline",
+            "roleCount": len(current),
+            "roles": list(current.values()),
+            "drifts": [],
+            "driftCount": 0,
+            "note": (
+                "No baseline_snapshot supplied: the current role permission bitfields are "
+                "returned as the baseline. Feed this payload back as baseline_snapshot to "
+                "diff later."
+            ),
+        }
+        return [
+            TextContent(
+                type="text", text=json.dumps(payload, ensure_ascii=False, indent=2)
+            )
+        ]
+
     drifts = []
-    for item in baseline_roles:
-        role_id = str(item.get("role_id"))
-        expected = str(item.get("permissions"))
-        role = role_map.get(role_id)
+    baseline_ids = set()
+    for index, item in enumerate(baseline_entries):
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"baseline_snapshot.roles[{index}] must be an object. {BASELINE_SCHEMA_NOTE}"
+            )
+        role_id = _baseline_role_id(item, index)
+        baseline_ids.add(role_id)
+        expected = _baseline_permissions(item, index)
+        role = current.get(role_id)
+
         if role is None:
             drifts.append(
                 {
                     "scope": "role",
                     "subject": role_id,
+                    "name": item.get("name"),
                     "permission": "permissions",
+                    "kind": "role_missing",
                     "expected": expected,
                     "actual": None,
+                    "added": [],
+                    "removed": [],
                 }
             )
             continue
 
-        actual = str(role.permissions)
-        if actual != expected:
-            drifts.append(
-                {
-                    "scope": "role",
-                    "subject": role_id,
-                    "permission": "permissions",
-                    "expected": expected,
-                    "actual": actual,
-                }
-            )
+        actual = role["permissions"]
+        if expected == actual:
+            continue
 
-    payload = {"drifts": drifts, "driftCount": len(drifts)}
+        expected_names = permission_names(expected)
+        drifts.append(
+            {
+                "scope": "role",
+                "subject": role_id,
+                "name": role["name"],
+                "permission": "permissions",
+                "kind": "permissions_changed",
+                "expected": expected,
+                "actual": actual,
+                "expectedNames": expected_names,
+                "actualNames": role["permissionNames"],
+                "added": [
+                    name
+                    for name in role["permissionNames"]
+                    if name not in expected_names
+                ],
+                "removed": [
+                    name
+                    for name in expected_names
+                    if name not in role["permissionNames"]
+                ],
+            }
+        )
+
+    new_roles = [
+        {"id": role_id, "name": role["name"], "permissions": role["permissions"]}
+        for role_id, role in current.items()
+        if role_id not in baseline_ids
+    ]
+
+    payload = {
+        "serverId": str(guild.id),
+        "mode": "drift",
+        "roleCount": len(current),
+        "baselineRoleCount": len(baseline_entries),
+        "comparedFields": ["permissions"],
+        "drifts": drifts,
+        "driftCount": len(drifts),
+        "rolesNotInBaseline": new_roles,
+    }
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))
     ]

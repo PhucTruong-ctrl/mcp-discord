@@ -13,6 +13,27 @@ if SRC not in sys.path:
 os.environ.setdefault("DISCORD_TOKEN", "test-token")
 
 
+class FakeFlag(int):  # stands in for discord.Permissions
+    @property
+    def value(self):
+        return int(self)
+
+
+class FakeOverwrite:
+    def __init__(self, allow=0, deny=0):
+        self._allow = FakeFlag(allow)
+        self._deny = FakeFlag(deny)
+
+    def pair(self):
+        return self._allow, self._deny
+
+
+class FakeTarget:
+    def __init__(self, target_id, name):
+        self.id = target_id
+        self.name = name
+
+
 class FakeChannel:
     def __init__(
         self, channel_id, name, ch_type, position, category_id=None, overwrites=None
@@ -24,30 +45,58 @@ class FakeChannel:
         self.category_id = category_id
         self.overwrites = overwrites or {}
 
+    @property
+    def category(self):
+        return self._category
+
+    @category.setter
+    def category(self, value):
+        self._category = value
+
 
 class FakeRole:
-    def __init__(self, role_id, name, position, hoist=False, mentionable=False):
+    def __init__(
+        self, role_id, name, position, hoist=False, mentionable=False, permissions=0
+    ):
         self.id = role_id
         self.name = name
         self.position = position
         self.hoist = hoist
         self.mentionable = mentionable
+        self.permissions = permissions
 
 
 class FakeGuild:
     def __init__(self):
         self.id = 1
         self.name = "Test Guild"
-        self.channels = [
-            FakeChannel(10, "General", "category", 1),
-            FakeChannel(11, "chat", "text", 2, category_id=10, overwrites={1: "x"}),
-            FakeChannel(12, "voice", "voice", 3, category_id=10),
-            FakeChannel(13, "lobby", "text", 4),
-        ]
+        category = FakeChannel(
+            10,
+            "General",
+            "category",
+            1,
+            overwrites={
+                FakeTarget(1, "@everyone"): FakeOverwrite(deny=131072),
+            },
+        )
+        chat = FakeChannel(
+            11,
+            "chat",
+            "text",
+            2,
+            category_id=10,
+            overwrites={FakeTarget(3, "Admin"): FakeOverwrite(allow=131072)},
+        )
+        chat.category = category
+        voice = FakeChannel(12, "voice", "voice", 3, category_id=10)
+        voice.category = category
+        lobby = FakeChannel(13, "lobby", "text", 4)
+        lobby.category = None
+        self.channels = [category, chat, voice, lobby]
         self.roles = [
-            FakeRole(1, "@everyone", 0),
+            FakeRole(1, "@everyone", 0, permissions=131072),
             FakeRole(2, "Mod", 20, hoist=True),
-            FakeRole(3, "Admin", 30, hoist=True, mentionable=True),
+            FakeRole(3, "Admin", 30, hoist=True, mentionable=True, permissions=8),
         ]
 
 
@@ -111,7 +160,22 @@ class TopologyToolsTests(unittest.IsolatedAsyncioTestCase):
         payload = json.loads(result[0].text)
         self.assertEqual(payload["channelCount"], 1)
         self.assertEqual(payload["channels"][0]["id"], "11")
-        self.assertEqual(payload["channels"][0]["overwrites"], 1)
+        self.assertEqual(payload["channels"][0]["overwriteCount"], 1)
+
+        roles = {role["name"]: role for role in payload["roles"]}
+        self.assertEqual(len(payload["roles"]), 3)
+        self.assertEqual(roles["@everyone"]["permissions"], 131072)
+        self.assertEqual(roles["@everyone"]["permissionNames"], ["mention_everyone"])
+
+        overwrite = payload["channels"][0]["overwrites"][0]
+        self.assertEqual(overwrite["allow"], 131072)
+        self.assertEqual(overwrite["deny"], 0)
+        self.assertEqual(overwrite["allowNames"], ["mention_everyone"])
+        self.assertEqual(overwrite["targetName"], "Admin")
+
+        inherited = payload["channels"][0]["categoryOverwrites"][0]
+        self.assertEqual(inherited["deny"], 131072)
+        self.assertEqual(inherited["denyNames"], ["mention_everyone"])
 
 
 if __name__ == "__main__":

@@ -127,13 +127,16 @@ NON_ALIAS_TOOLS = {
     "execute_channel_webhook",
     "list_guild_integrations",
     "get_guild_vanity_url",
+    "get_role_permissions",
+    "compute_member_permissions",
+    "audit_mass_mentions",
 }
 
 
 class TestRouterAliasCompatibility(unittest.TestCase):
     def test_alias_enabled_tools_count(self):
         self.assertEqual(len(ALIAS_MATRIX), 23)
-        self.assertEqual(len(NON_ALIAS_TOOLS), 84)
+        self.assertEqual(len(NON_ALIAS_TOOLS), 87)
 
     def test_alias_pairs_map_to_same_handler(self):
         for canonical, alias in ALIAS_MATRIX.items():

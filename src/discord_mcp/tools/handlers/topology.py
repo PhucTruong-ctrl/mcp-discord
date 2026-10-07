@@ -3,6 +3,8 @@ from typing import Any, Dict, List
 
 from mcp.types import TextContent
 
+from discord_mcp.core.permissions import overwrite_rows, role_payload
+
 
 def _sorted_channels(guild):
     return sorted(guild.channels, key=lambda c: (getattr(c, "position", 0), c.id))
@@ -78,16 +80,7 @@ async def handle_topology_role_hierarchy(
 
     payload = {
         "server": {"id": str(guild.id), "name": guild.name},
-        "roles": [
-            {
-                "id": str(role.id),
-                "name": role.name,
-                "position": role.position,
-                "hoist": bool(getattr(role, "hoist", False)),
-                "mentionable": bool(getattr(role, "mentionable", False)),
-            }
-            for role in roles
-        ],
+        "roles": [role_payload(role) for role in roles],
     }
     return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]
 
@@ -99,22 +92,37 @@ async def handle_topology_permission_matrix(
     guild = await gateway.resolve_guild(arguments["server_id"])
     filter_ids = {str(v) for v in arguments.get("channel_ids", [])}
 
+    roles = sorted(guild.roles, key=lambda role: role.position, reverse=True)
     channels = []
     for channel in _sorted_channels(guild):
         if filter_ids and str(channel.id) not in filter_ids:
             continue
+        overwrites = overwrite_rows(channel)
+        category = getattr(channel, "category", None)
+        category_overwrites = overwrite_rows(category) if category is not None else []
         channels.append(
             {
                 "id": str(channel.id),
                 "name": channel.name,
                 "type": str(getattr(channel, "type", "unknown")),
-                "overwrites": len(getattr(channel, "overwrites", {}) or {}),
+                "categoryId": (
+                    str(channel.category_id)
+                    if getattr(channel, "category_id", None) is not None
+                    else None
+                ),
+                "overwriteCount": len(overwrites),
+                "overwrites": overwrites,
+                "categoryOverwrites": category_overwrites,
             }
         )
 
     payload = {
         "server": {"id": str(guild.id), "name": guild.name},
-        "roleCount": len(guild.roles),
+        "everyoneRoleId": str(
+            getattr(getattr(guild, "default_role", None), "id", guild.id)
+        ),
+        "roleCount": len(roles),
+        "roles": [role_payload(role) for role in roles],
         "channelCount": len(channels),
         "channels": channels,
     }

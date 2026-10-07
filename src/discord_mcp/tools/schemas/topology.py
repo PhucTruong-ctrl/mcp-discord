@@ -34,7 +34,11 @@ TOPOLOGY_TOOLS = [
     ),
     Tool(
         name="topology_permission_matrix",
-        description="Return simplified role/channel permission matrix",
+        description=(
+            "Return role permission bitfields (with decoded names) plus per-channel "
+            "allow/deny overwrite masks, including each channel's parent-category "
+            "overwrites. Use compute_member_permissions for one member's effective bits."
+        ),
         inputSchema={
             "type": "object",
             "properties": {

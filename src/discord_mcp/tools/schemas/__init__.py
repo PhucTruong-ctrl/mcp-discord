@@ -14,7 +14,9 @@ from .moderation_core import MODERATION_CORE_TOOLS
 from .role_governance import ROLE_GOVERNANCE_TOOLS
 from .messaging_workflow import MESSAGING_WORKFLOW_TOOLS
 from .onboarding import ONBOARDING_TOOLS
+from .mass_mentions import MASS_MENTION_TOOLS
 from .misc import MISC_TOOLS
+from .permissions import PERMISSION_INTEL_TOOLS
 from .roles import ROLE_TOOLS
 from .server_info import SERVER_INFO_TOOLS
 from .topology import TOPOLOGY_TOOLS
@@ -42,6 +44,8 @@ def compose_tool_registry() -> List[Tool]:
         *INCIDENT_OPS_TOOLS,
         *AUTOMOD_POLICY_TOOLS,
         *EXPANSION_FILLER_TOOLS,
+        *PERMISSION_INTEL_TOOLS,
+        *MASS_MENTION_TOOLS,
     ]
 
 

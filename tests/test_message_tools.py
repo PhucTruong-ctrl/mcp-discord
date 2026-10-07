@@ -260,6 +260,32 @@ class MessageHandlerReadEmbedsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed_data[0]["embeds"][0]["title"], "Embed Title")
         self.assertEqual(embed_data[0]["embeds"][0]["author"], "Bot")
 
+    async def test_read_messages_distinguishes_mass_ping_from_literal_text(self):
+        pinged = self._make_message(1, "alice", "@everyone down for maintenance")
+        pinged.mention_everyone = True
+        literal = self._make_message(2, "bob", "@everyone")
+        literal.mention_everyone = False
+        plain = self._make_message(3, "carol", "hello everyone")
+        plain.mention_everyone = False
+
+        async def _history(*a, **kw):
+            for m in (pinged, literal, plain):
+                yield m
+
+        channel = type("Channel", (), {"history": _history})()
+        gateway = type(
+            "Gateway",
+            (),
+            {"resolve_text_or_thread_channel": AsyncMock(return_value=channel)},
+        )()
+        deps = {"gateway": gateway, "try_int": lambda x: int(x) if x else None}
+
+        results = await handle_read_messages({"channel_id": "100", "limit": 5}, deps)
+
+        self.assertIn("MASS MENTION delivered", results[0].text)
+        self.assertIn("did NOT deliver a mass ping", results[0].text)
+        self.assertIn("hello everyone", results[0].text)
+
     async def test_read_messages_returns_no_embeds_found_when_none(self):
         msgs = [
             self._make_message(1, "alice", "hello"),

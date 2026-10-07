@@ -5,15 +5,127 @@ from typing import Any, Dict, Iterable, List
 
 from mcp.types import TextContent
 
+from discord_mcp.core.permissions import as_permission_bits, permission_names
+from discord_mcp.core.validation import validate_limit
+
+_PERMISSION_FIELDS = ("permissions", "allow", "deny")
+
+
+def _display_name(obj: Any) -> Any:
+    for attribute in ("display_name", "nick", "name", "username"):
+        value = getattr(obj, attribute, None)
+        if value:
+            return str(value)
+    return None
+
+
+def _json_safe(value: Any) -> Any:
+    """Best-effort JSON conversion of discord.py audit-log diff values."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if getattr(value, "id", None) is not None:
+        return {
+            "id": str(value.id),
+            "name": _display_name(value),
+            "type": type(value).__name__,
+        }
+    inner = getattr(value, "value", None)
+    if inner is not None and not callable(inner):
+        return _json_safe(inner)
+    fields = getattr(value, "__dict__", None)
+    if fields:
+        return {str(key): _json_safe(item) for key, item in fields.items()}
+    return str(value)
+
+
+def _target_id(entry: Any) -> str:
+    """Raw audit target snowflake, safe for entries whose ``target_id`` is null."""
+    target_id = getattr(entry, "_target_id", None)
+    return str(target_id) if target_id is not None else ""
+
+
+def _target_snapshot(entry: Any) -> Dict[str, Any]:
+    """Target metadata without touching discord.py's fragile target conversion.
+
+    Entries such as member_move carry ``target_id: null``; resolving ``entry.target``
+    then raises TypeError inside discord.py. The raw snowflake, the optional
+    ``extra`` payload and ``changes`` are always safe to read.
+    """
+    target_id = _target_id(entry)
+    target = None
+    if target_id:
+        try:
+            target = entry.target
+        except Exception:  # noqa: BLE001 - discord.py conversion must not break the tool
+            target = None
+    return {
+        "targetId": target_id or None,
+        "targetName": _display_name(target) if target is not None else None,
+        "targetType": type(target).__name__ if target is not None else None,
+        "extra": _json_safe(getattr(entry, "extra", None)),
+    }
+
+
+def _changes_payload(entry: Any) -> Dict[str, Any]:
+    """before/after diff for one entry plus decoded permission-bit changes."""
+    try:
+        changes = entry.changes
+        raw_before = dict(changes.before)
+        raw_after = dict(changes.after)
+    except Exception as exc:  # noqa: BLE001 - one malformed entry must not fail the log
+        return {"before": {}, "after": {}, "permissionChanges": [], "error": str(exc)}
+
+    return {
+        "before": {str(key): _json_safe(value) for key, value in raw_before.items()},
+        "after": {str(key): _json_safe(value) for key, value in raw_after.items()},
+        "permissionChanges": _permission_changes(raw_before, raw_after),
+    }
+
+
+def _permission_changes(
+    before: Dict[str, Any], after: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """Decoded permission-bit deltas, e.g. a role gaining mention_everyone."""
+    deltas = []
+    for field in _PERMISSION_FIELDS:
+        if field not in before and field not in after:
+            continue
+        before_bits = as_permission_bits(before.get(field))
+        after_bits = as_permission_bits(after.get(field))
+        if before_bits == after_bits:
+            continue
+        before_names = permission_names(before_bits)
+        after_names = permission_names(after_bits)
+        deltas.append(
+            {
+                "field": field,
+                "before": before_bits,
+                "after": after_bits,
+                "added": [name for name in after_names if name not in before_names],
+                "removed": [name for name in before_names if name not in after_names],
+            }
+        )
+    return deltas
+
 
 def _serialize_entry(entry: Any) -> Dict[str, Any]:
-    return {
-        "action": str(entry.action),
+    action = entry.action
+    entry_payload = {
+        "action": getattr(action, "name", str(action)),
+        "actionId": getattr(action, "value", None),
         "actorId": str(entry.user.id) if getattr(entry, "user", None) else None,
-        "targetId": str(entry.target.id) if getattr(entry, "target", None) else None,
         "reason": entry.reason,
         "timestamp": entry.created_at.isoformat(),
     }
+    entry_payload.update(_target_snapshot(entry))
+    entry_payload["changes"] = _changes_payload(entry)
+    return entry_payload
 
 
 def _within_window(entries: Iterable[Any], window_hours: int) -> List[Any]:
@@ -26,7 +138,7 @@ async def handle_get_audit_log(
 ) -> List[TextContent]:
     gateway = deps["gateway"]
     server_id = arguments["server_id"]
-    limit = int(arguments.get("limit", 50))
+    limit = validate_limit(arguments.get("limit"), 50, 1000)
     action_type = arguments.get("action_type")
     entries = await gateway.fetch_audit_entries(
         server_id, limit=limit, action_type=action_type
@@ -34,6 +146,7 @@ async def handle_get_audit_log(
 
     payload = {
         "serverId": str(server_id),
+        "actionType": action_type or None,
         "entryCount": len(entries),
         "entries": [_serialize_entry(entry) for entry in entries],
     }
@@ -48,12 +161,10 @@ async def handle_get_member_moderation_history(
     gateway = deps["gateway"]
     server_id = arguments["server_id"]
     user_id = str(arguments["user_id"])
-    limit = int(arguments.get("limit", 200))
+    limit = validate_limit(arguments.get("limit"), 200, 1000)
     entries = await gateway.fetch_audit_entries(server_id, limit=limit)
 
-    history = [
-        entry for entry in entries if str(getattr(entry.target, "id", "")) == user_id
-    ]
+    history = [entry for entry in entries if _target_id(entry) == user_id]
     payload = {
         "serverId": str(server_id),
         "targetUserId": user_id,
@@ -74,9 +185,7 @@ async def handle_get_channel_activity_summary(
     window_hours = int(arguments.get("window_hours", 24))
     entries = await gateway.fetch_audit_entries(server_id, limit=1000)
     windowed = _within_window(entries, window_hours)
-    channel_events = [
-        e for e in windowed if str(getattr(e.target, "id", "")) == channel_id
-    ]
+    channel_events = [entry for entry in windowed if _target_id(entry) == channel_id]
     by_action = Counter(str(entry.action) for entry in channel_events)
 
     payload = {
@@ -106,7 +215,7 @@ async def handle_get_incident_timeline(
 
     events = []
     for entry in sorted(windowed, key=lambda value: value.created_at):
-        target_id = str(getattr(entry.target, "id", ""))
+        target_id = _target_id(entry)
         actor_id = str(getattr(entry.user, "id", ""))
         if channel_id and target_id != channel_id:
             continue
@@ -225,7 +334,7 @@ async def handle_governance_evidence_packager(
     filtered = []
     for entry in windowed:
         actor_id = str(getattr(entry.user, "id", ""))
-        target_id = str(getattr(entry.target, "id", ""))
+        target_id = _target_id(entry)
         if actor_filter and actor_id != actor_filter:
             continue
         if channel_filter and target_id != channel_filter:

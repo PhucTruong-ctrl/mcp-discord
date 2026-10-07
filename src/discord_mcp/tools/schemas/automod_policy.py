@@ -26,6 +26,16 @@ AUTOMOD_POLICY_TOOLS = [
                                         "items": {"type": "object"},
                                     },
                                     "enabled": {"type": "boolean"},
+                                    "exempt_roles": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "Role ids or names exempt from the rule (max 20)",
+                                    },
+                                    "exempt_channels": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "Channel ids or names exempt from the rule (max 50)",
+                                    },
                                 },
                                 "required": ["name", "trigger_type", "actions"],
                             },
@@ -54,7 +64,13 @@ AUTOMOD_POLICY_TOOLS = [
     ),
     Tool(
         name="automod_apply_ruleset",
-        description="Apply caller-supplied ruleset with reason and confirm token enforcement",
+        description=(
+            "Apply caller-supplied ruleset with reason and confirm token enforcement. Each "
+            "rule supports trigger_type keyword (keyword_filter / regex_patterns / allow_list), "
+            "keyword_preset, mention_spam and member_profile, actions block_message / "
+            "send_alert_message / timeout / block_member_interaction, plus exempt_roles and "
+            "exempt_channels given as ids or names."
+        ),
         inputSchema={
             "type": "object",
             "properties": {

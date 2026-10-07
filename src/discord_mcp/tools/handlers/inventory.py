@@ -5,18 +5,11 @@ from typing import Any, Dict, List
 
 from mcp.types import TextContent
 
+from discord_mcp.core.permissions import overwrite_rows, role_payload
 
-def _overwrites_map(channel: Any) -> Dict[str, Dict[str, int]]:
-    mapped: Dict[str, Dict[str, int]] = {}
-    for target, overwrite in channel.overwrites.items():
-        allow, deny = overwrite.pair()
-        mapped[str(target.id)] = {
-            "targetId": str(target.id),
-            "targetName": getattr(target, "name", str(target.id)),
-            "allow": int(allow.value),
-            "deny": int(deny.value),
-        }
-    return mapped
+
+def _overwrites_map(channel: Any) -> Dict[str, Dict[str, Any]]:
+    return {row["targetId"]: row for row in overwrite_rows(channel)}
 
 
 async def handle_get_channels_structured(
@@ -91,15 +84,11 @@ async def handle_get_role_hierarchy(
     roles = sorted(guild.roles, key=lambda role: role.position, reverse=True)
     payload = {
         "serverId": str(guild.id),
-        "roles": [
-            {
-                "id": str(role.id),
-                "name": role.name,
-                "position": role.position,
-                "managed": bool(getattr(role, "managed", False)),
-            }
-            for role in roles
-        ],
+        "everyoneRoleId": str(
+            getattr(getattr(guild, "default_role", None), "id", guild.id)
+        ),
+        "roleCount": len(roles),
+        "roles": [role_payload(role) for role in roles],
     }
     return [TextContent(type="text", text=json.dumps(payload))]
 
@@ -151,8 +140,13 @@ async def handle_export_server_snapshot(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     guild = await deps["gateway"].resolve_guild(arguments["server_id"])
+    roles = sorted(guild.roles, key=lambda role: role.position, reverse=True)
     payload = {
+        "snapshotVersion": 2,
         "server": {"id": str(guild.id), "name": guild.name},
+        "everyoneRoleId": str(
+            getattr(getattr(guild, "default_role", None), "id", guild.id)
+        ),
         "channels": [
             {
                 "id": str(channel.id),
@@ -167,14 +161,10 @@ async def handle_export_server_snapshot(
             }
             for channel in guild.channels
         ],
-        "roles": [
-            {
-                "id": str(role.id),
-                "name": role.name,
-                "position": role.position,
-            }
-            for role in sorted(guild.roles, key=lambda r: r.position, reverse=True)
-        ],
+        "roleCount": len(roles),
+        # role rows carry the permission bitfield (+ decoded names) so this payload can
+        # be fed straight back into permission_drift_check as baseline_snapshot
+        "roles": [role_payload(role) for role in roles],
     }
     return [TextContent(type="text", text=json.dumps(payload))]
 

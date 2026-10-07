@@ -37,6 +37,7 @@ class FakeRole:
     color: int = 0
     mentionable: bool = False
     hoist: bool = False
+    position: int = 0
 
     async def edit(self, **kwargs):
         for key, value in kwargs.items():
@@ -71,6 +72,7 @@ class FakeGuild:
     def __init__(self):
         self.id = 1
         self.name = "Guild"
+        self.channels = []
         self.roles = [
             FakeRole(1, "Admin", permissions=8),
             FakeRole(2, "Muted", permissions=0),
@@ -292,6 +294,52 @@ class RoleGovernanceToolTests(unittest.IsolatedAsyncioTestCase):
         )
         payload = json.loads(result[0].text)
         self.assertEqual(payload["driftCount"], 1)
+        drift = payload["drifts"][0]
+        self.assertEqual(drift["subject"], "2")
+        self.assertEqual(drift["kind"], "permissions_changed")
+        self.assertEqual(drift["expected"], 4)
+        self.assertEqual(drift["actual"], 0)
+        self.assertEqual(drift["removed"], ["ban_members"])
+
+    async def test_permission_drift_check_without_baseline_returns_current_bitfields(
+        self,
+    ):
+        result = await handle_permission_drift_check({"server_id": "1"}, self.deps)
+        payload = json.loads(result[0].text)
+
+        self.assertEqual(payload["mode"], "baseline")
+        self.assertEqual(payload["driftCount"], 0)
+        roles = {role["name"]: role for role in payload["roles"]}
+        self.assertEqual(roles["Admin"]["permissions"], 8)
+        self.assertEqual(roles["Admin"]["permissionNames"], ["administrator"])
+        self.assertEqual(roles["Member"]["permissions"], 1)
+
+    async def test_snapshot_round_trips_into_drift_check(self):
+        from discord_mcp.tools.handlers.inventory import handle_export_server_snapshot
+
+        snapshot_result = await handle_export_server_snapshot(
+            {"server_id": "1"}, self.deps
+        )
+        snapshot = json.loads(snapshot_result[0].text)
+        self.assertIn("permissions", snapshot["roles"][0])
+
+        drift_result = await handle_permission_drift_check(
+            {"server_id": "1", "baseline_snapshot": snapshot}, self.deps
+        )
+        drift = json.loads(drift_result[0].text)
+        self.assertEqual(drift["mode"], "drift")
+        self.assertEqual(drift["driftCount"], 0)
+        self.assertEqual(drift["rolesNotInBaseline"], [])
+
+    async def test_drift_check_rejects_baseline_without_permissions(self):
+        with self.assertRaisesRegex(ValueError, "no 'permissions' bitfield"):
+            await handle_permission_drift_check(
+                {
+                    "server_id": "1",
+                    "baseline_snapshot": {"roles": [{"id": "1", "name": "Admin"}]},
+                },
+                self.deps,
+            )
 
 
 if __name__ == "__main__":

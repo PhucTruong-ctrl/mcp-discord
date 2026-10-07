@@ -56,6 +56,16 @@ def _serialize_message(message: Any) -> Dict[str, Any]:
         "author": str(message.author),
         "content": message.content,
         "timestamp": message.created_at.isoformat(),
+        # mention_everyone false + '@everyone' in content means Discord did not register
+        # a mass ping: the text renders, nobody is notified
+        "mentionEveryone": bool(getattr(message, "mention_everyone", False)),
+        "mentions": [
+            {"id": str(user.id), "name": str(user)}
+            for user in (getattr(message, "mentions", None) or [])
+        ],
+        "roleMentionIds": [
+            str(role.id) for role in (getattr(message, "role_mentions", None) or [])
+        ],
         "attachments": [_serialize_attachment(att) for att in message.attachments],
         "embeds": [_serialize_embed(embed) for embed in message.embeds],
     }

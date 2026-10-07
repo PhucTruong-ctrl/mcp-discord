@@ -2,8 +2,8 @@
 
 ## Scope snapshot
 
-- Planned total: **107 canonical tools** (23 baseline + 84 expansion)
-- Current canonical registry in this branch: **107 tools**
+- Planned total: **110 canonical tools** (23 baseline + 84 expansion + 2 permission introspection + 1 mass-mention audit)
+- Current canonical registry in this branch: **110 tools**
 - Runtime is Discord-native only (Discord API + bot token), no external runtime dependency
 
 ## Channel CRUD/admin tools
@@ -175,6 +175,15 @@ Notes:
 106. `update_auto_moderation_rule`
 107. `automod_export_rules`
 
+### Post-wave additions — permission introspection (2)
+
+108. `get_role_permissions`
+109. `compute_member_permissions`
+
+### Post-wave addition — mass-mention audit (1)
+
+110. `audit_mass_mentions`
+
 ## Implementation-status note
 
 The 15 expansion filler/utility tools split into two groups with different runtime behavior:
@@ -188,10 +197,53 @@ The following tool families have specific capability notes:
 
 - **Wave 7 — Onboarding & lifecycle (69–76):** Most tools require a live gateway. Two (`get_guild_onboarding`, `update_guild_onboarding`) now use native discord.py 2.7.1+ Guild.onboarding() and Guild.edit_onboarding() APIs. Three (`verification_gate_orchestrator`, `progressive_access_unlock`, `onboarding_friction_audit`) are gateway-independent local logic tools.
 - **Wave 9 — Incident operations (85–88):** Gateway-independent. Use `dry_run`/`confirm_token` for lockdown/rollback but no live Discord API calls.
+- **AutoMod exemptions (`automod_apply_ruleset`):** each rule accepts `exempt_roles` and
+  `exempt_channels` as ids or names (max 20 roles / 50 channels), and keyword triggers accept
+  `keyword_filter`, `regex_patterns` and `allow_list`. Practical use: block `*@everyone*` /
+  `*@here*` text for everyone while exempting the roles that legitimately mass-mention.
+  Platform caveat verified on live Discord: AutoMod does not act on bot messages, so such a
+  rule constrains members, not bots.
 - **Wave 10 — AutoMod policy (89–92):** Mixed — `automod_validate_ruleset` is gateway-independent; `automod_get_ruleset` and `automod_apply_ruleset` use the live Discord API via gateway when available; `automod_rollback_ruleset` execute path returns `not_supported` (no Discord API primitive for rollback).
 - **Expansion fillers — tools 93–103 (synthetic-only):** Return `"applied"` or `"ok"` responses without Discord API calls.
 - **Expansion fillers — tools 104–107 (gateway-aware):** Use Discord API via gateway when available; fall back to synthetic `"applied"`/`"ok"` responses when gateway is absent.
 
-## 107-tool contract status
+## Permission introspection (tools 108-109)
 
-The canonical registry target is restored in this branch: **107 canonical tools** (23 baseline + 84 expansion). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.
+Role and channel permission reads all share one payload shape (`src/discord_mcp/core/permissions.py`):
+
+- Role rows: `id`, `name`, `position`, `permissions` (int bitfield), `permissionNames` (decoded
+  flags), `hoist`, `mentionable`, `managed`. Emitted by `get_role_permissions`,
+  `get_role_hierarchy`, `topology_role_hierarchy`, `topology_permission_matrix`,
+  `export_server_snapshot` and `permission_drift_check`.
+- Overwrite rows: `targetId`, `targetName`, `targetType`, `allow`, `deny` (int masks) plus
+  `allowNames`/`denyNames`. Emitted by `get_permission_overwrites`, `diff_channel_permissions`
+  and `topology_permission_matrix`.
+- `get_role_permissions`: every role (optionally one `role_id`) with decoded bitfields.
+- `compute_member_permissions`: base and effective bitfields plus the layer that decided each
+  permission (`administrator`, `base_role`, `everyone_overwrite`, `role_overwrite:<roleId>`,
+  `member_overwrite`, each suffixed `:allow`/`:deny`). The walk matches discord.py's
+  `GuildChannel.permissions_for` overwrite resolution; it does not apply discord.py's
+  implicit per-channel-type flag stripping, and category overwrites are reported
+  (`categoryOverwrites`) rather than inherited.
+- Drift round-trip: `export_server_snapshot` (v2) emits role permission bitfields, so its
+  payload is a valid `permission_drift_check` baseline; passing the same payload straight back
+  yields `driftCount: 0`.
+
+## Mass mentions (tool 110)
+
+`audit_mass_mentions` scans channel history (optionally threads/forum posts) and separates
+two things that look identical in a chat client:
+
+- `kind: "delivered"` — the message has `mention_everyone: true`; Discord registered the
+  mass mention and notified members.
+- `kind: "suppressed_text"` — the content contains `@everyone`/`@here` but
+  `mention_everyone` is false: the author lacked the MENTION_EVERYONE permission, so the
+  text is rendered as-is and **no notification is sent**.
+
+Each hit also carries the author's current permission context (`authorHasMentionEveryoneNow`,
+`authorGrantingRoles`, `channelAllowsEveryone`). `read_messages` and the forum message
+serializer expose the same distinction as `mentionEveryone` / `mentions` / `roleMentionIds`.
+
+## 110-tool contract status
+
+The canonical registry target is restored in this branch: **110 canonical tools** (23 baseline + 84 expansion + 2 permission introspection + 1 mass-mention audit). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.

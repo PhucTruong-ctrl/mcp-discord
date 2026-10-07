@@ -62,6 +62,7 @@ from .inventory import (
     handle_get_role_hierarchy,
     handle_list_inactive_channels,
 )
+from .mass_mentions import handle_audit_mass_mentions
 from .messages import (
     handle_edit_message,
     handle_read_messages,
@@ -111,6 +112,10 @@ from .onboarding import (
     handle_update_guild_onboarding,
     handle_update_guild_welcome_screen,
     handle_verification_gate_orchestrator,
+)
+from .permission_intel import (
+    handle_compute_member_permissions,
+    handle_get_role_permissions,
 )
 from .incident_ops import (
     handle_incident_apply_lockdown,
@@ -276,6 +281,9 @@ TOOL_ROUTER: Dict[str, Handler] = {
     "create_auto_moderation_rule": handle_create_auto_moderation_rule,
     "update_auto_moderation_rule": handle_update_auto_moderation_rule,
     "automod_export_rules": handle_automod_export_rules,
+    "get_role_permissions": handle_get_role_permissions,
+    "compute_member_permissions": handle_compute_member_permissions,
+    "audit_mass_mentions": handle_audit_mass_mentions,
 }
 
 

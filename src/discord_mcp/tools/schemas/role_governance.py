@@ -112,12 +112,24 @@ ROLE_GOVERNANCE_TOOLS = [
     ),
     Tool(
         name="permission_drift_check",
-        description="Compare current role permissions with baseline",
+        description=(
+            "Compare current role permission bitfields with a baseline. Without "
+            "baseline_snapshot the current state is returned as the baseline "
+            "(mode=baseline); with one (the export_server_snapshot payload, or this "
+            "tool's own baseline payload) it diffs every role and reports added/removed "
+            "permission names (mode=drift)."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
                 "server_id": {"type": "string"},
-                "baseline_snapshot": {"type": "object"},
+                "baseline_snapshot": {
+                    "type": "object",
+                    "description": (
+                        "Prior snapshot: {'roles': [{'id', 'permissions', ...}]}. "
+                        "Accepts export_server_snapshot output as-is."
+                    ),
+                },
             },
             "required": ["server_id"],
         },

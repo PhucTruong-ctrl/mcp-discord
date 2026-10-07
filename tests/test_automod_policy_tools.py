@@ -268,6 +268,125 @@ class AutomodPolicyToolTests(unittest.IsolatedAsyncioTestCase):
         call_kwargs = guild.create_automod_rule.call_args.kwargs
         self.assertEqual(call_kwargs["name"], "block-spam")
 
+    async def test_apply_ruleset_passes_exempt_roles_and_channels(self):
+        """exempt_roles/exempt_channels accept ids and names and reach the API call."""
+        import discord
+
+        class FakeGuild:
+            id = 123
+
+            def __init__(self):
+                self.roles = [
+                    type("R", (), {"id": 11, "name": "Admin"})(),
+                    type("R", (), {"id": 12, "name": "Mod"})(),
+                ]
+                self.channels = [type("C", (), {"id": 21, "name": "reports"})()]
+                self.create_automod_rule = AsyncMock(
+                    return_value=_mock_automod_rule(name="mass-mention-guard")
+                )
+
+        guild = FakeGuild()
+        gateway = AsyncMock()
+        gateway.resolve_guild = AsyncMock(return_value=guild)
+
+        ruleset = {
+            "name": "mass-mention-guard",
+            "rules": [
+                {
+                    "name": "block-everyone-text",
+                    "trigger_type": "keyword",
+                    "trigger_metadata": {
+                        "keyword_filter": ["*@everyone*"],
+                        "allow_list": ["@everyone-ok"],
+                    },
+                    "actions": [
+                        {"type": "block_message", "custom_message": "no mass pings"}
+                    ],
+                    "exempt_roles": ["Admin", "12"],
+                    "exempt_channels": ["reports"],
+                }
+            ],
+        }
+
+        dry_run = await handle_automod_apply_ruleset(
+            {
+                "guild_id": "123",
+                "ruleset": ruleset,
+                "reason": "stop fake @everyone pings",
+                "dry_run": True,
+            },
+            {},
+        )
+        token = _payload(dry_run)["confirmToken"]
+
+        result = await handle_automod_apply_ruleset(
+            {
+                "guild_id": "123",
+                "ruleset": ruleset,
+                "reason": "stop fake @everyone pings",
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            {"gateway": gateway},
+        )
+        self.assertEqual(_payload(result)["status"], "applied")
+
+        kwargs = guild.create_automod_rule.call_args.kwargs
+        self.assertEqual({obj.id for obj in kwargs["exempt_roles"]}, {11, 12})
+        self.assertTrue(
+            all(isinstance(o, discord.Object) for o in kwargs["exempt_roles"])
+        )
+        self.assertEqual([obj.id for obj in kwargs["exempt_channels"]], [21])
+        trigger = kwargs["trigger"]
+        self.assertEqual(trigger.keyword_filter, ["*@everyone*"])
+        self.assertEqual(trigger.allow_list, ["@everyone-ok"])
+
+    async def test_apply_ruleset_rejects_unknown_exemption_name(self):
+        class FakeGuild:
+            id = 123
+
+            def __init__(self):
+                self.roles = [type("R", (), {"id": 11, "name": "Admin"})()]
+                self.channels = []
+                self.create_automod_rule = AsyncMock()
+
+        guild = FakeGuild()
+        gateway = AsyncMock()
+        gateway.resolve_guild = AsyncMock(return_value=guild)
+
+        ruleset = {
+            "name": "guard",
+            "rules": [
+                {
+                    "name": "block",
+                    "trigger_type": "keyword",
+                    "trigger_metadata": {"keyword_filter": ["*@everyone*"]},
+                    "actions": [{"type": "block_message"}],
+                    "exempt_roles": ["Nope"],
+                }
+            ],
+        }
+        dry_run = await handle_automod_apply_ruleset(
+            {"guild_id": "123", "ruleset": ruleset, "reason": "r", "dry_run": True},
+            {},
+        )
+        token = _payload(dry_run)["confirmToken"]
+
+        result = await handle_automod_apply_ruleset(
+            {
+                "guild_id": "123",
+                "ruleset": ruleset,
+                "reason": "r",
+                "dry_run": False,
+                "confirm_token": token,
+            },
+            {"gateway": gateway},
+        )
+        payload = _payload(result)
+        self.assertEqual(payload["status"], "applied_with_errors")
+        self.assertIn("did not match a single role", payload["errors"][0])
+        guild.create_automod_rule.assert_not_awaited()
+
     # --- automod_rollback_ruleset: returns explicit unsupported error ---
 
     async def test_rollback_ruleset_dry_run_returns_confirm_token(self):

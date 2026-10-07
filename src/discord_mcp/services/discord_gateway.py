@@ -1,10 +1,51 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Callable, Dict, List, Optional
 
 import discord
 
 from discord_mcp.core.resolve import normalize_name, try_int
+
+_AUDIT_ACTION_ALIASES: Dict[str, discord.AuditLogAction] = {}
+for _action in discord.AuditLogAction:
+    _AUDIT_ACTION_ALIASES[_action.name] = _action
+    _AUDIT_ACTION_ALIASES[_action.name.replace("_", "")] = _action
+
+
+def resolve_audit_action(action_type: Any) -> discord.AuditLogAction:
+    """Resolve an audit-log action filter from a name, an alias or a numeric value.
+
+    Accepts the discord.py enum name (``role_update``), a spaced/cased spelling
+    (``ROLE_UPDATE``, ``roleUpdate``, ``role update``), a dotted name
+    (``AuditLogAction.role_update``) or the raw ``AuditLogAction`` value (``31``).
+    """
+    if isinstance(action_type, bool):
+        raise ValueError(f"Invalid audit log action type: {action_type}")
+
+    if isinstance(action_type, (int, float)):
+        return discord.enums.try_enum(discord.AuditLogAction, int(action_type))
+
+    token = str(action_type).strip()
+    if token.lstrip("+-").isdigit():
+        return discord.enums.try_enum(discord.AuditLogAction, int(token))
+
+    for prefix in ("auditlogaction.", "audit_log_action."):
+        if token.lower().startswith(prefix):
+            token = token[len(prefix) :]
+            break
+    normalized = re.sub(r"[^a-z0-9]+", "_", token.lower()).strip("_")
+
+    action = _AUDIT_ACTION_ALIASES.get(normalized) or _AUDIT_ACTION_ALIASES.get(
+        normalized.replace("_", "")
+    )
+    if action is None:
+        raise ValueError(
+            f"Invalid audit log action type: {action_type}. Use an AuditLogAction name "
+            f"(e.g. role_update, member_role_update, channel_overwrite_update) or its "
+            f"numeric value (e.g. 31)."
+        )
+    return action
 
 
 class DiscordGateway:
@@ -225,11 +266,8 @@ class DiscordGateway:
         guild = await self.resolve_guild(server_id)
 
         kwargs = {"limit": limit}
-        if action_type:
-            try:
-                kwargs["action"] = discord.AuditLogAction[action_type.upper()]
-            except KeyError:
-                raise ValueError(f"Invalid audit log action type: {action_type}")
+        if action_type not in (None, ""):
+            kwargs["action"] = resolve_audit_action(action_type)
 
         entries = []
         async for entry in guild.audit_logs(**kwargs):

@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 
 from mcp.types import TextContent
 
+from discord_mcp.core.resolve import try_int
 from discord_mcp.core.safety import (
     build_dry_run_result,
     verify_confirm_token,
@@ -48,7 +49,9 @@ def _build_automod_trigger(rule_data: Dict[str, Any]) -> Any:
 
     if trigger_type == "KEYWORD":
         return discord.AutoModTrigger(
-            keyword_filter=trigger_metadata.get("keyword_filter", [])
+            keyword_filter=trigger_metadata.get("keyword_filter", []),
+            regex_patterns=trigger_metadata.get("regex_patterns", []),
+            allow_list=trigger_metadata.get("allow_list", []),
         )
     if trigger_type == "KEYWORD_PRESET":
         presets_val = trigger_metadata.get("presets", 0)
@@ -59,13 +62,52 @@ def _build_automod_trigger(rule_data: Dict[str, Any]) -> Any:
         )
     if trigger_type == "MEMBER_PROFILE":
         return discord.AutoModTrigger(
-            keyword_filter=trigger_metadata.get("keyword_filter", [])
+            keyword_filter=trigger_metadata.get("keyword_filter", []),
+            regex_patterns=trigger_metadata.get("regex_patterns", []),
+            allow_list=trigger_metadata.get("allow_list", []),
         )
 
     # Default: keyword trigger
     return discord.AutoModTrigger(
-        keyword_filter=trigger_metadata.get("keyword_filter", [])
+        keyword_filter=trigger_metadata.get("keyword_filter", []),
+        regex_patterns=trigger_metadata.get("regex_patterns", []),
+        allow_list=trigger_metadata.get("allow_list", []),
     )
+
+
+def _resolve_automod_exemptions(guild: Any, values: Any, attribute: str) -> List[Any]:
+    """Resolve exempt role/channel references given as ids or names."""
+    import discord
+
+    if not values:
+        return []
+    if not isinstance(values, (list, tuple)):
+        raise ValueError(f"{attribute} must be an array of ids or names")
+
+    pool = list(getattr(guild, attribute, []) or [])
+    resolved: List[Any] = []
+    for value in values:
+        key = str(value).strip()
+        if not key:
+            continue
+        target_id = try_int(key)
+        if target_id is not None:
+            resolved.append(discord.Object(id=target_id))
+            continue
+        matches = [
+            item
+            for item in pool
+            if str(getattr(item, "name", "")).lower() == key.lower()
+        ]
+        if len(matches) == 1:
+            resolved.append(discord.Object(id=matches[0].id))
+            continue
+        available = ", ".join(sorted(str(getattr(i, "name", i.id)) for i in pool))
+        raise ValueError(
+            f"{attribute} entry '{value}' did not match a single "
+            f"{'role' if attribute == 'roles' else 'channel'}. Available: {available}"
+        )
+    return resolved
 
 
 def _build_automod_actions(
@@ -184,6 +226,17 @@ async def handle_automod_apply_ruleset(
                     rule_data.get("event_type", "message_send")
                 )
                 enabled = rule_data.get("enabled", True)
+                create_kwargs: Dict[str, Any] = {}
+                exempt_roles = _resolve_automod_exemptions(
+                    guild, rule_data.get("exempt_roles"), "roles"
+                )
+                if exempt_roles:
+                    create_kwargs["exempt_roles"] = exempt_roles
+                exempt_channels = _resolve_automod_exemptions(
+                    guild, rule_data.get("exempt_channels"), "channels"
+                )
+                if exempt_channels:
+                    create_kwargs["exempt_channels"] = exempt_channels
                 new_rule = await guild.create_automod_rule(
                     name=rule_data["name"],
                     event_type=event_type,
@@ -191,6 +244,7 @@ async def handle_automod_apply_ruleset(
                     actions=actions,
                     enabled=enabled,
                     reason=reason,
+                    **create_kwargs,
                 )
                 created_rules.append(_serialize_auto_moderation_rule(new_rule))
             except Exception as exc:

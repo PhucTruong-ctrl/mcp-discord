@@ -65,10 +65,31 @@ async def handle_read_messages(
                 "author": str(message.author),
                 "content": message.content,
                 "timestamp": message.created_at.isoformat(),
+                "mentionEveryone": bool(getattr(message, "mention_everyone", False)),
+                "mentions": [
+                    {"id": str(user.id), "name": str(user)}
+                    for user in (getattr(message, "mentions", None) or [])
+                ],
+                "roleMentionIds": [
+                    str(role.id)
+                    for role in (getattr(message, "role_mentions", None) or [])
+                ],
                 "reactions": reaction_data,
                 "embeds": [_serialize_embed(embed) for embed in message.embeds],
             }
         )
+
+    def format_mass_mention(m):
+        """Distinguish a delivered mass ping from literal '@everyone' text."""
+        content = m["content"] or ""
+        if m["mentionEveryone"]:
+            return "\n[!] MASS MENTION delivered (@everyone/@here)"
+        if "@everyone" in content or "@here" in content:
+            return (
+                "\n[!] '@everyone'/'@here' is literal text - Discord did NOT deliver a "
+                "mass ping"
+            )
+        return ""
 
     def format_reaction(r):
         return f"{r['emoji']}({r['count']})"
@@ -123,6 +144,7 @@ async def handle_read_messages(
                 [
                     f"{m['author']} ({m['timestamp']}) [message_id={m['id']}]: {m['content']}\n"
                     + f"Reactions: {', '.join([format_reaction(r) for r in m['reactions']]) if m['reactions'] else 'No reactions'}"
+                    + format_mass_mention(m)
                     + (
                         "\nEmbeds:\n"
                         + "\n".join([format_embed(e) for e in m["embeds"]])
