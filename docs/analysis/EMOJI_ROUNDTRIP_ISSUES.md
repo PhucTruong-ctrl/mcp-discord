@@ -112,6 +112,36 @@ reactions all route through these two.
    emoji, forum tag with a custom emoji, `list_guild_emojis` returning that guild's emoji set.
 3. Say in the PR/commit that the running MCP process needs a restart before the client sees the fix.
 
+---
+
+## Addendum: P1..P4 verified live, plus one correction to the merge comment
+
+All four were verified against the live guild after the patch:
+
+- P1 — `get_guild_onboarding` now returns `defaultChannelIds` (ids) next to the display names.
+- P2 — `get_guild_welcome_screen` now returns `emojiId` / `emojiAnimated` per welcome channel.
+- P3 — `list_forum_posts` tag objects now carry `emojiId` / `emojiAnimated`.
+- P4 — `list_guild_emojis` returns 84 emojis with `id`, `name`, `animated`, `available`, `managed`,
+  `requireColons`, `token`, `url`, `roleIds`, plus `stickerCount` / `stickers`.
+
+Correction, found while doing a real write: **prompt and option ids are not stable across a PUT.**
+`handle_update_guild_onboarding` documents the merge as preserving "channel order, prompt ids and animated
+emoji detail". The write succeeded, but Discord regenerated every prompt and option id:
+
+```
+before: prompt 1494710231895248940, option 1494710231895248943
+after : prompt 1557467612491808862, option 1557467612491808865
+```
+
+Content survived (titles, descriptions, channel/role ids, emoji id + animated flag all round tripped),
+identifiers did not. The PUT does not accept ids back, so this is an API property, not a bug in the handler.
+Two follow-ups worth doing:
+
+1. Document it, and drop "prompt ids survive" from that comment — anyone storing option ids as stable keys
+   (dashboards, metrics baselines, this repo's `docs/ops/*.json`) gets silently stale references.
+2. Since the handler already returns the new ids, a docstring line pointing at that field is enough for
+   callers to re-read and re-store.
+
 ## Status
 
 - P1 — implemented
