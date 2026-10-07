@@ -1,8 +1,13 @@
+import datetime
 import json
 from typing import Any, Dict, List
 
 import discord
 from mcp.types import TextContent
+
+from discord_mcp.core.images import load_image_bytes
+from discord_mcp.core.resolve import try_int
+from discord_mcp.core.safety import build_dry_run_result
 
 
 async def handle_get_server_info(
@@ -147,16 +152,145 @@ def _coerce_enum(mapping: Dict[str, int], value: Any, label: str) -> int:
     return mapping[key]
 
 
-async def handle_update_guild(
-    arguments: Dict[str, Any], deps: Dict[str, Any]
-) -> List[TextContent]:
-    gateway = deps["gateway"]
-    guild = await gateway.resolve_guild(arguments["server_id"])
+_NOTIFICATION_LEVELS = {
+    "0": 0,
+    "all_messages": 0,
+    "all": 0,
+    "1": 1,
+    "only_mentions": 1,
+    "mentions": 1,
+}
+
+_MFA_LEVELS = {"0": 0, "none": 0, "1": 1, "elevated": 1}
+
+_AFK_TIMEOUTS = (60, 300, 900, 1800, 3600)
+
+_IMAGE_FIELDS = ("icon", "banner", "splash", "discovery_splash")
+_CHANNEL_FIELDS = (
+    "afk_channel",
+    "system_channel",
+    "rules_channel",
+    "public_updates_channel",
+    "safety_alerts_channel",
+    "widget_channel",
+)
+_BOOL_FIELDS = (
+    "community",
+    "discoverable",
+    "invites_disabled",
+    "widget_enabled",
+    "premium_progress_bar_enabled",
+    "raid_alerts_disabled",
+)
+_DATETIME_FIELDS = ("invites_disabled_until", "dms_disabled_until")
+_STRING_FIELDS = ("name", "description", "preferred_locale", "vanity_code")
+_ENUM_FIELDS = (
+    "verification_level",
+    "explicit_content_filter",
+    "default_notifications",
+    "mfa_level",
+)
+
+SUPPORTED_UPDATE_GUILD_FIELDS = (
+    "server_id",
+    *_STRING_FIELDS,
+    *_ENUM_FIELDS,
+    *_BOOL_FIELDS,
+    *_CHANNEL_FIELDS,
+    "afk_timeout",
+    "system_channel_flags",
+    "owner",
+    *_IMAGE_FIELDS,
+    *_DATETIME_FIELDS,
+    "reason",
+)
+
+
+def _resolve_channel(guild: Any, value: Any, where: str):
+    if value is None:
+        return None
+    parsed = try_int(value)
+    if parsed is not None:
+        channel = guild.get_channel(parsed)
+        if channel is None:
+            raise ValueError(f"{where}: channel '{value}' not found")
+        return channel
+    wanted = str(value).strip().lower().removeprefix("#")
+    matches = [
+        channel
+        for channel in getattr(guild, "channels", []) or []
+        if str(getattr(channel, "name", "")).strip().lower() == wanted
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        raise ValueError(
+            f"{where}: channel name '{value}' is ambiguous; use the channel id"
+        )
+    raise ValueError(f"{where}: channel '{value}' not found")
+
+
+def _system_channel_flags(value: Any) -> Any:
+    if isinstance(value, (int,)) and not isinstance(value, bool):
+        return discord.SystemChannelFlags._from_value(int(value))
+    if isinstance(value, (list, tuple, set)):
+        flags = discord.SystemChannelFlags()
+        for name in value:
+            key = str(name).strip().lower().replace("-", "_").replace(" ", "_")
+            if key not in discord.SystemChannelFlags.VALID_FLAGS:
+                raise ValueError(
+                    f"system_channel_flags: unknown flag '{name}'; expected one of "
+                    f"{', '.join(sorted(discord.SystemChannelFlags.VALID_FLAGS))}"
+                )
+            setattr(flags, key, True)
+        return flags
+    parsed = try_int(value)
+    if parsed is None:
+        raise ValueError(
+            "system_channel_flags must be an int bitfield or an array of flag names"
+        )
+    return discord.SystemChannelFlags._from_value(parsed)
+
+
+def _parse_datetime(value: Any, where: str) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, datetime.datetime):
+        return value
+    try:
+        return datetime.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        raise ValueError(f"{where} must be an ISO8601 timestamp or null, got {value!r}")
+
+
+async def _build_guild_updates(guild: Any, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    unsupported = sorted(
+        key for key in arguments if key not in SUPPORTED_UPDATE_GUILD_FIELDS
+    )
+    if unsupported:
+        raise ValueError(
+            f"unsupported_fields: {', '.join(unsupported)}. Supported: "
+            f"{', '.join(sorted(SUPPORTED_UPDATE_GUILD_FIELDS))}"
+        )
 
     updates: Dict[str, Any] = {}
-    if "description" in arguments:
-        description = arguments["description"]
-        updates["description"] = None if description is None else str(description)
+    for field in _STRING_FIELDS:
+        if field in arguments:
+            value = arguments[field]
+            updates[field] = None if value is None else str(value)
+    for field in _BOOL_FIELDS:
+        if field in arguments and arguments[field] is not None:
+            updates[field] = bool(arguments[field])
+    for field in _CHANNEL_FIELDS:
+        if field in arguments:
+            updates[field] = _resolve_channel(guild, arguments[field], field)
+    for field in _DATETIME_FIELDS:
+        if field in arguments:
+            updates[field] = _parse_datetime(arguments[field], field)
+    for field in _IMAGE_FIELDS:
+        if field in arguments:
+            updates[field] = await load_image_bytes(arguments[field], field)
+
     if arguments.get("verification_level") is not None:
         updates["verification_level"] = discord.VerificationLevel(
             _coerce_enum(
@@ -173,21 +307,72 @@ async def handle_update_guild(
                 "explicit_content_filter",
             )
         )
+    if arguments.get("default_notifications") is not None:
+        updates["default_notifications"] = discord.NotificationLevel(
+            _coerce_enum(
+                _NOTIFICATION_LEVELS,
+                arguments["default_notifications"],
+                "default_notifications",
+            )
+        )
+    if arguments.get("mfa_level") is not None:
+        updates["mfa_level"] = discord.MFALevel(
+            _coerce_enum(_MFA_LEVELS, arguments["mfa_level"], "mfa_level")
+        )
+    if arguments.get("afk_timeout") is not None:
+        timeout = int(arguments["afk_timeout"])
+        if timeout not in _AFK_TIMEOUTS:
+            raise ValueError(
+                f"afk_timeout must be one of {', '.join(str(v) for v in _AFK_TIMEOUTS)}"
+            )
+        updates["afk_timeout"] = timeout
+    if "system_channel_flags" in arguments:
+        updates["system_channel_flags"] = _system_channel_flags(
+            arguments["system_channel_flags"]
+        )
+    if arguments.get("owner") is not None:
+        owner_id = try_int(arguments["owner"])
+        if owner_id is None:
+            raise ValueError(f"owner must be a user id, got {arguments['owner']!r}")
+        updates["owner"] = discord.Object(id=owner_id)
+    return updates
+
+
+async def handle_update_guild(
+    arguments: Dict[str, Any], deps: Dict[str, Any]
+) -> List[TextContent]:
+    gateway = deps["gateway"]
+    guild = await gateway.resolve_guild(arguments["server_id"])
+    updates = await _build_guild_updates(guild, arguments)
     if not updates:
         raise ValueError(
-            "nothing to update: pass description, verification_level or explicit_content_filter"
+            "nothing to update: pass at least one of "
+            + ", ".join(sorted(SUPPORTED_UPDATE_GUILD_FIELDS))
         )
 
     reason = arguments.get("reason")
-    await guild.edit(reason=reason, **updates)
+    try:
+        await guild.edit(reason=reason, **updates)
+    except discord.Forbidden as exc:
+        raise ValueError(
+            f"Cannot edit server '{guild.id}': {exc}. MANAGE_GUILD is required, and adding or "
+            "removing the COMMUNITY feature needs ADMINISTRATOR. Image fields (banner, splash, "
+            "discovery_splash, animated icon) also need the matching guild feature."
+        )
+    except discord.HTTPException as exc:
+        raise ValueError(f"Cannot edit server '{guild.id}': {exc}")
 
     payload = {
         "status": "applied",
         "server_id": str(guild.id),
+        "applied_fields": sorted(key for key in updates if key != "reason"),
         "name": guild.name,
         "description": guild.description,
+        "preferred_locale": str(getattr(guild, "preferred_locale", None)),
         "verification_level": str(guild.verification_level),
         "explicit_content_filter": str(guild.explicit_content_filter),
+        "default_notifications": str(getattr(guild, "default_notifications", None)),
+        "features": sorted(getattr(guild, "features", []) or []),
         "reason": reason,
     }
     return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]

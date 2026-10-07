@@ -145,6 +145,11 @@ Columns: **gate** = confirmation model, **verified** = evidence level.
   feature; they now explain what is missing.
 - `automod_apply_ruleset` did not wire `exempt_roles`/`exempt_channels`; keyword triggers now also
   accept `allow_list` / `regex_patterns`.
+- `update_guild` covered only 3 of the ~25 fields `Guild.edit` supports. It now maps the whole surface
+  (text/enums/booleans/channels/timeouts/flags/owner/images/timestamps), loads images from a URL, data
+  URI or path (`core/images.py`), rejects unknown fields and explains the 403 (MANAGE_GUILD, COMMUNITY
+  needs ADMINISTRATOR, image fields need their guild feature). Server-profile banner colour, traits,
+  games, private profile and the server tag have no public API and are rejected as unsupported.
 - `set_member_roles` (tool 114) added: replaces a member's whole role set in one gated call, ignoring
   @everyone, rejecting integration-managed roles when *assigning* and auto-preserving them when
   replacing (Discord answers 403 50013 if the request drops one - that is what made a self-edit fail).

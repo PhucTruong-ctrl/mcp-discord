@@ -215,6 +215,27 @@ Notes:
   `hadRoleBefore` / `hasRoleNow` / `changed` from a fresh API read (discord.py's `Member.edit`
   returns a new object and leaves the instance you called it on stale) and name MANAGE_ROLES plus
   the role-hierarchy comparison when Discord answers 403.
+## What `update_guild` can and cannot change
+
+`update_guild` maps the whole `discord.py Guild.edit` surface (PATCH /guilds/{id}):
+
+- text: `name`, `description`, `preferred_locale`, `vanity_code`
+- enums: `verification_level`, `explicit_content_filter`, `default_notifications`, `mfa_level`
+- booleans: `community`, `discoverable`, `invites_disabled`, `widget_enabled`,
+  `premium_progress_bar_enabled`, `raid_alerts_disabled`
+- channels (id or name): `afk_channel`, `system_channel`, `rules_channel`,
+  `public_updates_channel`, `safety_alerts_channel`, `widget_channel`; plus `afk_timeout`
+  (60/300/900/1800/3600), `system_channel_flags` (bitfield or flag names) and `owner`
+- images (http(s) URL, data URI or local path, `null` clears): `icon`, `banner`, `splash`,
+  `discovery_splash` — each needs its guild feature (`ANIMATED_ICON`, `BANNER`/`ANIMATED_BANNER`,
+  `INVITE_SPLASH`, `DISCOVERABLE`)
+- timestamps: `invites_disabled_until`, `dms_disabled_until`
+
+Unknown fields are rejected (`unsupported_fields: ...`). **Not settable through the API** (client-only
+Server Profile features, no documented fields or endpoints): the profile **banner colour**, **traits**,
+**games**, **private profile**, and the **server tag** (the tag lives on the *user* as `primary_guild`).
+The API `banner` field is an image, not the profile colour banner.
+
 ## Implementation-status note
 
 All 15 expansion utilities (tools 93–107) make live Discord API calls — see the
