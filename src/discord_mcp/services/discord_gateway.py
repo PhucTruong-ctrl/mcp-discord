@@ -249,23 +249,28 @@ class DiscordGateway:
         return role
 
     async def fetch_webhook(self, webhook_id: str, token: str):
-        """Fetch a webhook by ID and token.
+        """Fetch a webhook by ID and the webhook's own token.
 
         ``Client.fetch_webhook`` is authenticated with the bot token and takes no
-        webhook token, so it can only reach webhooks the bot owns. Executing or
-        editing a webhook by its own token has to go through
-        ``Webhook.from_url``, which accepts the token inside the URL.
+        webhook token, so it can only reach webhooks the bot owns. Reaching one
+        by its own token is a two-step in discord.py: ``Webhook.from_url`` is a
+        *synchronous* constructor that yields a partial webhook carrying the
+        id and token, and ``Webhook.fetch`` then performs the authenticated GET
+        using that token.
         """
         webhook_id_int = try_int(webhook_id)
         if webhook_id_int is None:
             raise ValueError(f"Invalid webhook ID: {webhook_id}")
 
-        client = self.client
-        url = f"{discord.http.Route.BASE}/webhooks/{webhook_id_int}/{token}"
+        # from_url matches discord[app].com/api/webhooks/<id>/<token> literally,
+        # so this URL must NOT carry the API version segment.
+        partial = discord.Webhook.from_url(
+            f"https://discord.com/api/webhooks/{webhook_id_int}/{token}",
+            client=self.client,
+            bot_token=self.client.http.token,
+        )
         try:
-            return await discord.Webhook.from_url(
-                url, client=client, bot_token=client.http.token
-            )
+            return await partial.fetch()
         except discord.NotFound:
             raise ValueError(f"Webhook '{webhook_id}' not found")
 

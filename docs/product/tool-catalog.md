@@ -2,8 +2,8 @@
 
 ## Scope snapshot
 
-- Planned total: **116 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 2 member admin + 1 emoji listing)
-- Current canonical registry in this branch: **116 tools**
+- Planned total: **212 canonical tools** (116 pre-existing + 96 added by the discord.py coverage-gap work)
+- Current canonical registry in this branch: **212 tools**
 - Runtime is Discord-native only (Discord API + bot token), no external runtime dependency
 
 ## Channel CRUD/admin tools
@@ -229,6 +229,156 @@ Notes:
      `emojis: [{id, name, animated, available, managed, requireColons, token, url, roleIds?}]` for every
      `guild.emojis`, plus `stickers` when requested, and `emojiCount`/`stickerCount` totals.
 
+## discord.py coverage-gap tools (96)
+
+Added by the coverage-gap work documented in `docs/product/coverage-gaps-implementation.md`. Every handler starts with `require_gateway(deps, "<tool>")` and responds through `json_text(...)` (`src/discord_mcp/core/common.py`). Creating/mutating tools are gated (`dry_run` defaults `true`); destructive ones require `reason`; snowflakes are strings; missing entities raise `ValueError`; byte inputs take URLs only (`http`/`https`).
+
+### invites_membership (8)
+
+| Tool | Required args | Optional args | Gate |
+|---|---|---|---|
+| `create_invite` | `server_id`, `channel_id` | `max_age`, `max_uses`, `temporary`, `unique`, `reason` | dry_run + confirm |
+| `list_invites` | `server_id` | — | — |
+| `delete_invite` | `server_id`, `invite_code` | `reason` | dry_run + confirm |
+| `list_bans` | `server_id` | — | — |
+| `get_ban` | `server_id`, `user_id` | — | — |
+| `search_members` | `server_id`, `query` | `limit` | — |
+| `get_role_member_counts` | `server_id`, `role_id` | — | — |
+| `estimate_pruned_members` | `server_id` | `days`, `include_roles` | dry_run + confirm |
+
+### thread_management (8)
+
+| Tool | Required args | Optional args | Gate |
+|---|---|---|---|
+| `create_thread` | `server_id`, `channel_id`, `name` | `message_id`, `auto_archive_duration`, `invitable`, `reason` | dry_run + confirm |
+| `join_thread` | `thread_id` | — | — |
+| `leave_thread` | `thread_id` | — | — |
+| `add_thread_member` | `thread_id`, `member_id` | `reason` | dry_run + confirm |
+| `remove_thread_member` | `thread_id`, `member_id` | `reason` | dry_run + confirm |
+| `edit_thread` | `thread_id` | `name`, `archived`, `locked`, `invitable`, `auto_archive_duration`, `reason` | dry_run + confirm |
+| `delete_thread` | `thread_id` | `reason` | dry_run + confirm |
+| `list_active_threads` | `server_id` | `channel_id` | — |
+
+### messages_advanced (11)
+
+| Tool | Required args | Optional args | Gate |
+|---|---|---|---|
+| `send_message_with_files` | `channel_id`, `content` | `files`, `reference_message_id`, `reason` | dry_run + confirm |
+| `send_components` | `channel_id`, `content`, `components` | `reference_message_id`, `reason` | dry_run + confirm |
+| `send_poll` | `channel_id`, `question`, `options` | `duration`, `allow_multiselect`, `reason` | dry_run + confirm |
+| `get_poll_results` | `channel_id`, `message_id` | — | — |
+| `forward_message` | `source_channel_id`, `dest_channel_id`, `message_id` | `reason` | dry_run + confirm |
+| `pin_message` | `channel_id`, `message_id` | `reason` | dry_run + confirm |
+| `unpin_message` | `channel_id`, `message_id` | `reason` | dry_run + confirm |
+| `clear_message_reactions` | `channel_id`, `message_id` | `emoji`, `reason` | dry_run + confirm |
+| `get_reaction_users` | `channel_id`, `message_id`, `emoji` | — | — |
+| `create_thread_from_message` | `message_id`, `name` | `auto_archive_duration`, `invitable`, `reason` | dry_run + confirm |
+| `send_typing` | `channel_id` | `duration` | — |
+
+### channel_advanced (6)
+
+| Tool | Required args | Optional args | Gate |
+|---|---|---|---|
+| `clone_channel` | `server_id`, `channel_id` | `name`, `category_id`, `reason` | dry_run + confirm |
+| `create_announcement_channel` | `server_id`, `name` | `category_id`, `topic`, `nsfw`, `slowmode_delay`, `reason` | dry_run + confirm |
+| `create_stage_channel` | `server_id`, `name` | `topic`, `privacy_level`, `reason` | dry_run + confirm |
+| `follow_channel` | `channel_id`, `target_channel_id` | `reason` | dry_run + confirm |
+| `sync_channel_permissions` | `source_channel_id`, `target_channel_id` | `reason` | dry_run + confirm |
+| `set_voice_channel_status` | `channel_id`, `status` | `reason` | dry_run + confirm |
+
+### members_roles_advanced (10)
+
+| Tool | Required args | Optional args | Gate |
+|---|---|---|---|
+| `change_member_voice_state` | `server_id`, `member_id` | `mute`, `deaf`, `self_mute`, `self_deaf`, `reason` | dry_run + confirm |
+| `move_member_voice` | `member_id`, `channel_id` | `reason` | dry_run + confirm |
+| `request_to_speak` | `channel_id` | `reason` | dry_run + confirm |
+| `get_member_voice_state` | `server_id`, `member_id` | — | — |
+| `edit_member_profile` | `server_id`, `member_id` | `nick`, `avatar_url`, `banner_url`, `reason` | dry_run + confirm |
+| `create_dm_channel` | `user_id` | `reason` | dry_run + confirm |
+| `update_bot_profile` | — | `username`, `avatar_url`, `reason` | dry_run + confirm |
+| `set_role_icon` | `role_id`, `icon_url` | `reason` | dry_run + confirm |
+| `reorder_roles` | `server_id`, `role_ids` | `reason` | dry_run + confirm |
+| `get_role_details` | `server_id`, `role_id` | — | — |
+
+### emoji_sticker_soundboard (16)
+
+| Tool | Required args | Optional args | Gate |
+|---|---|---|---|
+| `create_emoji` | `server_id`, `name`, `image_url` | `roles`, `reason` | dry_run + confirm |
+| `edit_emoji` | `emoji_id`, `name` | `roles`, `reason` | dry_run + confirm |
+| `delete_emoji` | `emoji_id` | `reason` | dry_run + confirm |
+| `create_application_emoji` | `name`, `image_url` | `reason` | dry_run + confirm |
+| `edit_application_emoji` | `emoji_id`, `name` | `reason` | dry_run + confirm |
+| `delete_application_emoji` | `emoji_id` | `reason` | dry_run + confirm |
+| `list_application_emojis` | — | — | — |
+| `create_sticker` | `server_id`, `name`, `file_url` | `description`, `tags`, `reason` | dry_run + confirm |
+| `edit_sticker` | `sticker_id`, `name` | `description`, `tags`, `reason` | dry_run + confirm |
+| `delete_sticker` | `sticker_id` | `reason` | dry_run + confirm |
+| `list_stickers` | `server_id` | — | — |
+| `create_soundboard_sound` | `server_id`, `sound_url` | `name`, `emoji`, `volume`, `reason` | dry_run + confirm |
+| `list_soundboard_sounds` | `server_id` | — | — |
+| `edit_soundboard_sound` | `sound_id`, `name` | `emoji`, `volume`, `reason` | dry_run + confirm |
+| `delete_soundboard_sound` | `sound_id` | `reason` | dry_run + confirm |
+| `send_soundboard_sound` | `channel_id`, `sound_id` | `reason` | dry_run + confirm |
+
+### webhook_mgmt (6)
+
+| Tool | Required args | Optional args | Gate |
+|---|---|---|---|
+| `get_webhook` | `webhook_id` | — | — |
+| `edit_webhook` | `webhook_id` | `name`, `avatar_url`, `channel_id`, `reason` | dry_run + confirm |
+| `delete_webhook` | `webhook_id` | `reason` | dry_run + confirm |
+| `get_webhook_message` | `webhook_id`, `message_id` | — | — |
+| `edit_webhook_message` | `webhook_id`, `message_id` | `content`, `embeds`, `components`, `reason` | dry_run + confirm |
+| `delete_webhook_message` | `webhook_id`, `message_id` | `reason` (validated, not transmitted) | dry_run + confirm |
+
+### scheduled_stage (13)
+
+| Tool | Required args | Optional args | Gate |
+|---|---|---|---|
+| `create_scheduled_event` | `server_id`, `name`, `start_time`, `end_time` | `channel_id`, `location`, `description`, `entity_type`, `privacy_level`, `reason` | dry_run + confirm |
+| `get_scheduled_event` | `event_id` | — | — |
+| `list_scheduled_events` | `server_id` | `include_expired` | — |
+| `edit_scheduled_event` | `event_id` | `name`, `start_time`, `end_time`, `location`, `description`, `entity_type`, `privacy_level`, `reason` | dry_run + confirm |
+| `delete_scheduled_event` | `event_id` | `reason` | dry_run + confirm |
+| `start_scheduled_event` | `event_id` | `reason` | dry_run + confirm |
+| `end_scheduled_event` | `event_id` | `reason` | dry_run + confirm |
+| `cancel_scheduled_event` | `event_id` | `reason` | dry_run + confirm |
+| `list_scheduled_event_users` | `event_id` | — | — |
+| `create_stage_instance` | `channel_id`, `topic` | `privacy_level`, `reason` | dry_run + confirm |
+| `get_stage_instance` | `channel_id` | — | — |
+| `edit_stage_instance` | `channel_id` | `topic`, `privacy_level`, `reason` | dry_run + confirm |
+| `delete_stage_instance` | `channel_id` | `reason` | dry_run + confirm |
+
+### monetization_appcmds (9)
+
+| Tool | Required args | Optional args | Gate |
+|---|---|---|---|
+| `list_skus` | `application_id` | — | — |
+| `list_entitlements` | `application_id` | `user_id`, `before`, `after`, `limit` | — |
+| `get_entitlement` | `entitlement_id` | — | — |
+| `create_entitlement` | `application_id`, `sku_id`, `user_id` | `reason` (validated, not transmitted) | dry_run + confirm |
+| `consume_entitlement` | `entitlement_id` | `reason` | dry_run + confirm |
+| `delete_entitlement` | `entitlement_id` | `reason` | dry_run + confirm |
+| `list_app_commands` | `application_id` | `guild_id`, `with_localizations` | — |
+| `get_app_command` | `application_id`, `command_id` | `guild_id` | — |
+| `sync_app_commands` | `application_id` | `commands`, `guild_id`, `reason` | dry_run + confirm |
+
+### templates_widget (9)
+
+| Tool | Required args | Optional args | Gate |
+|---|---|---|---|
+| `list_templates` | `server_id` | — | — |
+| `create_template` | `server_id`, `name` | `description`, `usage_count`, `reason` (validated, not transmitted) | dry_run + confirm |
+| `get_template` | `template_code` | — | — |
+| `sync_template` | `server_id`, `template_code` | `reason` | dry_run + confirm |
+| `edit_template` | `template_code` | `name`, `description`, `reason` | dry_run + confirm |
+| `delete_template` | `template_code` | `reason` | dry_run + confirm |
+| `get_guild_preview` | `server_id` | — | — |
+| `get_widget_settings` | `server_id` | — | — |
+| `edit_widget_settings` | `server_id` | `enabled`, `channel_id`, `reason` | dry_run + confirm |
+
 ## What `update_guild` can and cannot change
 
 `update_guild` maps the whole `discord.py Guild.edit` surface (PATCH /guilds/{id}):
@@ -327,11 +477,21 @@ serializer expose the same distinction as `mentionEveryone` / `mentions` / `role
 
 ## Feature audit
 
-`docs/analysis/DISCORDPY_COVERAGE_GAPS.md` lists the discord.py capabilities this MCP does not expose yet.
+`docs/analysis/DISCORDPY_COVERAGE_GAPS.md` now records implemented coverage-gap status; the per-tool field contracts live in `docs/product/coverage-gaps-implementation.md`.
 
-`docs/analysis/FEATURE_AUDIT.md` lists all 116 tools with their confirmation model and the verification
+`docs/analysis/FEATURE_AUDIT.md` lists all 212 tools with their confirmation model and the verification
 evidence gathered against a live server (live API run vs unit test), plus the defects that audit fixed.
 
-## 116-tool contract status
 
-The canonical registry target in this branch: **116 canonical tools** (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 2 member admin + 1 emoji listing). All tools are covered by registry-count, router-coverage, and runtime-contract tests. See `tests/test_tool_runtime_contracts.py` for the detailed contract assertions.
+## Coverage-gap field contracts
+
+- Every creating/mutating tool is gated: `dry_run` defaults `true`; first call returns a `confirmToken` (dry run); execute needs `dry_run: false` plus that token.
+- `reason` is mandatory for destructive actions and validated before the dry-run branch, so an invalid `reason` can never mint a token.
+- Snowflakes cross the MCP boundary as strings in both directions (`server_id`, `member_id`, `channel_id`, etc.).
+- A missing entity raises `ValueError` naming the id and server — no empty success payload, and no synthetic response when the gateway is down.
+- Byte-requiring endpoints (emoji/sticker/sound/avatar/banner/role icon/image) take a URL, reject any scheme other than `http`/`https`, and never shell out.
+- A handful of endpoints accept no audit-log reason (`templates`, `entitlements`, `webhook message delete`, `sticker/message reaction clear`). Those tools still require and validate `reason` for the gate; their schema notes it is not transmitted.
+
+## 212-tool contract status
+
+The canonical registry target in this branch: **212 canonical tools** (116 pre-existing + 96 coverage-gap). Every handler begins with `require_gateway(deps, "<tool>")` (`core/common.py`) and responds through `json_text(...)`. All creating/mutating tools use the `dry_run` (default `true`) + `confirm_token` gate; destructive actions require validated `reason`; snowflakes are strings; missing entities raise `ValueError`; byte inputs are URLs (`http`/`https`). See `tests/test_tool_runtime_contracts.py` and `tests/test_confirm_token_enforcement_matrix.py`.

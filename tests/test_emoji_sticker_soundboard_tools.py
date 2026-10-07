@@ -412,7 +412,7 @@ class EmojiStickerSoundboardHandlerTests(unittest.IsolatedAsyncioTestCase):
                     await handler(arguments, {})
 
     async def test_create_emoji_dry_run_returns_confirm_token(self):
-        with patch.object(tools, "_download_url", return_value=b"image-bytes"):
+        with patch("discord_mcp.core.common.download_url", return_value=b"image-bytes"):
             payload = await self._call(
                 handle_create_emoji,
                 {
@@ -428,7 +428,7 @@ class EmojiStickerSoundboardHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.guild.created_emoji)
 
     async def test_create_emoji_execute_without_token_raises(self):
-        with patch.object(tools, "_download_url", return_value=b"image-bytes"):
+        with patch("discord_mcp.core.common.download_url", return_value=b"image-bytes"):
             with self.assertRaisesRegex(ValueError, "confirm_token is required"):
                 await self._call(
                     handle_create_emoji,
@@ -442,7 +442,7 @@ class EmojiStickerSoundboardHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.guild.created_emoji)
 
     async def test_create_emoji_executes_with_token(self):
-        with patch.object(tools, "_download_url", return_value=b"image-bytes"):
+        with patch("discord_mcp.core.common.download_url", return_value=b"image-bytes"):
             payload = await self._execute(
                 handle_create_emoji,
                 {
@@ -614,7 +614,7 @@ class EmojiStickerSoundboardHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["emojis"][0]["name"], "app-wave")
 
     async def test_create_application_emoji_gate_round_trip(self):
-        with patch.object(tools, "_download_url", return_value=b"app-bytes"):
+        with patch("discord_mcp.core.common.download_url", return_value=b"app-bytes"):
             payload = await self._execute(
                 handle_create_application_emoji,
                 {"name": "app-wave", "image_url": "https://example.com/a.png"},
@@ -667,7 +667,7 @@ class EmojiStickerSoundboardHandlerTests(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_create_soundboard_sound_gate_round_trip(self):
-        with patch.object(tools, "_download_url", return_value=b"sound-bytes"):
+        with patch("discord_mcp.core.common.download_url", return_value=b"sound-bytes"):
             dry = await self._call(
                 handle_create_soundboard_sound,
                 {
@@ -681,7 +681,7 @@ class EmojiStickerSoundboardHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(dry["status"], "dry_run")
         self.assertTrue(dry["confirmToken"])
 
-        with patch.object(tools, "_download_url", return_value=b"sound-bytes"):
+        with patch("discord_mcp.core.common.download_url", return_value=b"sound-bytes"):
             payload = await self._execute(
                 handle_create_soundboard_sound,
                 {

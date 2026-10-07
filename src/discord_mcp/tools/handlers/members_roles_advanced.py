@@ -1,20 +1,15 @@
-import asyncio
 from typing import Any, Dict, List, Optional
-from urllib.error import URLError
-from urllib.parse import urlparse
-from urllib.request import urlopen
 
 import discord
 from discord.channel import VocalGuildChannel
 from mcp.types import TextContent
 
-from discord_mcp.core.common import json_text, member_row, require_gateway, user_row
+from discord_mcp.core.common import fetch_bytes, json_text, member_row, require_gateway, user_row
 from discord_mcp.core.permissions import permission_names
 from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 from discord_mcp.core.validation import require_reason, validate_snowflake
 from discord_mcp.tools.handlers.member_admin import _nickname_value
 
-_URL_SCHEMES = ("http", "https")
 
 
 def _is_dry_run(arguments: Dict[str, Any]) -> bool:
@@ -68,22 +63,6 @@ def _resolve_voice_channel(guild: Any, channel_id: Any) -> Any:
     return channel
 
 
-def _download_image(url: Any, field: str) -> bytes:
-    """Read an http(s) URL in-process; reject every other scheme outright."""
-    if not isinstance(url, str):
-        raise ValueError(f"{field} must be an http(s) URL string or null (got {url!r})")
-    scheme = urlparse(url).scheme.lower()
-    if scheme not in _URL_SCHEMES:
-        raise ValueError(f"{field}: only http/https URLs are supported, got '{url}'")
-    try:
-        with urlopen(url, timeout=30) as response:  # noqa: S310 - scheme checked above
-            return response.read()
-    except (URLError, OSError) as exc:
-        raise ValueError(f"{field}: failed to download '{url}': {exc}") from exc
-
-
-async def _image_bytes(url: Any, field: str) -> bytes:
-    return await asyncio.to_thread(_download_image, url, field)
 
 
 def _display_icon_url(value: Any) -> Optional[str]:
@@ -310,14 +289,14 @@ async def handle_edit_member_profile(
     if has_avatar:
         avatar_url = arguments.get("avatar_url")
         kwargs["avatar"] = (
-            await _image_bytes(avatar_url, "avatar_url")
+            await fetch_bytes(avatar_url, "avatar_url")
             if avatar_url is not None
             else None
         )
     if has_banner:
         banner_url = arguments.get("banner_url")
         kwargs["banner"] = (
-            await _image_bytes(banner_url, "banner_url")
+            await fetch_bytes(banner_url, "banner_url")
             if banner_url is not None
             else None
         )
@@ -414,14 +393,14 @@ async def handle_update_bot_profile(
     if has_avatar:
         avatar_url = arguments.get("avatar_url")
         kwargs["avatar"] = (
-            await _image_bytes(avatar_url, "avatar_url")
+            await fetch_bytes(avatar_url, "avatar_url")
             if avatar_url is not None
             else None
         )
     if has_banner:
         banner_url = arguments.get("banner_url")
         kwargs["banner"] = (
-            await _image_bytes(banner_url, "banner_url")
+            await fetch_bytes(banner_url, "banner_url")
             if banner_url is not None
             else None
         )
@@ -457,7 +436,7 @@ async def handle_set_role_icon(
         raise ValueError(f"Role '{role_id}' not found in server '{guild.name}'")
 
     icon_url = arguments.get("icon_url")
-    icon = await _image_bytes(icon_url, "icon_url") if icon_url is not None else None
+    icon = await fetch_bytes(icon_url, "icon_url") if icon_url is not None else None
     reason = _optional_reason(arguments)
 
     action = "set_role_icon"

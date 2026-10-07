@@ -1,12 +1,10 @@
 # Documentation Index
 
-## Product
-
 - [Tool catalog](product/tool-catalog.md)
 - [Rollout map](product/rollout/01-10-rollout.md)
+- [Coverage-gaps spec](product/coverage-gaps-implementation.md)
 - [Destructive actions policy](product/safety/destructive-actions-policy.md)
 - [OpenClaw ecosystem research](product/research/openclaw-ecosystem-research.md)
-
 ## Analysis
 
 - [Analysis index](analysis/ANALYSIS_INDEX.md)
@@ -15,7 +13,7 @@
 - [Phase 1 implementation](analysis/PHASE1_IMPLEMENTATION.md)
 - [Research index](analysis/RESEARCH_INDEX.md)
 - [Tool gap analysis](analysis/TOOL_GAP_ANALYSIS.md)
-
+- [Discord.py coverage gaps](analysis/DISCORDPY_COVERAGE_GAPS.md)
 ## Meta
 
 - [Plan notes](meta/plans/2026-03-16-single-guild-lock-design.md)

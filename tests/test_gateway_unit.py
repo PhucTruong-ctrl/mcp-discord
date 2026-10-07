@@ -1,5 +1,6 @@
 """Unit tests for DiscordGateway using real discord.py types for isinstance checks."""
 
+import inspect
 import unittest
 
 import discord
@@ -151,6 +152,55 @@ class DiscordGatewayUnitTests(unittest.IsolatedAsyncioTestCase):
             "Configured default server '999' is not accessible",
         ):
             await gateway.resolve_guild("1")
+
+    async def test_fetch_webhook_builds_url_then_fetches_the_partial(self):
+        """Regression: reaching a webhook by its own token is a two-step.
+
+        Client.fetch_webhook is positional-only and takes no webhook token.
+        Webhook.from_url is a *synchronous* constructor whose regex is anchored
+        on discord[app].com/api/webhooks/<id>/<token> with no API version
+        segment, and it returns a partial; the authenticated GET is the
+        separate coroutine Webhook.fetch.
+        """
+        client = FakeClient()
+        client.http = type("Http", (), {"token": "bot-token"})()
+        gateway = DiscordGateway(lambda: client)
+
+        seen = {}
+
+        class Partial:
+            async def fetch(self):
+                seen["fetched"] = True
+                return "full-webhook"
+
+        def fake_from_url(cls, url, **kwargs):
+            seen["url"] = url
+            seen["kwargs"] = kwargs
+            return Partial()
+
+        original = discord.Webhook.from_url
+        discord.Webhook.from_url = classmethod(fake_from_url)
+        try:
+            result = await gateway.fetch_webhook("1234567890", "tok")
+        finally:
+            discord.Webhook.from_url = original
+
+        self.assertEqual(result, "full-webhook")
+        self.assertTrue(seen["fetched"])
+        self.assertEqual(seen["url"], "https://discord.com/api/webhooks/1234567890/tok")
+        self.assertNotIn("/v10", seen["url"])
+        self.assertEqual(seen["kwargs"]["bot_token"], "bot-token")
+
+    async def test_fetch_webhook_does_not_await_the_from_url_result(self):
+        """from_url is not a coroutine; awaiting it raises TypeError."""
+        self.assertFalse(inspect.iscoroutinefunction(discord.Webhook.from_url))
+        self.assertTrue(inspect.iscoroutinefunction(discord.Webhook.fetch))
+
+    async def test_fetch_webhook_rejects_non_numeric_id(self):
+        client = FakeClient()
+        gateway = DiscordGateway(lambda: client)
+        with self.assertRaisesRegex(ValueError, "Invalid webhook ID"):
+            await gateway.fetch_webhook("not-an-id", "tok")
 
 
 if __name__ == "__main__":

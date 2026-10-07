@@ -492,8 +492,8 @@ class WebhookMgmtHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.webhook.edit_calls, [])
 
         with patch(
-            "discord_mcp.tools.handlers.webhook_mgmt.urlopen",
-            return_value=_FakeUrlResponse(b"png-bytes"),
+            "discord_mcp.core.common.download_url",
+            return_value=b"png-bytes",
         ):
             payload = await self._call(
                 handle_edit_webhook,

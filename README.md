@@ -5,12 +5,8 @@ A Model Context Protocol (MCP) server that provides Discord integration capabili
 
 <a href="https://glama.ai/mcp/servers/wvwjgcnppa"><img width="380" height="200" src="https://glama.ai/mcp/servers/wvwjgcnppa/badge" alt="mcp-discord MCP server" /></a>
 
-## Tool Catalog & Rollout Documentation
-
-The comprehensive expansion roadmap is documented as a phased rollout:
-
-- **Target scope**: 114 canonical tools (24 baseline + 86 expansion + 2 permission introspection + 1 mass-mention audit + 2 member admin)
-- **Current branch registry snapshot**: 114 canonical tools
+- **Target scope**: 212 canonical tools (116 pre-existing + 96 from the discord.py coverage-gap work documented in `docs/product/coverage-gaps-implementation.md`).
+- **Current branch registry snapshot**: 212 canonical tools.
 - **Rollout model**: 10 implementation waves (Waves 1-10), plus Wave 0 (channel admin), 15 post-wave expansion fillers and 3 post-wave permission/mass-mention tools, with Wave 11 explicitly deferred for stateful extensions
 
 For full details, use:
@@ -179,6 +175,8 @@ The following tool families have specific capability notes:
   - actions: `block_message` (+`custom_message`), `send_alert_message` (requires `channel_id`), `timeout` (`duration` or `duration_seconds`, max 2419200), `block_member_interaction`.
   - exemptions: `exempt_roles` / `exempt_role_ids` and `exempt_channels` / `exempt_channel_ids`, given as ids or names; on update only the supplied keys are sent.
 
+### Coverage-gap domains (96 new tools)
+- invites & membership · thread management · messages advanced · channel advanced · members & roles advanced · emoji/sticker/soundboard · webhook management · scheduled events & stage · templates & widget · monetization & app commands.
 ## Installation
 
 1. Set up your Discord bot:

@@ -787,7 +787,7 @@ class MembersRolesAdvancedHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_set_role_icon_downloads_url_bytes(self):
         with mock.patch(
-            "discord_mcp.tools.handlers.members_roles_advanced._download_image",
+            "discord_mcp.core.common.download_url",
             return_value=b"png-bytes",
         ) as downloader:
             payload = await self._execute(

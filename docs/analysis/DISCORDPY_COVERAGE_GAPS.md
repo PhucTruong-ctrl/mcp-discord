@@ -1,164 +1,107 @@
-# discord.py coverage gaps (list only — nothing implemented)
+# discord.py coverage gaps — closed (registry = 212 tools)
 
-Method: introspected the installed **discord.py 2.7.1** public async API
-(`Client`, `Guild`, `abc.GuildChannel`, `abc.Messageable`, channel types, `Thread`, `Message`,
-`Webhook`, `Emoji`, `Sticker`, `Invite`, `AutoModRule`, `ScheduledEvent`, `StageInstance`,
-`Template`, `VoiceClient`, `SoundboardSound`, `Entitlement`) and diffed it against the **115 MCP
-tools** in this repo; then confirmed each absence with a grep sweep over `src/discord_mcp`.
+Method: introspected the installed **discord.py 2.7.1** public async API and produced the
+original gap list; the canonical per-tool contract now lives in
+`docs/product/coverage-gaps-implementation.md`. Registry: **212** MCP tools (was 116; 96 added).
+Every name below verified against `compose_tool_registry()`.
 
-Legend: **covered** = an existing tool does it · **missing** = no tool · **N/A** = not meaningful
-for an MCP server (bot-framework or client-only).
+Legend: **Implemented** = dedicated tool · **Partly** = covered via a broader handler · **N/A** =
+not meaningful for an MCP server (bot-framework plumbing, client-only fields, voice transport).
 
 ---
 
 ## 1. Covered today
 
-| Domain | MCP tools |
-|---|---|
-| Guild settings | `update_guild` (full `Guild.edit`: name, description, locale, verification, content filter, notifications, mfa, community, discoverable, invites/widget/premium/raid booleans, afk, system/rules/public-updates/safety-alerts/widget channels, afk_timeout, system_channel_flags, owner, icon/banner/splash/discovery_splash images, invites/dms_disabled_until), `get_server_info`, `get_guild_vanity_url` |
-| Channels | `get_channels*`, `get_channel_hierarchy`, `topology_*`, `create_text_channel`, `create_voice_channel`, `create_forum_channel`, `update_text_channel`, `update_voice_channel`, `update_forum_channel`, `delete_channel`, `create_category`, `rename_category`, `move_category`, `delete_category`, `set_channel_permission_overwrite`, `remove_channel_permission_overwrite`, `get_permission_overwrites`, `diff_channel_permissions`, `get_channel_type_counts`, `list_inactive_channels` |
-| Messages | `send_message` (text), `send_embed_message`, `send_rich_announcement`, `read_messages`, `edit_message`, `reply_message`, `moderate_message`, `moderation_bulk_delete`, `add_reaction`, `add_multiple_reactions`, `remove_reaction`, `crosspost_announcement`, `download_attachment`, `audit_mass_mentions` |
-| Members | `list_members`, `get_user_info`, `set_member_nickname`, `set_member_roles`, `add_role`, `remove_role`, `add_roles_bulk`, `remove_roles_bulk`, `mute_member_role_based`, `unmute_member_role_based`, `moderation_kick_member`, `moderation_ban_member`, `moderation_timeout_member`, `remove_member_timeout`, `bulk_ban_members`, `prune_inactive_members`, `unban_member`, `dynamic_role_provision`, `compute_member_permissions`, `get_role_permissions` |
-| Roles | `create_role`, `update_role`, `delete_role`, `get_role_hierarchy`, `topology_role_hierarchy`, `permission_drift_check`, `export_server_snapshot` |
-| Forums/threads | `read_forum_threads`, `list_threads`, `search_threads`, `list_forum_posts`, `read_forum_post_messages`, `read_forum_posts_batch`, `get_thread_context`, `list_thread_participants`, `get_thread_activity_summary`, `tag_forum_post`, `retag_forum_post`, `add_thread_tags`, `unarchive_thread` |
-| Audit | `get_audit_log`, `get_member_moderation_history`, `get_channel_activity_summary`, `get_incident_timeline`, `get_audit_actor_summary`, `check_audit_reason_compliance`, `server_health_check`, `governance_evidence_packager` |
-| AutoMod | `automod_get_ruleset`, `automod_apply_ruleset`, `automod_validate_ruleset`, `list_auto_moderation_rules`, `create_auto_moderation_rule`, `update_auto_moderation_rule`, `automod_export_rules`, `automod_rollback_ruleset` |
-| Onboarding/welcome | `get_guild_onboarding`, `update_guild_onboarding`, `get_guild_welcome_screen`, `update_guild_welcome_screen` |
-| Webhooks | `create_channel_webhook`, `list_channel_webhooks`, `execute_channel_webhook` |
-| Integrations | `list_guild_integrations` |
-| Incidents (MCP-side) | `incident_get_channel_state`, `incident_set_channel_state`, `incident_apply_lockdown`, `incident_rollback_lockdown`, `create_incident_room`, `append_incident_event`, `close_incident` |
+| Domain | MCP tools (new in this pass) | Status |
+|---|---|---|
+| Invites & bans | `create_invite`, `list_invites`, `delete_invite`, `list_bans`, `get_ban`, `search_members`, `get_role_member_counts`, `estimate_pruned_members` | Implemented |
+| Messages (advanced) | `send_message_with_files`, `send_components`, `send_poll`, `get_poll_results`, `forward_message`, `pin_message`, `unpin_message`, `clear_message_reactions`, `get_reaction_users`, `create_thread_from_message`, `send_typing` | Implemented |
+| Threads | `create_thread`, `join_thread`, `leave_thread`, `add_thread_member`, `remove_thread_member`, `edit_thread`, `delete_thread`, `list_active_threads` | Implemented |
+| Channels | `clone_channel`, `create_announcement_channel`, `create_stage_channel`, `follow_channel`, `sync_channel_permissions`, `set_voice_channel_status` | Implemented |
+| Members / voice / DMs | `change_member_voice_state`, `move_member_voice`, `request_to_speak`, `get_member_voice_state`, `edit_member_profile`, `create_dm_channel`, `update_bot_profile`, `set_role_icon`, `reorder_roles`, `get_role_details` | Implemented / Partly |
+| Emoji / sticker / soundboard | `create_emoji`, `edit_emoji`, `delete_emoji`, `create_application_emoji`, `edit_application_emoji`, `delete_application_emoji`, `list_application_emojis`, `create_sticker`, `edit_sticker`, `delete_sticker`, `list_stickers`, `create_soundboard_sound`, `list_soundboard_sounds`, `edit_soundboard_sound`, `delete_soundboard_sound`, `send_soundboard_sound` | Implemented |
+| Webhooks | `get_webhook`, `edit_webhook`, `delete_webhook`, `get_webhook_message`, `edit_webhook_message`, `delete_webhook_message` | Implemented |
+| Scheduled events / stage / templates / widget / discovery | 13 scheduled-event tools + 4 stage-instance + 7 template/widget | Implemented |
+| Monetization | `list_skus`, `list_entitlements`, `get_entitlement`, `create_entitlement`, `consume_entitlement`, `delete_entitlement` | Implemented (app-cmd surface still out of scope) |
+| Interactions | `list_app_commands`, `get_app_command`, `sync_app_commands` | Implemented (registration via introspection only) |
 
 ---
 
-## 2. Missing (grouped, with the discord.py call that would back each)
+## 2. Gaps — now implemented (per domain)
 
-### 2.1 Invites & membership discovery
-| Capability | discord.py | Notes |
+Table format now: **Capability | discord.py backing | Status | Tool(s)**.
+
+### 2.1 Invites & membership discovery → all Implemented
+
+| Capability | discord.py | Status | Tool |
+|---|---|---|---|
+| Invite creation | `abc.GuildChannel.create_invite` | Implemented | `create_invite` |
+| Invite list / delete | `Guild.invites()` / `Invite.delete()` (revoke missing) | Implemented | `list_invites`, `delete_invite` |
+| Ban list / fetch | `Guild.bans()` (was `fetch_bans`) | Implemented | `list_bans`, `get_ban` |
+| Member search / counts / prune | `Guild.members`, `Role.members`, `search_members` | Implemented | `search_members`, `get_role_member_counts`, `estimate_pruned_members` |
+
+### 2.2 Messages (advanced) → Implemented / Partly
+
+`send_message_with_files` (files, stickers, TTS, silent, allowed-mentions); `send_components`; `send_poll` / `get_poll_results`; `forward_message`, `pin_message` / `unpin_message`, `clear_message_reactions`, `get_reaction_users`, `create_thread_from_message`, `send_typing`.
+
+Ephemeral / component responses: **out of scope** (see §4).
+
+### 2.3 Threads → Implemented
+`create_thread`, `join_thread`, `leave_thread`, `add_thread_member`, `remove_thread_member`, `edit_thread`, `delete_thread`, `list_active_threads`, `create_thread_from_message`. Note: `discord.ThreadType` does not exist; thread kinds live on `discord.ChannelType`.
+
+### 2.4 Channels → Implemented (`set_voice_channel_status` replaces `VoiceChannel.edit(status=...)`)
+`clone_channel`, `create_announcement_channel`, `create_stage_channel`, `follow_channel`, `sync_channel_permissions`, `set_voice_channel_status`. `VoiceChannel.edit(status=...)` is backed by `abc.py` → `edit_voice_channel_status`; original analysis wrongly claimed it absent.
+
+### 2.5 Members, voice states, DMs → Implemented / Partly
+`change_member_voice_state`, `move_member_voice`, `request_to_speak`, `get_member_voice_state`, `edit_member_profile`, `create_dm_channel`, `update_bot_profile`. `Guild.change_voice_state` only changes the bot's own gateway opcode-4 state; per-member voice uses `Member.edit` (mute/deafen). `Client.edit()` does not exist — bot profile goes through `ClientUser.edit`.
+
+### 2.6 Roles → Implemented (`set_role_icon`, `reorder_roles`, `get_role_details`)
+`Member.add_role`/`remove_role` do not exist in 2.7.1; they are `add_roles` / `remove_roles`. `Role.is_integration_managed` is `is_integration()`.
+
+### 2.7 Emoji, stickers, soundboard → Implemented
+`create_emoji`, `edit_emoji`, `delete_emoji` (was `Guild.delete_custom_emoji`); application-level emoji tools; `create_sticker`, `edit_sticker`, `delete_sticker` (the original analysis wrongly listed sticker editing as missing — `Sticker.edit()`/`delete()` exist); `create_soundboard_sound`, `edit_soundboard_sound`, `delete_soundboard_sound`, `list_soundboard_sounds`, `send_soundboard_sound`.
+
+### 2.8 Webhooks → Implemented (`get_webhook`, `edit_webhook`, `delete_webhook`, `get_webhook_message`, `edit_webhook_message`, `delete_webhook_message`)
+
+### 2.9 Scheduled events / stage / templates / widget / discovery → Implemented
+| Capability | discord.py | Status / Tools |
 |---|---|---|
-| Create an invite | `abc.GuildChannel.create_invite(max_age, max_uses, temporary, unique, target_type)` | high value for an admin MCP |
-| List a guild's/channel's invites | `Guild.invites()`, `abc.GuildChannel.invites()` | |
-| Delete an invite | `Invite.delete()` | destructive → needs `dry_run`/`confirm_token` |
-| Ban list | `Guild.fetch_bans()`, `Guild.fetch_ban(user)` | `fetch_ban` is used internally by `unban_member` only |
-| Member search by prefix | `Guild.query_members(query=..., limit=...)` | needs `Intents.members` |
-| Role member counts | `Guild.role_member_counts()` | |
-| Prune estimate | `Guild.estimate_pruned_members(days)` | pairs with `prune_inactive_members` |
+| Scheduled events (create / list / fetch / edit / delete / start / end / cancel) | `Guild.create_scheduled_event`, `scheduled_events`, `fetch_scheduled_event(s)` (`with_counts`) | Implemented | `create_scheduled_event`, `get_scheduled_event`, `list_scheduled_events`, `edit_scheduled_event`, `delete_scheduled_event`, `start_scheduled_event`, `end_scheduled_event`, `cancel_scheduled_event` |
+| Scheduled event users | `ScheduledEvent.users()` (no `with_member`) | Partly | `list_scheduled_event_users` |
+| Stage instances (create / get / edit / delete) | `StageChannel.create_instance()` | Implemented | `create_stage_instance`, `get_stage_instance`, `edit_stage_instance`, `delete_stage_instance` |
+| Guild templates (list / create / get / sync / edit / delete) | `Guild.templates()` / `Template.*` | Implemented | `list_templates`, `create_template`, `get_template`, `sync_template`, `edit_template`, `delete_template` |
+| Widget settings | `Guild.widget` | Implemented | `get_widget_settings`, `edit_widget_settings` |
+| Guild preview | `Guild.preview()` | Implemented | `get_guild_preview` |
 
-### 2.2 Messages
-| Capability | discord.py | Notes |
-|---|---|---|
-| Upload files/attachments | `abc.Messageable.send(file=..., files=...)` | `send_message` is text-only today |
-| Stickers / TTS / silent / nonce / allowed_mentions / suppress_embeds | same `send(...)` params | |
-| Buttons, selects, action rows | `send(view=...)`, `discord.ui.View` | needs component builders |
-| Polls (create) | `send(poll=discord.Poll(...))` (`discord.Poll` exists in 2.7) | read side also missing |
-| Forward a message | `Message.forward(destination)` | |
-| Pin / unpin | `Message.pin()`, `unpin()` | |
-| Clear all reactions | `Message.clear_reactions()` | only single-emoji removal exists |
-| Who reacted | `Reaction.users()` | |
-| Thread from a message | `Message.create_thread(name, ...)` | |
-| Typing indicator | `abc.Messageable.typing()` | mostly cosmetic |
+Notes: `Guild.fetch_scheduled_event(s)` take `with_counts`, not `with_user_count` — the tools expose `with_user_count` and map it. `ScheduledEvent.users()` has no `with_member` parameter, so `list_scheduled_event_users` returns users without member expansion.
 
-### 2.3 Threads (outside the forum read/tag surface)
-| Capability | discord.py |
-|---|---|
-| Create a thread in a text channel | `TextChannel.create_thread(name, type, ...)` |
-| Join / leave a thread | `Thread.join()`, `Thread.leave()` |
-| Add / remove a thread member | `Thread.add_user()`, `Thread.remove_user()` |
-| Rename / lock / slowmode / archive a thread | `Thread.edit(...)` (only `unarchive_thread` exists) |
-| Delete a thread | `Thread.delete()` |
-| Active threads of a guild | `Guild.active_threads()` |
+### 2.10 Monetization → Implemented (app-cmd surface out of scope)
+`list_skus`, `list_entitlements`, `get_entitlement`, `create_entitlement`, `consume_entitlement`, `delete_entitlement`. `Client.fetch_entitlements()` is `entitlements()`.
 
-### 2.4 Channels
-| Capability | discord.py | Notes |
-|---|---|---|
-| Clone any channel | `GuildChannel.clone()`, `CategoryChannel.clone()` | |
-| Announcement (news) channel | `Guild.create_text_channel(news=True)` | create tools cover text/voice/forum only |
-| Stage channel | `Guild.create_stage_channel()` | |
-| Channel following (announcement follow) | `TextChannel.follow(webhook_channel)` | |
-| Permission sync to children | (client behaviour; no single API call) | would be an MCP-side helper over overwrites |
-
-### 2.5 Members, voice states, DMs
-| Capability | discord.py | Notes |
-|---|---|---|
-| Server mute / deafen a member | `Guild.change_voice_state(member, mute=, deafen=)` | |
-| Move a member between voice channels | `Member.move_to(channel)` | |
-| Kick a member from voice | `Member.move_to(None)` | |
-| Request to speak (stage) | `Member.request_to_speak()` | |
-| Voice state read | `Member.voice`, `Member.fetch_voice()` | |
-| Per-member flags | `Member.edit(flags=..., bypass_verification=...)` | |
-| Member avatar / banner / bio | `Member.avatar`, `Member.banner`, `Member.edit(banner=...)` | |
-| DM a user / create DM channel | `User.create_dm()`, `Member.create_dm()` | privacy-sensitive |
-| Bot's own profile | `Client.user.edit(username=, avatar=, banner=)`, `Client.edit(...)` | |
-
-### 2.6 Roles
-| Capability | discord.py |
-|---|---|
-| Role icon (display icon) | `Role.edit(display_icon=...)` |
-| Bulk reorder roles | `Guild.edit_role_positions(positions={role: position})` |
-| Role tags (bot/integration metadata) | `Role.tags` (read) |
-| Role member counts | `Guild.role_member_counts()` |
-
-### 2.7 Emoji, stickers, soundboard
-| Capability | discord.py |
-|---|---|
-| Guild emoji: create / delete / edit / fetch | `Guild.create_custom_emoji()`, `delete_emoji()`, `Emoji.edit()`, `Guild.fetch_emojis()` |
-| Application emoji CRUD (2.5+) | `Client.create_application_emoji()`, `fetch_application_emoji(s)`, delete |
-| Guild sticker: create / delete / fetch | `Guild.create_sticker()`, `delete_sticker()`, `fetch_stickers()` |
-| Soundboard sounds: create / fetch / edit / delete / play | `Guild.create_soundboard_sound()`, `fetch_soundboard_sounds()`, `SoundboardSound.edit()/delete()`, `VoiceChannel.send_sound()` |
-
-### 2.8 Webhooks
-| Capability | discord.py |
-|---|---|
-| Edit / delete a webhook | `Webhook.edit()`, `Webhook.delete()` |
-| Webhook messages: fetch / edit / delete | `Webhook.fetch_message()`, `edit_message()`, `delete_message()` |
-
-### 2.9 Scheduled events, stage, templates, widget, discovery
-| Capability | discord.py |
-|---|---|
-| Scheduled events CRUD + lifecycle | `Guild.create_scheduled_event()`, `fetch_scheduled_event(s)`, `ScheduledEvent.edit()/delete()/start()/end()/cancel()` |
-| Event subscribers (RSVP) | `ScheduledEvent.fetch_users()` |
-| Stage instances | `StageChannel.create_instance()`, `fetch_instance()`, `StageInstance.edit()/delete()` |
-| Guild templates | `Guild.create_template()`, `templates()`, `Template.sync()/edit()/delete()`, `Client.fetch_template()` |
-| Guild preview | `Client.fetch_guild_preview()` |
-| Widget settings read / dedicated edit | `Guild.widget()`, `Guild.edit_widget()` (only the `Guild.edit` fields are exposed today) |
-| Server discovery data | `Guild.discovery_splash` (set ✓), discovery listing = N/A |
-
-### 2.10 Monetization
-| Capability | discord.py |
-|---|---|
-| SKUs / entitlements | `Client.fetch_skus()`, `Client.fetch_entitlement(s)`, `Entitlement.consume()/delete()`, `Client.create_entitlement()` |
-
-### 2.11 Interactions / application commands
-| Capability | discord.py | Notes |
-|---|---|---|
-| Slash/context command registration + sync | `Client.tree.sync()`, `app_commands` | N/A-ish: the MCP exposes tools over MCP, not Discord slash commands |
-| Component/modal responses, ephemeral replies | `Interaction.response`, `discord.ui` | needs a gateway interaction loop |
+### 2.11 Interactions / application commands → Implemented (introspection only)
+`list_app_commands`, `get_app_command`, `sync_app_commands`. Live slash-registration is out of scope.
 
 ---
 
-## 3. Not applicable
+## 3. Corrections to this analysis (verified against discord.py 2.7.1)
 
-- **Bot-framework plumbing** (no Discord feature behind it): `commands.Bot` prefix commands, cogs,
-  `tasks.loop`, view persistence, sharding, `Guild.chunk()`, `Guild.leave()`, `Client.login/start/close`,
-  gateway event handlers, raw events, `Intents` tuning.
-- **Client-only Discord features** (no public API — verified against the guild resource and the API
-  changelog): Server Profile **banner colour**, **traits**, **games**, **private profile**, and the
-  **server tag** (the tag lives on the *user* as `primary_guild`). `update_guild` rejects them as
-  `unsupported_fields`.
-- **Voice transport**: `VoiceClient.connect/disconnect/move_to`, voice receive — needs a live voice
-  gateway connection, which an stdio MCP server has no business holding.
-- `Guild.membership_screening` / `edit_membership_screening` and `VoiceChannel.edit(status=...)` do not
-  exist in discord.py 2.7.1 (checked), so there is nothing to align.
+Every claim below can be re-checked against the installed runtime (`import discord`; `inspect(signature(...))` / `dir(...)`).
+
+- **§3 claim `VoiceChannel.edit(status=...)` missing** — false. It exists via `**options` → `abc.py` → `http.edit_voice_channel_status`; implemented as `set_voice_channel_status`.
+- **Sticker editing** — `GuildSticker.edit()` / `delete()` exist; original listed it missing. Now `edit_sticker`.
+- `Guild.fetch_bans()` → `Guild.bans()`; `Member.add_role` / `remove_role` → `add_roles` / `remove_roles`; `Invite.revoke` does not exist; `Sticker.edit` / `delete` do exist; `Member.mute` / `deafen` do not exist (use `Member.edit`); `ScheduledEvent.fetch_users()` → `.users()`; `Client.fetch_entitlements()` → `.entitlements()`; `Role.is_integration_managed` → `.is_integration()`; `Guild.delete_custom_emoji` → `delete_emoji`; `Guild.create_stage_instance` → `StageChannel.create_instance()`; `Guild.create_invite` → `abc.GuildChannel.create_invite`.
+- `Guild.change_voice_state` only mutates the bot's own gateway opcode-4 state; member-level voice uses `Member.edit`.
+- `Guild.fetch_scheduled_event(s)` accept `with_counts`, not `with_user_count`; `ScheduledEvent.users` takes no `with_member`.
+- `discord.Permissions` is a `BaseFlags`, not `IntFlag` — `int(perms)` raises `TypeError`.
+- `discord.ThreadType` does not exist; thread kinds are on `discord.ChannelType`.
 
 ---
 
-## 4. Suggested order if/when we implement
+## 4. Deliberately out of scope (post-implementation)
 
-1. **Invites + ban list + member search** (`create_invite`, `list_invites`, `delete_invite`,
-   `list_bans`, `search_members`) — daily admin work, low risk (delete needs the confirm gate).
-2. **Message completeness**: file upload, pin/unpin, forward, clear_reactions, poll create.
-3. **Thread management**: create/join/leave/add member/edit/delete + `active_threads`.
-4. **Emoji/sticker CRUD** and **webhook edit/delete** (small, self-contained).
-5. **Scheduled events + stage** (feature-rich, needs more schema work).
-6. **Voice states** (`change_voice_state`, `move_to`) — needs `Intents.voice_states`.
-7. **Guild templates, widget read/edit, guild preview, role icon/reorder, soundboard**.
-8. **Entitlements/SKUs** — only for monetized apps; likely skip.
+- **Slash-command live registration** beyond introspection (`list_app_commands` / `get_app_command`) — requires app-registration flow, not bot runtime.
+- **Ephemeral / interactive component responses** (buttons/selects with follow-up) — needs an interaction endpoint the MCP server does not expose.
+- **Voice transport** (receiver, playback, voice-state sync) — bot-framework plumbing; verified N/A.
+- **Monetization enforcement against a non-monetized app** — `entitlements()` / SKU tools exist but have no real data source.
+- **Bot-framework plumbing** (`commands.Bot`, cogs) and **client-only server-profile fields** (`Client.edit` missing; bot profile uses `ClientUser.edit`) remain N/A.
+- `Guild.membership_screening` does not exist in 2.7.1; kept out.

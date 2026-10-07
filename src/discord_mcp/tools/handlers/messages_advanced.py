@@ -6,24 +6,20 @@ MCP boundary as strings; entity misses raise ``ValueError`` naming the id and th
 
 from __future__ import annotations
 
-import asyncio
 import io
 import os
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.error import URLError
 from urllib.parse import urlparse
-from urllib.request import urlopen
 
 import discord
 from mcp.types import TextContent
 
-from discord_mcp.core.common import json_text, require_gateway, user_row
+from discord_mcp.core.common import fetch_bytes, json_text, require_gateway, user_row
 from discord_mcp.core.emoji import emoji_payload, emoji_token, parse_emoji, serialize_emoji
 from discord_mcp.core.resolve import try_int
 from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 
-_URL_SCHEMES = ("http", "https")
 _AUTO_ARCHIVE_DURATIONS = (60, 1440, 4320, 10080)
 _MAX_SLOWMODE_SECONDS = 21600
 
@@ -89,16 +85,6 @@ def _filename_from_url(url: str) -> str:
     return os.path.basename(urlparse(url).path) or "download"
 
 
-def _download_url(url: str) -> bytes:
-    """Read an http(s) URL in-process; reject every other scheme outright."""
-    scheme = urlparse(url).scheme.lower()
-    if scheme not in _URL_SCHEMES:
-        raise ValueError(f"file_urls: only http/https URLs are supported, got '{url}'")
-    try:
-        with urlopen(url, timeout=30) as response:  # noqa: S310 - scheme checked above
-            return response.read()
-    except (URLError, OSError) as exc:
-        raise ValueError(f"file_urls: failed to download '{url}': {exc}") from exc
 
 
 async def _load_files(file_paths: Any, file_urls: Any) -> List[discord.File]:
@@ -109,7 +95,7 @@ async def _load_files(file_paths: Any, file_urls: Any) -> List[discord.File]:
         except OSError as exc:
             raise ValueError(f"file_paths: cannot read '{path}': {exc}") from exc
     for url in _as_list(file_urls, "file_urls"):
-        data = await asyncio.to_thread(_download_url, str(url))
+        data = await fetch_bytes(str(url), "file_urls")
         files.append(discord.File(io.BytesIO(data), filename=_filename_from_url(str(url))))
     return files
 

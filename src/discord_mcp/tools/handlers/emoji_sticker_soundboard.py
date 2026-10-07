@@ -2,23 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
 import os
 from typing import Any, Dict, List, Optional
-from urllib.error import URLError
-from urllib.parse import urlparse
-from urllib.request import urlopen
 
 import discord
 from mcp.types import TextContent
 
-from discord_mcp.core.common import as_id, json_text, require_gateway
+from discord_mcp.core.common import as_id, fetch_bytes, json_text, require_gateway
 from discord_mcp.core.emoji import emoji_payload, parse_emoji
 from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 from discord_mcp.core.validation import require_reason, validate_snowflake
 from discord_mcp.tools.handlers.emoji import _emoji_row
-
-_URL_SCHEMES = ("http", "https")
 
 
 def _is_dry_run(arguments: Dict[str, Any]) -> bool:
@@ -30,23 +24,6 @@ def _client(deps: Dict[str, Any], tool: str) -> Any:
     if not client:
         raise ValueError(f"discord_client is required for {tool}")
     return client
-
-
-def _download_url(url: Any, field: str) -> bytes:
-    """Read an http(s) URL in-process; reject every other scheme outright."""
-    text = str(url).strip()
-    scheme = urlparse(text).scheme.lower()
-    if scheme not in _URL_SCHEMES:
-        raise ValueError(f"{field}: only http/https URLs are supported, got '{text}'")
-    try:
-        with urlopen(text, timeout=30) as response:  # noqa: S310 - scheme checked above
-            return response.read()
-    except (URLError, OSError) as exc:
-        raise ValueError(f"{field}: failed to download '{text}': {exc}") from exc
-
-
-async def _download(field: str, url: Any) -> bytes:
-    return await asyncio.to_thread(_download_url, str(url), field)
 
 
 def _name(
@@ -241,7 +218,7 @@ async def handle_create_emoji(
     name = _name(arguments, "create_emoji")
     roles = _resolve_roles(guild, arguments.get("role_ids"))
     reason = arguments.get("reason")
-    image = await _download("image_url", arguments["image_url"])
+    image = await fetch_bytes(arguments["image_url"], "image_url")
 
     action = "create_emoji"
     targets = {
@@ -335,7 +312,7 @@ async def handle_create_application_emoji(
     gateway = require_gateway(deps, "create_application_emoji")
     client = _client(deps, "create_application_emoji")
     name = _name(arguments, "create_application_emoji")
-    image = await _download("image_url", arguments["image_url"])
+    image = await fetch_bytes(arguments["image_url"], "image_url")
 
     action = "create_application_emoji"
     targets = {"name": name}
@@ -562,7 +539,7 @@ async def handle_create_soundboard_sound(
     volume = _volume(arguments)
     emoji_value = parse_emoji(guild, arguments.get("emoji"))
     reason = arguments.get("reason")
-    sound_bytes = await _download("sound_url", arguments["sound_url"])
+    sound_bytes = await fetch_bytes(arguments["sound_url"], "sound_url")
 
     action = "create_soundboard_sound"
     targets = {"server_id": str(guild.id), "name": name}

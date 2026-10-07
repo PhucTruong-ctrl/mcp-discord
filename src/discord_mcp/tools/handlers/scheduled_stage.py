@@ -1,16 +1,13 @@
 """Guild scheduled-event and stage-instance handlers."""
 
-import asyncio
 import datetime
 from typing import Any, Dict, List
-from urllib.error import URLError
 from urllib.parse import urlparse
-from urllib.request import urlopen
 
 import discord
 from mcp.types import TextContent
 
-from discord_mcp.core.common import as_id, json_text, require_gateway, user_row
+from discord_mcp.core.common import as_id, fetch_bytes, json_text, require_gateway, user_row
 from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 from discord_mcp.core.validation import (
     require_reason,
@@ -128,16 +125,8 @@ def _validate_image_url(value: Any) -> str:
     return url
 
 
-def _download_image(url: str) -> bytes:
-    try:
-        with urlopen(url, timeout=30) as response:  # noqa: S310 - scheme checked above
-            return response.read()
-    except (URLError, OSError) as exc:
-        raise ValueError(f"image_url: failed to download '{url}': {exc}") from exc
 
 
-async def _fetch_image(url: str) -> bytes:
-    return await asyncio.to_thread(_download_image, url)
 
 
 async def _fetch_event(guild: Any, event_id: Any, server: str, *, with_counts=False):
@@ -291,14 +280,16 @@ async def handle_create_scheduled_event(
         kwargs["channel"] = channel
     if end_time is not None:
         kwargs["end_time"] = end_time
-    if privacy_level is not None:
-        kwargs["privacy_level"] = privacy_level
+    # Discord requires privacy_level on the create payload. discord.py defaults
+    # it to MISSING (i.e. omits it), which the API rejects with an opaque
+    # 50035, so default it here to the only value 2.7.1 exposes.
+    kwargs["privacy_level"] = privacy_level or discord.PrivacyLevel.guild_only
     if description is not None:
         kwargs["description"] = description
     if location is not None:
         kwargs["location"] = location
     if image_url is not None:
-        kwargs["image"] = await _fetch_image(image_url)
+        kwargs["image"] = await fetch_bytes(image_url, "image_url")
     if reason is not None:
         kwargs["reason"] = reason
     event = await guild.create_scheduled_event(**kwargs)
@@ -382,7 +373,7 @@ async def handle_edit_scheduled_event(
     verify_confirm_token(action, targets, arguments.get("confirm_token"))
 
     if image_url is not None:
-        updates["image"] = await _fetch_image(image_url)
+        updates["image"] = await fetch_bytes(image_url, "image_url")
     if reason is not None:
         updates["reason"] = reason
     edited = await event.edit(**updates)

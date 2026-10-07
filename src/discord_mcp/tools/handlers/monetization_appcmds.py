@@ -38,6 +38,24 @@ def _client(deps: Dict[str, Any], tool: str) -> Any:
     return client
 
 
+
+def _tree(deps: Dict[str, Any], tool: str) -> Any:
+    """Return the application command tree, or explain why it is unavailable.
+
+    ``Client.tree`` only exists on ``discord.ext.commands.Bot``; a bare
+    ``discord.Client`` carries no command tree, so say so plainly rather than
+    letting an AttributeError escape from the call site.
+    """
+    client = _client(deps, tool)
+    tree = getattr(client, "tree", None)
+    if tree is None:
+        raise ValueError(
+            f"{tool} needs a bot with an application command tree "
+            "(discord.ext.commands.Bot); this client has none"
+        )
+    return tree
+
+
 def _enum_name(value: Any) -> str:
     return str(getattr(value, "name", value))
 
@@ -271,10 +289,10 @@ async def handle_list_app_commands(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     require_gateway(deps, "list_app_commands")
-    client = _client(deps, "list_app_commands")
+    tree = _tree(deps, "list_app_commands")
 
     guild, guild_id = _guild_scope(arguments.get("guild_id"))
-    commands = await client.tree.fetch_commands(guild=guild)
+    commands = await tree.fetch_commands(guild=guild)
     rows = [_command_row(command) for command in commands]
     return json_text({"guildId": guild_id, "count": len(rows), "commands": rows})
 
@@ -283,13 +301,13 @@ async def handle_get_app_command(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     require_gateway(deps, "get_app_command")
-    client = _client(deps, "get_app_command")
+    tree = _tree(deps, "get_app_command")
 
     raw = str(arguments["command_id"])
     command_id = validate_snowflake(raw)
     guild, _guild_id = _guild_scope(arguments.get("guild_id"))
     try:
-        command = await client.tree.fetch_command(command_id, guild=guild)
+        command = await tree.fetch_command(command_id, guild=guild)
     except discord.NotFound:
         raise ValueError(f"Application command '{raw}' not found") from None
     return json_text(_command_row(command))
@@ -299,7 +317,7 @@ async def handle_sync_app_commands(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     require_gateway(deps, "sync_app_commands")
-    client = _client(deps, "sync_app_commands")
+    tree = _tree(deps, "sync_app_commands")
 
     guild, guild_id = _guild_scope(arguments.get("guild_id"))
     action = "sync_app_commands"
@@ -312,7 +330,7 @@ async def handle_sync_app_commands(
         return json_text(build_dry_run_result(action, targets, {"guildId": guild_id}))
     verify_confirm_token(action, targets, arguments.get("confirm_token"))
 
-    commands = await client.tree.sync(guild=guild)
+    commands = await tree.sync(guild=guild)
     return json_text(
         {
             "status": "executed",

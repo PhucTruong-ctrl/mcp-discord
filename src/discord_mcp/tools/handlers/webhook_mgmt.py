@@ -7,16 +7,13 @@ binds on ``webhook_id`` alone.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Dict, List
-from urllib.error import URLError
 from urllib.parse import urlparse
-from urllib.request import urlopen
 
 import discord
 from mcp.types import TextContent
 
-from discord_mcp.core.common import as_id, json_text, require_gateway
+from discord_mcp.core.common import as_id, fetch_bytes, json_text, require_gateway
 from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 from discord_mcp.core.validation import require_reason, validate_snowflake
 
@@ -107,14 +104,6 @@ def _check_avatar_url(value: Any) -> str:
     return url
 
 
-def _download_avatar(url: str) -> bytes:
-    try:
-        with urlopen(url, timeout=30) as response:  # noqa: S310 - scheme checked above
-            return response.read()
-    except (URLError, OSError) as exc:
-        raise ValueError(f"avatar_url: failed to download '{url}': {exc}") from exc
-
-
 async def _fetch_webhook(gateway: Any, webhook_id: int, token: str) -> Any:
     # Reuses the gateway lookup: it translates discord.NotFound into a
     # ValueError naming the webhook id.
@@ -182,7 +171,7 @@ async def handle_edit_webhook(
     verify_confirm_token(action, targets, arguments.get("confirm_token"))
 
     if avatar_url is not None:
-        kwargs["avatar"] = await asyncio.to_thread(_download_avatar, avatar_url)
+        kwargs["avatar"] = await fetch_bytes(avatar_url, "avatar_url")
     if reason is not None:
         kwargs["reason"] = reason
     edited = await webhook.edit(**kwargs)

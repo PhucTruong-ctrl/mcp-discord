@@ -1,14 +1,19 @@
 """Shared handler helpers for the tool layer.
 
 Small, boring primitives every tool handler needs: a gateway guard, a JSON
-``TextContent`` wrapper, and common payload rows. Keep this module free of tool
-knowledge so any domain can import it without creating a dependency edge.
+``TextContent`` wrapper, URL downloads, and common payload rows. Keep this
+module free of tool knowledge so any domain can import it without creating a
+dependency edge.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, Dict, List, Optional
+from urllib.error import URLError
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from mcp.types import TextContent
 
@@ -16,10 +21,14 @@ __all__ = [
     "json_text",
     "require_gateway",
     "as_id",
+    "download_url",
+    "fetch_bytes",
     "member_row",
     "channel_row",
     "user_row",
 ]
+
+_USER_AGENT = "discord-mcp (mcp-discord; +https://github.com/hanweg/mcp-discord)"
 
 
 def json_text(payload: Dict[str, Any], *, indent: Optional[int] = None) -> List[TextContent]:
@@ -50,6 +59,30 @@ def as_id(value: Any) -> Optional[str]:
     if value is None or value == "":
         return None
     return str(value)
+
+
+def download_url(url: Any, field: str) -> bytes:
+    """Read an ``http``/``https`` URL in-process; reject every other scheme.
+
+    A User-Agent is sent because Discord's CDN answers 403 to the default
+    ``Python-urllib`` agent, which would otherwise make every image-taking
+    tool unusable against a real CDN URL.
+    """
+    text = str(url).strip()
+    if urlparse(text).scheme.lower() not in ("http", "https"):
+        raise ValueError(f"{field}: only http/https URLs are supported, got '{text}'")
+
+    request = Request(text, headers={"User-Agent": _USER_AGENT})
+    try:
+        with urlopen(request, timeout=30) as response:  # noqa: S310 - scheme checked above
+            return response.read()
+    except (URLError, OSError) as exc:
+        raise ValueError(f"{field}: failed to download '{text}': {exc}") from exc
+
+
+async def fetch_bytes(url: Any, field: str) -> bytes:
+    """Async wrapper around :func:`download_url` so the event loop is not blocked."""
+    return await asyncio.to_thread(download_url, url, field)
 
 
 def _isoformat(value: Any) -> Optional[str]:
