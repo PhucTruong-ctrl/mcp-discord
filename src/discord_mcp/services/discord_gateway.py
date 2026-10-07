@@ -249,14 +249,23 @@ class DiscordGateway:
         return role
 
     async def fetch_webhook(self, webhook_id: str, token: str):
-        """Fetch a webhook by ID and token."""
+        """Fetch a webhook by ID and token.
+
+        ``Client.fetch_webhook`` is authenticated with the bot token and takes no
+        webhook token, so it can only reach webhooks the bot owns. Executing or
+        editing a webhook by its own token has to go through
+        ``Webhook.from_url``, which accepts the token inside the URL.
+        """
         webhook_id_int = try_int(webhook_id)
         if webhook_id_int is None:
             raise ValueError(f"Invalid webhook ID: {webhook_id}")
 
+        client = self.client
+        url = f"{discord.http.Route.BASE}/webhooks/{webhook_id_int}/{token}"
         try:
-            webhook = await self.client.fetch_webhook(webhook_id_int, token=token)
-            return webhook
+            return await discord.Webhook.from_url(
+                url, client=client, bot_token=client.http.token
+            )
         except discord.NotFound:
             raise ValueError(f"Webhook '{webhook_id}' not found")
 

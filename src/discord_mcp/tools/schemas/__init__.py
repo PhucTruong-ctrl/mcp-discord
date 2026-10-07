@@ -23,6 +23,16 @@ from .roles import ROLE_TOOLS
 from .server_info import SERVER_INFO_TOOLS
 from .topology import TOPOLOGY_TOOLS
 from .audit_analytics import AUDIT_ANALYTICS_TOOLS
+from .channel_advanced import CHANNEL_ADVANCED_TOOLS
+from .invites_membership import INVITES_MEMBERSHIP_TOOLS
+from .messages_advanced import MESSAGES_ADVANCED_TOOLS
+from .thread_management import THREAD_MANAGEMENT_TOOLS
+from .emoji_sticker_soundboard import EMOJI_STICKER_SOUNDBOARD_TOOLS
+from .members_roles_advanced import MEMBERS_ROLES_ADVANCED_TOOLS
+from .monetization_appcmds import MONETIZATION_APPCMDS_TOOLS
+from .scheduled_stage import SCHEDULED_STAGE_TOOLS
+from .webhook_mgmt import WEBHOOK_MGMT_TOOLS
+from .templates_widget import TEMPLATES_WIDGET_TOOLS
 
 
 def compose_tool_registry() -> List[Tool]:
@@ -51,6 +61,16 @@ def compose_tool_registry() -> List[Tool]:
         *MASS_MENTION_TOOLS,
         *MEMBER_ADMIN_TOOLS,
         *EMOJI_TOOLS,
+        *INVITES_MEMBERSHIP_TOOLS,
+        *THREAD_MANAGEMENT_TOOLS,
+        *MESSAGES_ADVANCED_TOOLS,
+        *CHANNEL_ADVANCED_TOOLS,
+        *MEMBERS_ROLES_ADVANCED_TOOLS,
+        *EMOJI_STICKER_SOUNDBOARD_TOOLS,
+        *WEBHOOK_MGMT_TOOLS,
+        *SCHEDULED_STAGE_TOOLS,
+        *MONETIZATION_APPCMDS_TOOLS,
+        *TEMPLATES_WIDGET_TOOLS,
     ]
 
 

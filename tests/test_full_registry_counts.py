@@ -14,7 +14,7 @@ os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
 from discord_mcp.tools.schemas import compose_tool_registry
 
 
-# Composition breakdown of 116 canonical tools:
+# Composition breakdown of 212 canonical tools:
 #   24 baseline tools (SERVER_INFO[:3], ROLE, CHANNEL, MESSAGE,        ← +1 (reply_message)
 #                      FORUM, MISC, SERVER_INFO[3])                    ← +1 (update_guild)
 #    5 channel admin tools  (create_voice, create_forum, update_text, update_voice, update_forum)
@@ -33,15 +33,25 @@ from discord_mcp.tools.schemas import compose_tool_registry
 #    1 mass-mention audit (audit_mass_mentions)
 #    2 member admin (set_member_nickname, set_member_roles)
 #    1 emoji listing (list_guild_emojis)
+#    8 invites & membership discovery  ← discord.py coverage-gap domain
+#    8 thread management               ← discord.py coverage-gap domain
+#   11 messages advanced               ← discord.py coverage-gap domain
+#    6 channel advanced                ← discord.py coverage-gap domain
+#   10 members & roles advanced         ← discord.py coverage-gap domain
+#   16 emoji/sticker/soundboard         ← discord.py coverage-gap domain
+#    6 webhook management               ← discord.py coverage-gap domain
+#   13 scheduled events & stage         ← discord.py coverage-gap domain
+#    9 monetization & app commands      ← discord.py coverage-gap domain
+#    9 templates & widget               ← discord.py coverage-gap domain
 #  ---
-#  116 total
+#  212 total
 
 
 class TestFullRegistryCounts(unittest.TestCase):
-    def test_canonical_registry_has_116_unique_tools(self):
+    def test_canonical_registry_has_212_unique_tools(self):
         names = [tool.name for tool in compose_tool_registry()]
-        self.assertEqual(len(names), 116)
-        self.assertEqual(len(set(names)), 116)
+        self.assertEqual(len(names), 212)
+        self.assertEqual(len(set(names)), 212)
 
     def test_registry_order_is_deterministic(self):
         first = [tool.name for tool in compose_tool_registry()]
