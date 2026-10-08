@@ -355,7 +355,11 @@ class P3ForumTagRoundTrip(unittest.IsolatedAsyncioTestCase):
                     "server_id": "1",
                     "channel_id": "30",
                     "availableTags": [
-                        {"name": "help", "emoji": "Herta_Kurukuru", "moderated": False}
+                        # the id travels with the tag: an id-less rewrite would
+                        # orphan every post tagged with it, and the handler now
+                        # refuses that rather than silently recreating the tags
+                        {"id": "7", "name": "help", "emoji": "Herta_Kurukuru",
+                         "moderated": False}
                     ],
                     "defaultReactionEmoji": "Herta_Kurukuru",
                 },

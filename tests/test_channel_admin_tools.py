@@ -125,6 +125,9 @@ from discord_mcp.tools.handlers.inventory import (
 )
 
 
+from discord_mcp.core.serialize import _serialize_forum_tag
+from discord_mcp.tools.handlers.channels import _build_forum_tags, _guard_tag_ids
+
 class ChannelAdminToolRegistryTests(unittest.TestCase):
     def test_channel_admin_tools_are_present_in_schema_registry(self):
         names = [tool.name for tool in schemas.compose_tool_registry()]
@@ -404,6 +407,98 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
             return value
 
         return inner
+
+
+class ForumTagIdPreservationTests(unittest.TestCase):
+    """Regression: rewriting forum tags without ids orphaned every tagged post.
+
+    Discord keys applied tags by tag id, and ``ForumTag.to_dict`` only emits
+    ``id`` when the instance already carries one while ``ForumTag.__init__``
+    takes no ``id`` argument. A handler that builds tags without assigning the
+    id therefore asks Discord to recreate every tag, and each forum post that
+    had one loses it.
+    """
+
+    @staticmethod
+    def _guild():
+        return SimpleNamespace(emojis=[])
+
+    def test_existing_tag_id_is_sent_to_discord(self):
+        tags = _build_forum_tags(
+            self._guild(),
+            [{"id": "1443173616320512060", "name": "Nhật Ký", "emoji": "📜",
+              "emojiId": None, "emojiAnimated": False, "moderated": False}],
+            "available_tags",
+        )
+        self.assertEqual(tags[0].to_dict()["id"], 1443173616320512060)
+
+    def test_read_payload_round_trips_the_id(self):
+        """get_channels_structured emits id/emojiId; feeding it back must keep both."""
+        tag = SimpleNamespace(
+            id=1443173616320512060, name="Suy Ngẫm",
+            emoji=SimpleNamespace(name="☁️", id=None, animated=False),
+            moderated=False,
+        )
+        payload = _serialize_forum_tag(tag)
+        rebuilt = _build_forum_tags(self._guild(), [payload], "available_tags")
+        self.assertEqual(rebuilt[0].to_dict()["id"], 1443173616320512060)
+        self.assertEqual(rebuilt[0].name, "Suy Ngẫm")
+
+    def test_tag_id_is_never_used_as_the_emoji_id(self):
+        """Regression: the tag's own id leaked into parse_emoji as an emoji id.
+
+        parse_emoji falls back to ``id`` when ``emojiId`` is absent, so passing
+        the whole tag object produced ``<:💡:<tag id>`` and Discord answered
+        "Invalid emoji id or name".
+        """
+        tags = _build_forum_tags(
+            self._guild(),
+            [{"id": "1443173616320512060", "name": "Tips", "emoji": "💡"}],
+            "available_tags",
+        )
+        payload = tags[0].to_dict()
+        self.assertEqual(payload["emoji_id"], None)
+        self.assertEqual(payload["emoji_name"], "💡")
+        self.assertNotIn(str(1443173616320512060), str(payload["emoji_name"]))
+
+    def test_custom_emoji_id_is_still_honoured(self):
+        tags = _build_forum_tags(
+            self._guild(),
+            [{"id": "1443173616320512060", "name": "X", "emoji": "custom",
+              "emojiId": "999888777", "emojiAnimated": False}],
+            "available_tags",
+        )
+        self.assertIn("999888777", tags[0].to_dict()["emoji_name"])
+
+    def test_a_brand_new_tag_sends_no_id(self):
+        tags = _build_forum_tags(self._guild(), [{"name": "New", "emoji": "🎉"}], "available_tags")
+        self.assertNotIn("id", tags[0].to_dict())
+
+    def test_guard_blocks_a_rewrite_that_would_orphan_tags(self):
+        channel = SimpleNamespace(available_tags=[
+            SimpleNamespace(id=1, name="Nhật Ký"), SimpleNamespace(id=2, name="Tư duy"),
+        ])
+        incoming = _build_forum_tags(
+            self._guild(), [{"name": "Nhật Ký", "emoji": "📜"}], "available_tags"
+        )
+        with self.assertRaisesRegex(ValueError, "would drop existing tag"):
+            _guard_tag_ids(channel, incoming, "available_tags", allow_recreate=False)
+
+    def test_guard_allows_a_rename_that_keeps_every_id(self):
+        channel = SimpleNamespace(available_tags=[
+            SimpleNamespace(id=1, name="Nhật Ký"), SimpleNamespace(id=2, name="Tư duy"),
+        ])
+        incoming = _build_forum_tags(
+            self._guild(),
+            [{"id": "1", "name": "Nhật Ký 2"}, {"id": "2", "name": "Tư duy 2"}],
+            "available_tags",
+        )
+        _guard_tag_ids(channel, incoming, "available_tags", allow_recreate=False)
+
+    def test_guard_can_be_overridden_explicitly(self):
+        channel = SimpleNamespace(available_tags=[SimpleNamespace(id=1, name="Nhật Ký")])
+        incoming = _build_forum_tags(self._guild(), [{"name": "Tư duy"}], "available_tags")
+        _guard_tag_ids(channel, incoming, "available_tags", allow_recreate=True)
 
 
 if __name__ == "__main__":

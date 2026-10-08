@@ -5,6 +5,8 @@ from mcp.types import TextContent
 
 from discord_mcp.core.emoji import parse_emoji
 
+from discord_mcp.core.validation import validate_snowflake
+
 
 def _json_text(message: str) -> List[TextContent]:
     return [TextContent(type="text", text=message)]
@@ -100,8 +102,27 @@ async def handle_create_voice_channel(
     return _create_result("Created", channel, "voice")
 
 
+def _tag_emoji(guild: Any, entry: Dict[str, Any]) -> Optional[str]:
+    """Emoji token for one tag, from the emoji keys only.
+
+    The whole tag object must never be handed to :func:`parse_emoji`: that helper
+    falls back to ``id`` when ``emojiId`` is absent, so a tag's own snowflake
+    would be sent as an emoji id and Discord answers ``Invalid emoji id or name``.
+    """
+    if "emoji" not in entry:
+        return None
+    spec = {key: entry[key] for key in ("emoji", "emojiId", "emojiAnimated") if key in entry}
+    return parse_emoji(guild, spec)
+
+
 def _build_forum_tags(guild: Any, value: Any, where: str) -> List[Any]:
-    """Build discord.ForumTag objects: ForumChannel.edit calls tag.to_dict()."""
+    """Build discord.ForumTag objects: ForumChannel.edit calls tag.to_dict().
+
+    ``ForumTag.to_dict`` only emits ``id`` when the tag already has one, and
+    ``ForumTag.__init__`` takes no ``id``, so the id has to be assigned onto the
+    instance here. Omitting it makes Discord treat every tag as brand new, which
+    drops the tag from every forum post that had it applied.
+    """
     if value is None:
         return []
     if not isinstance(value, (list, tuple)):
@@ -118,14 +139,42 @@ def _build_forum_tags(guild: Any, value: Any, where: str) -> List[Any]:
             raise ValueError(
                 f"{where}[{index}].name is {len(name)} characters; Discord allows 20"
             )
-        tags.append(
-            discord.ForumTag(
-                name=name,
-                emoji=parse_emoji(guild, entry),
-                moderated=bool(entry.get("moderated", False)),
-            )
+        tag = discord.ForumTag(
+            name=name,
+            emoji=_tag_emoji(guild, entry),
+            moderated=bool(entry.get("moderated", False)),
         )
+        raw_id = entry.get("id")
+        if raw_id not in (None, ""):
+            tag.id = validate_snowflake(raw_id)
+        tags.append(tag)
     return tags
+
+
+def _guard_tag_ids(
+    channel: Any, incoming: List[Any], where: str, allow_recreate: bool
+) -> None:
+    """Refuse a tag rewrite that would silently orphan every tagged post.
+
+    Discord keys applied tags by tag id, so replacing a forum's tag list without
+    the existing ids detaches the tags from every post that used them. That is
+    unrecoverable from the API, so it needs an explicit opt-in.
+    """
+    if allow_recreate:
+        return
+    existing = getattr(channel, "available_tags", None) or []
+    if not existing:
+        return
+    kept = {tag.id for tag in incoming if getattr(tag, "id", 0)}
+    dropped = [tag.name for tag in existing if tag.id not in kept]
+    if dropped:
+        raise ValueError(
+            f"{where} would drop existing tag(s) {', '.join(repr(n) for n in dropped)}; "
+            "every forum post tagged with them loses that tag. Pass each tag's "
+            "'id' (get_channels_structured returns it), or set allow_recreate_tags=true "
+            "to accept the loss."
+        )
+
 
 
 def _forum_default_reaction(guild: Any, value: Any) -> Optional[str]:
@@ -292,6 +341,7 @@ async def handle_update_forum_channel(
             "available_tags",
             "availableTags",
             "category_id",
+            "allow_recreate_tags",
             "position",
         ],
     )
@@ -316,6 +366,14 @@ async def handle_update_forum_channel(
     updates.pop("available_tags", None)
     updates.pop("default_reaction_emoji", None)
     updates.update(_pop_forum_extras(guild, arguments))
+    if "available_tags" in updates:
+        _guard_tag_ids(
+            channel,
+            updates["available_tags"],
+            "available_tags",
+            bool(arguments.get("allow_recreate_tags", False)),
+        )
+
     if "category_id" in arguments:
         updates["category"] = _resolve_category(guild, arguments.get("category_id"))
 

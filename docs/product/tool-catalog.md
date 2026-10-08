@@ -21,11 +21,20 @@ Field contracts:
 - `create_voice_channel`: `server_id`, `name`, optional `category_id`, optional `bitrate`, optional `user_limit`, optional `rtc_region`, optional `video_quality_mode`
 - `update_voice_channel`: `server_id`, `channel_id`, optional `name`, optional `category_id`, optional `bitrate`, optional `user_limit`, optional `rtc_region`, optional `video_quality_mode`, optional `position`, optional `reason`
 - `create_forum_channel`: `server_id`, `name`, optional `category_id`, optional `topic`, optional `nsfw`, optional `slowmode_delay`, optional `default_auto_archive_duration`, optional `default_reaction_emoji`, optional `default_sort_order`, optional `available_tags`
-- `update_forum_channel`: `server_id`, `channel_id`, optional `name`, optional `category_id`, optional `topic`, optional `nsfw`, optional `slowmode_delay`, optional `default_auto_archive_duration`, optional `default_reaction_emoji`, optional `default_sort_order`, optional `available_tags`, optional `position`, optional `reason`
+- `update_forum_channel`: `server_id`, `channel_id`, optional `name`, optional `category_id`, optional `topic`, optional `nsfw`, optional `slowmode_delay`, optional `default_auto_archive_duration`, optional `default_reaction_emoji`, optional `default_sort_order`, optional `available_tags`, optional `allow_recreate_tags`, optional `position`, optional `reason`
 
 Notes:
 - `update_forum_channel` supports `default_sort_order` on the current discord.py 2.7.1+ runtime and passes it through to `ForumChannel.edit(...)`.
 - Update tools reject unknown fields with `unsupported_fields: ...`.
+- **`available_tags` replaces the whole tag list, and each tag needs its `id`.** Discord
+  keys applied tags by tag id, so a rewrite that drops an id makes Discord create a new tag
+  and every forum post that had the old one silently loses it — unrecoverable through the
+  API. `update_forum_channel` now refuses such a rewrite and names the tags it would drop.
+  Read the current tags with `get_channels_structured` (they carry `id`), edit the names,
+  and send them back. Set `allow_recreate_tags: true` to accept the loss deliberately.
+- Pass only the emoji keys (`emoji`, `emojiId`, `emojiAnimated`) to a tag's emoji. The
+  tag's own `id` must never be read as an emoji id — Discord answers
+  `Invalid emoji id or name`.
 
 ## Baseline 23 tools (legacy compatibility surface)
 

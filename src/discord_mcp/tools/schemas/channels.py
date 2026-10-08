@@ -215,8 +215,34 @@ CHANNEL_ADMIN_TOOLS = [
                 },
                 "available_tags": {
                     "type": "array",
-                    "items": {"type": "object"},
-                    "description": "Optional available forum tags",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "description": "Existing tag id. Required to keep a tag: Discord "
+                                "keys applied tags by id, so a rewrite without ids detaches the "
+                                "tag from every post that had it.",
+                            },
+                            "name": {"type": "string", "description": "Tag name (max 20 chars)"},
+                            "emoji": {"type": "string", "description": "Tag emoji"},
+                            "emojiId": {
+                                "type": ["string", "null"],
+                                "description": "Custom emoji id; leave null for a standard emoji",
+                            },
+                            "emojiAnimated": {"type": "boolean", "description": "Animated emoji"},
+                            "moderated": {"type": "boolean", "description": "Can only moderators apply"},
+                        },
+                        "required": ["name"],
+                    },
+                    "description": "Replaces the forum's tag list. Read the current tags with "
+                    "get_channels_structured and send them back with their ids to rename safely.",
+                },
+                "allow_recreate_tags": {
+                    "type": "boolean",
+                    "description": "Set true to allow replacing the tag list without ids. Every "
+                    "forum post tagged with a dropped tag loses it, and this is not recoverable "
+                    "through the API. Defaults to false.",
                 },
                 "position": {
                     "type": "number",
