@@ -160,6 +160,21 @@ class RoleGovernanceToolTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("deleted", deleted[0].text)
 
+    async def test_update_role_moves_role_position(self):
+        updated = await handle_update_role(
+            {"server_id": "1", "role_id": "2", "position": "4"}, self.deps
+        )
+        self.assertEqual(self.guild.get_role(2).position, 4)
+        self.assertIn("position=4", updated[0].text)
+
+    async def test_update_role_rejects_position_below_one(self):
+        for bad in (0, -3):
+            with self.assertRaisesRegex(ValueError, "position must be an integer"):
+                await handle_update_role(
+                    {"server_id": "1", "role_id": "2", "position": bad}, self.deps
+                )
+        self.assertEqual(self.guild.get_role(2).position, 0)
+
     async def test_bulk_add_and_remove_roles(self):
         dry_run = await handle_add_roles_bulk(
             {

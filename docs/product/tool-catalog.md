@@ -214,6 +214,8 @@ Notes:
   roles are rejected when assigning and preserved when replacing, because Discord refuses a request that drops
   them). `update_role` / `delete_role` accept `role_name` as an alternative to `role_id` (unique, case-insensitive),
   and a null `color` / `secondary_color` / `tertiary_color` clears that colour.
+  `update_role` also takes `position` (integer >= 1, 0 is @everyone) to move one role in the hierarchy —
+  Discord shifts the surrounding roles; `reorder_roles` sets every role's position in one dry-run call.
 - **Role colours and role assignment:** every role-emitting tool (`get_role_permissions`,
   `get_role_hierarchy`, `topology_role_hierarchy`, `topology_permission_matrix`,
   `export_server_snapshot`, `permission_drift_check`) now reports `color` (int), `colorHex`,

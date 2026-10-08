@@ -51,8 +51,9 @@ ROLE_GOVERNANCE_TOOLS = [
         name="update_role",
         description=(
             "Update role properties (name, permissions, color, secondary/tertiary gradient colour, "
-            "hoist, mentionable). Works on integration-managed roles too as long as the role sits "
-            "below the bot's highest role; only the hierarchy blocks it."
+            "hoist, mentionable, position). Works on integration-managed roles too as long as the role "
+            "sits below the bot's highest role; only the hierarchy blocks it. `position` is the new "
+            "1-based role position (other roles shift); use reorder_roles to set every role at once."
         ),
         inputSchema={
             "type": "object",
@@ -81,6 +82,10 @@ ROLE_GOVERNANCE_TOOLS = [
                     "description": "Gradient colour 3 (int/hex) or null to clear the gradient stop",
                 },
                 "hoist": {"type": "boolean"},
+                "position": {
+                    "type": "number",
+                    "description": "New 1-based role position (>=1); other roles shift",
+                },
                 "mentionable": {"type": "boolean"},
                 "reason": {"type": "string"},
             },

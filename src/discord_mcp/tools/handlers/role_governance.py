@@ -181,13 +181,21 @@ async def handle_update_role(
         updates["hoist"] = bool(arguments["hoist"])
     if "mentionable" in arguments and arguments["mentionable"] is not None:
         updates["mentionable"] = bool(arguments["mentionable"])
+    if "position" in arguments and arguments["position"] is not None:
+        position = try_int(arguments["position"])
+        if position is None or position < 1:
+            raise ValueError(
+                f"position must be an integer >= 1 (0 is @everyone), got "
+                f"{arguments['position']!r}"
+            )
+        updates["position"] = position
     if "reason" in arguments and arguments["reason"] is not None:
         updates["reason"] = str(arguments["reason"])
 
     if not updates:
         raise ValueError(
             "update_role needs at least one of: name, permissions, color, "
-            "secondary_color, tertiary_color, hoist, mentionable, reason"
+            "secondary_color, tertiary_color, hoist, mentionable, position, reason"
         )
     try:
         await role.edit(**updates)
@@ -201,7 +209,7 @@ async def handle_update_role(
             type="text",
             text=(
                 f"Role '{role.id}' updated: name={row['name']!r} color={row['colorHex']} "
-                f"gradient={row['gradient']} hoist={row['hoist']} "
+                f"gradient={row['gradient']} hoist={row['hoist']} position={row['position']} "
                 f"mentionable={row['mentionable']} permissions={row['permissions']}"
             ),
         )
