@@ -13,8 +13,9 @@ in 2.7.1, the verified replacement is listed instead.
 |---|---|
 | `Guild.fetch_bans()` | `Guild.bans(*, limit=1000, before, after)` — async iterator of `BanEntry` |
 | `Member.add_role` / `remove_role` | `Member.add_roles` / `remove_roles` (plural) |
-| `Member.mute()` / `deafen()` | **Do not exist.** Use `Member.edit(mute=, deafen=)` / `Guild.change_voice_state(...)` |
-| `Sticker.edit()` / `Sticker.delete()` | **Do not exist.** Use `Guild.create_sticker` / `Guild.delete_sticker` |
+| `Member.mute()` / `deafen()` | **Do not exist.** Use `Member.edit(mute=, deafen=)` |
+| `Sticker.edit()` / `Sticker.delete()` | **Do not exist on the base `Sticker`, but `GuildSticker` has both** — so the gap document omitted sticker editing entirely |
+| `Guild.change_voice_state(member, ...)` | **Only changes the bot's own voice state** (gateway opcode 4); use `Member.edit(voice_channel=, mute=, deafen=)` for a member |
 | `Invite.revoke()` | **Does not exist.** Use `Invite.delete()` |
 | `ScheduledEvent.fetch_users()` | `ScheduledEvent.users(*, limit, before, after, oldest_first)` |
 | `Client.fetch_entitlements()` | `Client.entitlements(...)` — async iterator |
@@ -151,9 +152,11 @@ Files: `schemas/thread_management.py` → `THREAD_MANAGEMENT_TOOLS`;
 
 Notes: resolve threads with `gateway.resolve_thread(thread_id, server_id)` which returns
 `(thread, guild)`. `create_thread` needs a **text** channel — reject a forum parent with a
-clear `ValueError` telling the caller to use the forum-post tools. `ThreadType` is
-`discord.ThreadType.public_thread` / `private_thread`; parse the `type` arg with
-`discord.utils.get` style lookup and raise a clear error on an unknown name.
+clear `ValueError` telling the caller to use the forum-post tools. `discord.ThreadType`
+does **not** exist in 2.7.1 — the thread types are members of `discord.ChannelType`
+(`public_thread` / `private_thread`); parse the `type` arg against those names and
+raise a clear error on an unknown value. Note `TextChannel.create_thread` defaults
+`type=None` to a **private** thread.
 
 ## Domain A3 — `messages_advanced`
 
@@ -211,7 +214,7 @@ Files: `schemas/members_roles_advanced.py` → `MEMBERS_ROLES_ADVANCED_TOOLS`;
 
 | Tool | Args | discord.py 2.7.1 | Gate |
 |---|---|---|---|
-| `change_member_voice_state` | `server_id`, `member_id`; opt `channel_id`, `mute`, `deafen`, `reason` | `Guild.change_voice_state(*, channel, self_mute=False, self_deaf=False)` | yes |
+| `change_member_voice_state` | `server_id`, `member_id`; opt `channel_id`, `mute`, `deafen`, `reason` | `member.edit(voice_channel=, mute=, deafen=, reason=)` | yes |
 | `move_member_voice` | `server_id`, `member_id`; opt `channel_id` (`None`/empty = disconnect), `reason` | `Member.move_to(channel_or_None, reason=...)` | yes |
 | `request_to_speak` | `server_id`, `member_id`, `reason` | `member.request_to_speak()` | yes |
 | `get_member_voice_state` | `server_id`, `member_id` | `Member.voice` / `await member.fetch_voice()` | no |
@@ -222,9 +225,11 @@ Files: `schemas/members_roles_advanced.py` → `MEMBERS_ROLES_ADVANCED_TOOLS`;
 | `reorder_roles` | `server_id`, `positions` (map roleId→int), `reason` | `guild.edit_role_positions(positions, reason=...)` | yes |
 | `get_role_details` | `server_id`; opt `role_id` | `Role.tags`, `Role.is_bot_managed()`, `Role.is_integration()`, `guild.role_member_counts()` | no |
 
-Notes: `change_voice_state` takes `self_mute`/`self_deaf` **keywords** and a positional-only
-`channel`; `move_to(None)` disconnects from voice — map an empty/absent `channel_id` to
-`None` and say so in the schema description. `edit_member_profile` needs `bytes`: load the
+Notes: `Guild.change_voice_state` only changes the **bot's own** voice state (gateway
+opcode 4) and takes no member, so member voice must go through
+`Member.edit(voice_channel=, mute=, deafen=)`; `move_to(None)` disconnects from voice —
+map an empty/absent `channel_id` to `None` and say so in the schema description.
+`edit_member_profile` needs `bytes`: load the
 URL the same way `send_message_with_files` does. `update_bot_profile` must use
 `deps["discord_client"].user`, not `Client.edit` (which does not exist in 2.7.1).
 
@@ -348,4 +353,37 @@ description and return `{"synced": n, "guildId": ...}`. Entitlement owner type p
 
 ## Total
 
-93 new tools across 10 domains, on top of the existing 116 → **209**.
+**96 new tools** across 10 domains, on top of the existing 116 → **212**.
+
+Two tools are not in the original gap list and were added after verification found
+them missing or wrongly dismissed: `edit_sticker` (the gap document omitted
+`GuildSticker.edit`, which does exist in 2.7.1) and `set_voice_channel_status`
+(the gap document claimed `VoiceChannel.edit(status=)` does not exist; it does).
+
+## Live verification
+
+`live_smoke.py` in the repo root drives the new tools against a real Discord server
+through the real handler layer. It resolves the guild from the standard
+`DEFAULT_GUILD_ID` environment variable, records every artifact it creates, deletes
+them all in a `finally` block, and then re-reads server state to prove nothing
+survived. Run it with the usual `DISCORD_TOKEN` / `DISCORD_MCP_CONFIRM_SECRET`
+environment in place.
+
+Three tools cannot be exercised on an arbitrary server and fail with Discord's own
+error rather than a defect:
+
+- `change_member_voice_state` needs a member already connected to voice (error 40032).
+- `create_sticker` needs a free sticker slot; Discord caps a guild at 5 (error 30039).
+- `create_soundboard_sound` needs Opus or MP3 audio; other containers are rejected.
+
+`list_app_commands` / `get_app_command` / `sync_app_commands` require a client that
+has an application command tree. `server.py` runs `discord.ext.commands.Bot`, which
+does; a bare `discord.Client` does not, and the tools say so rather than raising
+`AttributeError`.
+
+Two unit-test-level environment notes:
+
+- `create_stage_instance`, `get_stage_instance`, `edit_stage_instance` and
+  `delete_stage_instance` need a channel of type **stage**.
+- The monetization tools only do anything for a monetized application; a
+  non-monetized app simply returns an empty SKU list.
