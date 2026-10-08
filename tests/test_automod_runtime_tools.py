@@ -18,11 +18,18 @@ from discord_mcp.tools.handlers.expansion_fillers import (
     handle_create_auto_moderation_rule,
     handle_list_auto_moderation_rules,
     handle_update_auto_moderation_rule,
-)
+    handle_delete_auto_moderation_rule,
+ )
 
 
 def _payload(result):
     return json.loads(result[0].text)
+
+
+def _token(action, targets):
+    from discord_mcp.core.safety import generate_confirm_token
+
+    return generate_confirm_token(action, targets)
 
 
 def _mock_automod_rule(name="test-rule", rule_id="111", **overrides):
@@ -177,6 +184,16 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
                     "actions": [{"type": "block_message"}],
                     "enabled": True,
                 },
+                "reason": "audit-reason",
+                "dry_run": False,
+                "confirm_token": _token(
+                    "create_auto_moderation_rule",
+                    {
+                        "server_id": "123",
+                        "rule_name": "new-rule",
+                        "reason": "audit-reason",
+                    },
+                ),
             },
             deps,
         )
@@ -205,6 +222,16 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
                     "trigger_type": "keyword",
                     "actions": [{"type": "block_message"}],
                 },
+                "reason": "audit-reason",
+                "dry_run": False,
+                "confirm_token": _token(
+                    "create_auto_moderation_rule",
+                    {
+                        "server_id": "123",
+                        "rule_name": "created-rule",
+                        "reason": "audit-reason",
+                    },
+                ),
             },
             deps,
         )
@@ -236,6 +263,15 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
                     "enabled": True,
                 },
                 "reason": "audit-reason-123",
+                "dry_run": False,
+                "confirm_token": _token(
+                    "create_auto_moderation_rule",
+                    {
+                        "server_id": "123",
+                        "rule_name": "reasoned-rule",
+                        "reason": "audit-reason-123",
+                    },
+                ),
             },
             deps,
         )
@@ -262,13 +298,21 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
                 "server_id": "123",
                 "rule_id": "111",
                 "rule": {"name": "updated-name", "enabled": False},
+                "reason": "audit-reason",
+                "dry_run": False,
+                "confirm_token": _token(
+                    "update_auto_moderation_rule",
+                    {"server_id": "123", "rule_id": "111", "reason": "audit-reason"},
+                ),
             },
             deps,
         )
         payload = _payload(result)
 
         self.assertEqual(payload["status"], "applied")
-        rule_mock.edit.assert_awaited_once_with(name="updated-name", enabled=False)
+        rule_mock.edit.assert_awaited_once_with(
+            name="updated-name", enabled=False, reason="audit-reason"
+        )
 
     async def test_update_rule_raises_on_missing_rule(self):
         """update should raise if rule ID not found."""
@@ -306,6 +350,15 @@ class AutomodRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
                 "rule_id": "111",
                 "rule": {"name": "updated-name", "enabled": False},
                 "reason": "audit-reason-update",
+                "dry_run": False,
+                "confirm_token": _token(
+                    "update_auto_moderation_rule",
+                    {
+                        "server_id": "123",
+                        "rule_id": "111",
+                        "reason": "audit-reason-update",
+                    },
+                ),
             },
             deps,
         )

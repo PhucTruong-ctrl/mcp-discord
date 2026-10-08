@@ -109,9 +109,13 @@ class FakeGateway:
                 created_at=now - timedelta(hours=3),
             ),
         ]
+        self.guild = FakeGuild(self)
 
     async def fetch_guild(self, _server_id):
         return type("Guild", (), {"id": 1, "name": "Guild"})()
+
+    async def resolve_guild(self, _server_id):
+        return self.guild
 
     async def fetch_audit_entries(self, _server_id, limit=100, action_type=None):
         if action_type:
@@ -122,6 +126,29 @@ class FakeGateway:
                 or entry.action.name == str(action_type)
             ][:limit]
         return self.entries[:limit]
+
+
+class FakeGuild:
+    def __init__(self, gateway):
+        self.id = 1
+        self.gateway = gateway
+        self.audit_kwargs = None
+
+    def audit_logs(self, **kwargs):
+        self.audit_kwargs = kwargs
+
+        async def iterator():
+            limit = kwargs.get("limit", 100)
+            action = kwargs.get("action")
+            user = kwargs.get("user")
+            for entry in self.gateway.entries[:limit]:
+                if action is not None and entry.action.name != action.name:
+                    continue
+                if user is not None and entry._target_id != user.id:
+                    continue
+                yield entry
+
+        return iterator()
 
 
 class AuditAnalyticsToolTests(unittest.IsolatedAsyncioTestCase):
@@ -264,6 +291,64 @@ class AuditAnalyticsToolTests(unittest.IsolatedAsyncioTestCase):
         )
         evidence_payload = json.loads(evidence_result[0].text)
         self.assertIn("bundle", evidence_payload)
+
+class AuditPaginationTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.deps = {"gateway": FakeGateway()}
+
+    async def test_audit_log_forwards_pagination_kwargs(self):
+        result = await handle_get_audit_log(
+            {
+                "server_id": "1",
+                "before": "111",
+                "after": "222",
+                "oldest_first": True,
+                "action_type": "ban",
+            },
+            self.deps,
+        )
+        payload = json.loads(result[0].text)
+        self.assertEqual(payload["entryCount"], 1)
+
+        kwargs = self.deps["gateway"].guild.audit_kwargs
+        self.assertEqual(kwargs["before"].id, 111)
+        self.assertEqual(kwargs["after"].id, 222)
+        self.assertIs(kwargs["oldest_first"], True)
+        self.assertIs(kwargs["action"], discord.AuditLogAction.ban)
+
+    async def test_audit_log_omits_pagination_kwargs_when_absent(self):
+        await handle_get_audit_log({"server_id": "1"}, self.deps)
+        kwargs = self.deps["gateway"].guild.audit_kwargs
+        self.assertNotIn("before", kwargs)
+        self.assertNotIn("after", kwargs)
+        self.assertNotIn("oldest_first", kwargs)
+
+    async def test_audit_log_rejects_non_numeric_pagination_ids(self):
+        with self.assertRaisesRegex(ValueError, "before must be a snowflake id"):
+            await handle_get_audit_log({"server_id": "1", "before": "many"}, self.deps)
+        with self.assertRaisesRegex(ValueError, "after must be a snowflake id"):
+            await handle_get_audit_log({"server_id": "1", "after": "many"}, self.deps)
+
+    async def test_member_history_filters_server_side_on_user(self):
+        await handle_get_member_moderation_history(
+            {"server_id": "1", "user_id": "10"}, self.deps
+        )
+        kwargs = self.deps["gateway"].guild.audit_kwargs
+        self.assertEqual(kwargs["user"].id, 10)
+        payload = json.loads(
+            (
+                await handle_get_member_moderation_history(
+                    {"server_id": "1", "user_id": "10"}, self.deps
+                )
+            )[0].text
+        )
+        self.assertEqual(payload["eventCount"], 1)
+
+    async def test_member_history_rejects_non_numeric_user_id(self):
+        with self.assertRaisesRegex(ValueError, "user_id must be a snowflake id"):
+            await handle_get_member_moderation_history(
+                {"server_id": "1", "user_id": "many"}, self.deps
+            )
 
 
 class AuditActionResolutionTests(unittest.IsolatedAsyncioTestCase):

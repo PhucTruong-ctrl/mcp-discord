@@ -468,9 +468,27 @@ class RoleByNameAndColourClearTests(unittest.IsolatedAsyncioTestCase):
 
         role.delete = delete
         guild = FakeGuild(roles=[role])
+        base = {"server_id": "1", "role_name": "temp", "reason": "cleanup"}
+        dry = (
+            await handle_delete_role(base, {"gateway": FakeGateway(guild)})
+        )[0].text
+        dry_payload = json.loads(dry)
+        self.assertEqual(dry_payload["status"], "dry_run")
+        self.assertTrue(dry_payload["confirmToken"])
+        self.assertEqual(deleted, [])
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_delete_role(
+                {**base, "dry_run": False}, {"gateway": FakeGateway(guild)}
+            )
+
         text = (
             await handle_delete_role(
-                {"server_id": "1", "role_name": "temp", "reason": "cleanup"},
+                {
+                    **base,
+                    "dry_run": False,
+                    "confirm_token": dry_payload["confirmToken"],
+                },
                 {"gateway": FakeGateway(guild)},
             )
         )[0].text
@@ -484,15 +502,30 @@ class RoleAssignmentTests(unittest.IsolatedAsyncioTestCase):
         member = FakeMember()
         guild = FakeGuild(roles=[role], member=member)
         gateway = FakeGateway(guild)
+        base = {
+            "server_id": "1",
+            "user_id": "42",
+            "role_id": "7",
+            "reason": "promotion",
+        }
+
+        dry = json.loads(
+            (await handle_add_role(base, {"gateway": gateway}))[0].text
+        )
+        self.assertEqual(dry["status"], "dry_run")
+        self.assertTrue(dry["confirmToken"])
+        self.assertEqual(member.calls, [])
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_add_role({**base, "dry_run": False}, {"gateway": gateway})
 
         payload = json.loads(
             (
                 await handle_add_role(
                     {
-                        "server_id": "1",
-                        "user_id": "42",
-                        "role_id": "7",
-                        "reason": "promotion",
+                        **base,
+                        "dry_run": False,
+                        "confirm_token": dry["confirmToken"],
                     },
                     {"gateway": gateway},
                 )
@@ -506,23 +539,45 @@ class RoleAssignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(payload["changed"])
         self.assertEqual(payload["roleName"], "Rank")
         self.assertEqual(member.calls, [("add", [7], "promotion")])
-        self.assertEqual(gateway.role_reads, 2)  # before + after, both fresh reads
+        self.assertEqual(gateway.role_reads, 4)  # dry-run + execute, before + after
 
     async def test_remove_role_reports_no_change_when_not_held(self):
         role = FakeRole(role_id=7)
         member = FakeMember()
         guild = FakeGuild(roles=[role], member=member)
+        base = {
+            "server_id": "1",
+            "user_id": "42",
+            "role_id": "7",
+            "reason": "demotion",
+        }
+
+        dry = json.loads(
+            (await handle_remove_role(base, {"gateway": FakeGateway(guild)}))[0].text
+        )
+        self.assertEqual(dry["status"], "dry_run")
+        self.assertTrue(dry["confirmToken"])
+        self.assertEqual(member.calls, [])
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_remove_role(
+                {**base, "dry_run": False}, {"gateway": FakeGateway(guild)}
+            )
 
         payload = json.loads(
             (
                 await handle_remove_role(
-                    {"server_id": "1", "user_id": "42", "role_id": "7"},
+                    {
+                        **base,
+                        "dry_run": False,
+                        "confirm_token": dry["confirmToken"],
+                    },
                     {"gateway": FakeGateway(guild)},
                 )
             )[0].text
         )
         self.assertFalse(payload["changed"])
-        self.assertEqual(member.calls, [("remove", [7], "Role removed via MCP")])
+        self.assertEqual(member.calls, [("remove", [7], "demotion")])
 
     async def test_uncached_role_is_fetched_instead_of_crashing(self):
         role = FakeRole(role_id=7)
@@ -533,10 +588,26 @@ class RoleAssignmentTests(unittest.IsolatedAsyncioTestCase):
             return None  # cache miss
 
         guild.get_role = get_role
+        dry = json.loads(
+            (
+                await handle_add_role(
+                    {"server_id": "1", "user_id": "42", "role_id": "7", "reason": "x"},
+                    {"gateway": FakeGateway(guild)},
+                )
+            )[0].text
+        )
+        self.assertEqual(dry["status"], "dry_run")
         payload = json.loads(
             (
                 await handle_add_role(
-                    {"server_id": "1", "user_id": "42", "role_id": "7"},
+                    {
+                        "server_id": "1",
+                        "user_id": "42",
+                        "role_id": "7",
+                        "reason": "x",
+                        "dry_run": False,
+                        "confirm_token": dry["confirmToken"],
+                    },
                     {"gateway": FakeGateway(guild)},
                 )
             )[0].text
@@ -547,7 +618,7 @@ class RoleAssignmentTests(unittest.IsolatedAsyncioTestCase):
         guild = FakeGuild(roles=[FakeRole(role_id=7)], member=FakeMember())
         with self.assertRaisesRegex(ValueError, "Role '404' not found in server '1'"):
             await handle_add_role(
-                {"server_id": "1", "user_id": "42", "role_id": "404"},
+                {"server_id": "1", "user_id": "42", "role_id": "404", "reason": "x"},
                 {"gateway": FakeGateway(guild)},
             )
 
@@ -555,7 +626,7 @@ class RoleAssignmentTests(unittest.IsolatedAsyncioTestCase):
         guild = FakeGuild(roles=[FakeRole()], member=None)
         with self.assertRaisesRegex(ValueError, "Member '42' not found"):
             await handle_add_role(
-                {"server_id": "1", "user_id": "42", "role_id": "7"},
+                {"server_id": "1", "user_id": "42", "role_id": "7", "reason": "x"},
                 {"gateway": FakeGateway(guild)},
             )
 
@@ -575,14 +646,27 @@ class RoleAssignmentTests(unittest.IsolatedAsyncioTestCase):
             member=ForbiddenMember(),
             me=type("Me", (), {"top_role": bot_top})(),
         )
+        dry = json.loads(
+            (
+                await handle_add_role(
+                    {"server_id": "1", "user_id": "42", "role_id": "7", "reason": "x"},
+                    {"gateway": FakeGateway(guild)},
+                )
+            )[0].text
+        )
         with self.assertRaisesRegex(ValueError, "MANAGE_ROLES") as ctx:
             await handle_add_role(
-                {"server_id": "1", "user_id": "42", "role_id": "7"},
+                {
+                    "server_id": "1",
+                    "user_id": "42",
+                    "role_id": "7",
+                    "reason": "x",
+                    "dry_run": False,
+                    "confirm_token": dry["confirmToken"],
+                },
                 {"gateway": FakeGateway(guild)},
             )
         self.assertIn("must sit above the target role", str(ctx.exception))
+
         self.assertIn("position 10 vs role position 90", str(ctx.exception))
 
-
-if __name__ == "__main__":
-    unittest.main()

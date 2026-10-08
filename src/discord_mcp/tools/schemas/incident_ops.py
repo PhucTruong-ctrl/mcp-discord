@@ -30,8 +30,14 @@ INCIDENT_OPS_TOOLS = [
                     "type": "object",
                     "description": "State model containing permission and slowdown controls",
                 },
+                "reason": {
+                    "type": "string",
+                    "description": "Audit reason for the state overwrite",
+                },
+                "dry_run": {"type": "boolean"},
+                "confirm_token": {"type": "string"},
             },
-            "required": ["channel_id", "state"],
+            "required": ["channel_id", "state", "reason"],
         },
     ),
     Tool(

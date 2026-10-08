@@ -46,6 +46,10 @@ SERVER_INFO_TOOLS = [
                     "minimum": 1,
                     "maximum": 1000,
                 },
+                "after": {
+                    "type": "string",
+                    "description": "Only return members who joined after this snowflake id",
+                },
             },
             "required": ["server_id"],
         },

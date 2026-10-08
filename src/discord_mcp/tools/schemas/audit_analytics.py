@@ -20,6 +20,18 @@ AUDIT_ANALYTICS_TOOLS = [
                         "(ROLE_UPDATE, roleUpdate) or numeric value (31). Omit for all actions."
                     ),
                 },
+                "before": {
+                    "type": "string",
+                    "description": "Only return entries created before this snowflake id",
+                },
+                "after": {
+                    "type": "string",
+                    "description": "Only return entries created after this snowflake id",
+                },
+                "oldest_first": {
+                    "type": "boolean",
+                    "description": "Return oldest entries first (default false)",
+                },
             },
             "required": ["server_id"],
         },
@@ -33,6 +45,14 @@ AUDIT_ANALYTICS_TOOLS = [
                 "server_id": {"type": "string"},
                 "user_id": {"type": "string"},
                 "limit": {"type": "number", "minimum": 1, "maximum": 1000},
+                "before": {
+                    "type": "string",
+                    "description": "Only return entries created before this snowflake id",
+                },
+                "after": {
+                    "type": "string",
+                    "description": "Only return entries created after this snowflake id",
+                },
             },
             "required": ["server_id", "user_id"],
         },

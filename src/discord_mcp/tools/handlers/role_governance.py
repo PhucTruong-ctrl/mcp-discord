@@ -141,7 +141,38 @@ async def handle_delete_role(
     gateway = deps["gateway"]
     guild = await gateway.resolve_guild(arguments["server_id"])
     role = _resolve_role(guild, arguments.get("role_id"), arguments.get("role_name"))
-    await role.delete(reason=arguments.get("reason"))
+    reason = str(arguments.get("reason") or "").strip()
+    if not reason:
+        raise ValueError("reason is required")
+
+    targets = {
+        "server_id": str(guild.id),
+        "role_id": str(role.id),
+        "role_name": role.name,
+        "reason": reason,
+    }
+    if bool(arguments.get("dry_run", True)):
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    build_dry_run_result(
+                        "delete_role",
+                        targets,
+                        {
+                            "serverId": str(guild.id),
+                            "roleId": str(role.id),
+                            "roleName": role.name,
+                            "reason": reason,
+                        },
+                    ),
+                    ensure_ascii=False,
+                ),
+            )
+        ]
+    verify_confirm_token("delete_role", targets, arguments.get("confirm_token"))
+
+    await role.delete(reason=reason)
     return [TextContent(type="text", text=f"Role '{role.name}' ({role.id}) deleted.")]
 
 

@@ -71,7 +71,7 @@ THREAD_MANAGEMENT_TOOLS = [
     Tool(
         name="leave_thread",
         description=(
-            "Leave a thread the bot has joined. No confirmation gate; only affects "
+            "Leave a thread the bot has joined (dry-run by default). Only affects "
             "the bot's own membership."
         ),
         inputSchema={
@@ -79,6 +79,16 @@ THREAD_MANAGEMENT_TOOLS = [
             "properties": {
                 "server_id": {"type": "string", "description": "Server ID"},
                 "thread_id": {"type": "string", "description": "Thread ID"},
+                "reason": {"type": "string", "description": "Optional audit log reason"},
+                "dry_run": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Return dry-run result",
+                },
+                "confirm_token": {
+                    "type": "string",
+                    "description": "Confirm token from dry-run",
+                },
             },
             "required": ["server_id", "thread_id"],
         },

@@ -227,8 +227,26 @@ class ChannelOverwriteTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_remove_overwrite(self):
         channel, deps = self._deps()
+        base = {"channel_id": "555", "target_id": "111", "reason": "cleanup"}
+        dry = _payload(
+            await handle_remove_channel_permission_overwrite(base, deps)
+        )
+        self.assertEqual(dry["status"], "dry_run")
+        self.assertTrue(dry["confirmToken"])
+        self.assertEqual(channel.calls, [])
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_remove_channel_permission_overwrite(
+                {**base, "dry_run": False}, deps
+            )
+
         result = await handle_remove_channel_permission_overwrite(
-            {"channel_id": "555", "target_id": "111", "reason": "cleanup"}, deps
+            {
+                **base,
+                "dry_run": False,
+                "confirm_token": dry["confirmToken"],
+            },
+            deps,
         )
         self.assertEqual(channel.calls[0], (111, None, "cleanup"))
         self.assertEqual(_payload(result)["status"], "applied")

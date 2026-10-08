@@ -26,6 +26,12 @@ from discord_mcp.tools.schemas import compose_tool_registry
 def _payload(result):
     return json.loads(result[0].text)
 
+from discord_mcp.core.safety import generate_confirm_token
+
+
+def _token(action, targets):
+    return generate_confirm_token(action, targets)
+
 
 class IncidentOpsToolTests(unittest.IsolatedAsyncioTestCase):
     def test_registry_includes_incident_ops_tools(self):
@@ -54,6 +60,12 @@ class IncidentOpsToolTests(unittest.IsolatedAsyncioTestCase):
                     "add_reactions": False,
                     "slowmode_seconds": 10,
                 },
+                "reason": "test-roundtrip",
+                "dry_run": False,
+                "confirm_token": _token(
+                    "incident_set_channel_state",
+                    {"channel_id": "123", "reason": "test-roundtrip"},
+                ),
             },
             {},
         )

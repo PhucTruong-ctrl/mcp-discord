@@ -272,8 +272,8 @@ class PackageEntrypointTests(unittest.TestCase):
     def test_registry_and_alias_gate_snapshots(self):
         tools = compose_tool_registry()
         names = [tool.name for tool in tools]
-        self.assertEqual(len(names), 212)
-        self.assertEqual(len(set(names)), 212)
+        self.assertEqual(len(names), 213)
+        self.assertEqual(len(set(names)), 213)
 
         for name in [
             "create_voice_channel",

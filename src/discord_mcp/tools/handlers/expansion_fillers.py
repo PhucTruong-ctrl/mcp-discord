@@ -120,20 +120,42 @@ async def handle_prune_inactive_members(
     server_id = str(arguments["server_id"])
     days = int(arguments["days"])
     reason = str(arguments.get("reason", "")).strip() or None
+    role_ids = arguments.get("role_ids")
+    if role_ids is not None and not isinstance(role_ids, list):
+        raise ValueError("role_ids must be an array of role ids")
+    compute_prune_count = (
+        bool(arguments["compute_prune_count"])
+        if arguments.get("compute_prune_count") is not None
+        else True
+    )
     action = "prune_inactive_members"
-    targets = {"server_id": server_id, "days": days}
+    targets = {
+        "server_id": server_id,
+        "days": days,
+        "role_ids": [str(role_id) for role_id in role_ids] if role_ids else [],
+        "compute_prune_count": compute_prune_count,
+    }
 
     if bool(arguments.get("dry_run", True)):
         return _json(
             build_dry_run_result(
-                action, targets, {"reason": reason or "", "days": days}
+                action,
+                targets,
+                {
+                    "reason": reason or "",
+                    "days": days,
+                    "role_ids": targets["role_ids"],
+                    "compute_prune_count": compute_prune_count,
+                },
             )
         )
     verify_confirm_token(action, targets, arguments.get("confirm_token"))
     if not gateway:
         raise ValueError("gateway is required to prune members")
 
-    pruned = await gateway.prune_inactive_members(server_id, days, reason)
+    pruned = await gateway.prune_inactive_members(
+        server_id, days, reason, role_ids, compute_prune_count
+    )
     return _json(
         {
             "status": "executed",
@@ -153,7 +175,26 @@ async def handle_remove_member_timeout(
         raise ValueError("gateway is required to remove a timeout")
     server_id = str(arguments["server_id"])
     member_id = str(arguments["member_id"])
-    reason = str(arguments.get("reason", "")).strip() or None
+    reason = str(arguments.get("reason") or "").strip()
+    if not reason:
+        raise ValueError("reason is required")
+
+    targets = {
+        "server_id": server_id,
+        "member_id": member_id,
+        "reason": reason,
+    }
+    if bool(arguments.get("dry_run", True)):
+        return _json(
+            build_dry_run_result(
+                "remove_member_timeout",
+                targets,
+                {"memberId": member_id, "reason": reason},
+            )
+        )
+    verify_confirm_token(
+        "remove_member_timeout", targets, arguments.get("confirm_token")
+    )
 
     member = await _resolve_member(gateway, server_id, member_id)
     await gateway.timeout_member(server_id, member_id, 0, reason)
@@ -177,7 +218,22 @@ async def handle_unban_member(
         raise ValueError("gateway is required to unban a member")
     server_id = str(arguments["server_id"])
     member_id = str(arguments["member_id"])
-    reason = str(arguments.get("reason", "")).strip() or None
+    reason = str(arguments.get("reason") or "").strip()
+    if not reason:
+        raise ValueError("reason is required")
+
+    targets = {
+        "server_id": server_id,
+        "member_id": member_id,
+        "reason": reason,
+    }
+    if bool(arguments.get("dry_run", True)):
+        return _json(
+            build_dry_run_result(
+                "unban_member", targets, {"memberId": member_id, "reason": reason}
+            )
+        )
+    verify_confirm_token("unban_member", targets, arguments.get("confirm_token"))
 
     guild = await gateway.resolve_guild(server_id)
     try:
@@ -415,6 +471,21 @@ async def handle_close_incident(
     summary = str(arguments["summary"])
     reason = str(arguments["reason"]).strip()
 
+    targets = {
+        "channel_id": channel_id,
+        "summary": summary,
+        "reason": reason,
+    }
+    if bool(arguments.get("dry_run", True)):
+        return _json(
+            build_dry_run_result(
+                "close_incident",
+                targets,
+                {"channelId": channel_id, "summary": summary, "reason": reason},
+            )
+        )
+    verify_confirm_token("close_incident", targets, arguments.get("confirm_token"))
+
     channel = await _resolve_channel(gateway, channel_id, expect="channel")
     state = get_channel_state(channel_id)
     previous_overwrite = _channel_everyone_overwrite(channel)
@@ -477,7 +548,26 @@ async def handle_create_auto_moderation_rule(
         raise ValueError("gateway is required to create an AutoMod rule")
     guild = await gateway.resolve_guild(arguments.get("server_id"))
     rule_data = arguments["rule"]
-    reason = str(arguments.get("reason", "")).strip() or None
+    reason = str(arguments.get("reason") or "").strip()
+    if not reason:
+        raise ValueError("reason is required")
+
+    targets = {
+        "server_id": str(arguments.get("server_id", "")),
+        "rule_name": rule_data["name"],
+        "reason": reason,
+    }
+    if bool(arguments.get("dry_run", True)):
+        return _json(
+            build_dry_run_result(
+                "create_auto_moderation_rule",
+                targets,
+                {"ruleName": rule_data["name"], "reason": reason},
+            )
+        )
+    verify_confirm_token(
+        "create_auto_moderation_rule", targets, arguments.get("confirm_token")
+    )
 
     trigger = _build_automod_trigger(rule_data)
     actions = _build_automod_actions(rule_data.get("actions", []))
@@ -517,7 +607,26 @@ async def handle_update_auto_moderation_rule(
     if target is None:
         raise ValueError(f"AutoMod rule '{arguments['rule_id']}' not found in guild")
 
-    reason = str(arguments.get("reason", "")).strip() or None
+    reason = str(arguments.get("reason") or "").strip()
+    if not reason:
+        raise ValueError("reason is required")
+
+    targets = {
+        "server_id": str(arguments.get("server_id", "")),
+        "rule_id": str(arguments["rule_id"]),
+        "reason": reason,
+    }
+    if bool(arguments.get("dry_run", True)):
+        return _json(
+            build_dry_run_result(
+                "update_auto_moderation_rule",
+                targets,
+                {"ruleId": str(arguments["rule_id"]), "reason": reason},
+            )
+        )
+    verify_confirm_token(
+        "update_auto_moderation_rule", targets, arguments.get("confirm_token")
+    )
     rule_data = arguments["rule"]
     kwargs: Dict[str, Any] = {}
     if "name" in rule_data:
@@ -559,5 +668,48 @@ async def handle_automod_export_rules(
             "status": "ok",
             "server_id": str(arguments.get("server_id", "")),
             "export": {"rules": rules},
+        }
+    )
+
+
+async def handle_delete_auto_moderation_rule(
+    arguments: Dict[str, Any], deps: Dict[str, Any]
+) -> List[TextContent]:
+    gateway = deps.get("gateway")
+    if not gateway:
+        raise ValueError("gateway is required to delete an AutoMod rule")
+    server_id = str(arguments.get("server_id", ""))
+    rule_id = str(arguments["rule_id"])
+    reason = str(arguments.get("reason") or "").strip()
+    if not reason:
+        raise ValueError("reason is required")
+
+    guild = await gateway.resolve_guild(server_id)
+    rules = await guild.fetch_automod_rules()
+    target = next((r for r in rules if str(r.id) == rule_id), None)
+    if target is None:
+        raise ValueError(f"AutoMod rule '{rule_id}' not found in guild")
+
+    targets = {"server_id": server_id, "rule_id": rule_id, "reason": reason}
+    if bool(arguments.get("dry_run", True)):
+        return _json(
+            build_dry_run_result(
+                "delete_auto_moderation_rule",
+                targets,
+                {"ruleId": rule_id, "ruleName": target.name, "reason": reason},
+            )
+        )
+    verify_confirm_token(
+        "delete_auto_moderation_rule", targets, arguments.get("confirm_token")
+    )
+
+    await target.delete(reason=reason)
+    return _json(
+        {
+            "status": "executed",
+            "action": "delete_auto_moderation_rule",
+            "serverId": server_id,
+            "ruleId": rule_id,
+            "ruleName": target.name,
         }
     )

@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 import discord
 from mcp.types import TextContent
 
+from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 
 async def _resolve_member(guild: Any, user_id: Any):
     try:
@@ -55,14 +56,47 @@ async def _set_role_membership(
     guild = await gateway.resolve_guild(arguments["server_id"])
     member = await _resolve_member(guild, arguments["user_id"])
     role = await _resolve_role(guild, arguments["role_id"])
-    reason = str(arguments.get("reason") or "").strip() or (
-        "Role added via MCP" if add else "Role removed via MCP"
-    )
+    reason = str(arguments.get("reason") or "").strip()
+    if not reason:
+        raise ValueError("reason is required")
 
     server_id = str(arguments["server_id"])
     held_before = role.id in await gateway.fetch_member_role_ids(
         server_id, str(member.id)
     )
+
+    targets = {
+        "server_id": server_id,
+        "user_id": str(member.id),
+        "role_id": str(role.id),
+        "reason": reason,
+    }
+    if bool(arguments.get("dry_run", True)):
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    build_dry_run_result(
+                        "add_role" if add else "remove_role",
+                        targets,
+                        {
+                            "serverId": str(guild.id),
+                            "userId": str(member.id),
+                            "roleId": str(role.id),
+                            "roleName": role.name,
+                            "reason": reason,
+                            "hadRoleBefore": held_before,
+                            "operation": "add" if add else "remove",
+                        },
+                    ),
+                    ensure_ascii=False,
+                ),
+            )
+        ]
+    verify_confirm_token(
+        "add_role" if add else "remove_role", targets, arguments.get("confirm_token")
+    )
+
     try:
         if add:
             await member.add_roles(role, reason=reason)

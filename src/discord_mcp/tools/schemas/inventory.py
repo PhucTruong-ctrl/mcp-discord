@@ -144,7 +144,7 @@ INVENTORY_TOOLS = [
         name="remove_channel_permission_overwrite",
         description=(
             "Delete a channel permission overwrite for a role or member "
-            "(explicit overwrite only, inherited state is untouched)."
+            "(explicit overwrite only, inherited state is untouched; dry-run by default)."
         ),
         inputSchema={
             "type": "object",
@@ -159,8 +159,17 @@ INVENTORY_TOOLS = [
                     "description": "role|member; auto-detected from cache when omitted",
                 },
                 "reason": {"type": "string", "description": "Audit log reason"},
+                "dry_run": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Return dry-run result",
+                },
+                "confirm_token": {
+                    "type": "string",
+                    "description": "Confirm token from dry-run",
+                },
             },
-            "required": ["channel_id", "target_id"],
+            "required": ["channel_id", "target_id", "reason"],
         },
     ),
 ]

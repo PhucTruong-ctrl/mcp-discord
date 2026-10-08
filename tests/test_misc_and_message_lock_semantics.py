@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import unittest
@@ -107,9 +108,33 @@ class MiscAndMessageHandlerLockTests(unittest.IsolatedAsyncioTestCase):
             {"resolve_text_or_thread_channel": AsyncMock(return_value=channel)},
         )()
         client = type("Client", (), {"user": object()})()
+        base = {
+            "channel_id": "2",
+            "message_id": "3",
+            "emoji": "✅",
+            "server_id": "1",
+            "reason": "cleanup",
+        }
+
+        dry = await handle_remove_reaction(
+            base, {"gateway": gateway, "discord_client": client}
+        )
+        self.assertEqual(json.loads(dry[0].text)["status"], "dry_run")
+        self.assertTrue(json.loads(dry[0].text)["confirmToken"])
+        message.remove_reaction.assert_not_awaited()
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_remove_reaction(
+                {**base, "dry_run": False},
+                {"gateway": gateway, "discord_client": client},
+            )
 
         await handle_remove_reaction(
-            {"channel_id": "2", "message_id": "3", "emoji": "✅", "server_id": "1"},
+            {
+                **base,
+                "dry_run": False,
+                "confirm_token": json.loads(dry[0].text)["confirmToken"],
+            },
             {"gateway": gateway, "discord_client": client},
         )
 
@@ -153,21 +178,40 @@ class MiscAndMessageHandlerLockTests(unittest.IsolatedAsyncioTestCase):
             (),
             {"resolve_text_or_thread_channel": AsyncMock(return_value=channel)},
         )()
+        base = {
+            "channel_id": "2",
+            "message_id": "3",
+            "reason": "cleanup",
+            "timeout_minutes": 5,
+            "server_id": "1",
+        }
+
+        dry = await handle_moderate_message(base, {"gateway": gateway})
+        payload = json.loads(dry[0].text)
+        self.assertEqual(payload["status"], "dry_run")
+        self.assertTrue(payload["confirmToken"])
+        self.assertTrue(payload["details"]["will_timeout"])
+        message.delete.assert_not_awaited()
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_moderate_message(
+                {**base, "dry_run": False}, {"gateway": gateway}
+            )
 
         with patch.object(discord, "Member", type(author)):
             author.timeout = AsyncMock()
             await handle_moderate_message(
                 {
-                    "channel_id": "2",
-                    "message_id": "3",
-                    "reason": "cleanup",
-                    "timeout_minutes": 5,
-                    "server_id": "1",
+                    **base,
+                    "dry_run": False,
+                    "confirm_token": payload["confirmToken"],
                 },
                 {"gateway": gateway},
             )
 
         gateway.resolve_text_or_thread_channel.assert_awaited_once_with("2", "1")
+        message.delete.assert_awaited_once_with(reason="cleanup")
+        author.timeout.assert_awaited_once()
 
 
 if __name__ == "__main__":

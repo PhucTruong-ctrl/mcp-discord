@@ -88,6 +88,19 @@ async def handle_incident_set_channel_state(
     state = arguments["state"]
     if not isinstance(state, dict):
         raise ValueError("state must be an object")
+    reason = _required_reason(arguments)
+    action = "incident_set_channel_state"
+    targets = {"channel_id": channel_id, "reason": reason}
+
+    if bool(arguments.get("dry_run", True)):
+        return _json(
+            build_dry_run_result(
+                action,
+                targets,
+                {"channelId": channel_id, "state": state, "reason": reason},
+            )
+        )
+    verify_confirm_token(action, targets, _required_confirm_token(arguments))
     set_channel_state(channel_id, state)
     return _json({"channel_id": channel_id, "state": state, "storedAt": _now()})
 

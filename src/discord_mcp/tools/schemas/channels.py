@@ -18,6 +18,21 @@ CHANNEL_TOOLS = [
                     "type": "string",
                     "description": "Optional channel topic",
                 },
+                "position": {"type": "number", "description": "Optional channel position"},
+                "nsfw": {"type": "boolean", "description": "Mark channel as NSFW"},
+                "slowmode_delay": {
+                    "type": "number",
+                    "description": "Optional slowmode delay in seconds",
+                },
+                "default_auto_archive_duration": {
+                    "type": "number",
+                    "description": "Optional default auto archive duration (minutes)",
+                },
+                "default_thread_slowmode_delay": {
+                    "type": "number",
+                    "description": "Optional default thread slowmode delay",
+                },
+                "reason": {"type": "string", "description": "Reason for creation"},
             },
             "required": ["server_id", "name"],
         },
@@ -33,8 +48,10 @@ CHANNEL_TOOLS = [
                     "description": "ID of channel to delete",
                 },
                 "reason": {"type": "string", "description": "Reason for deletion"},
+                "dry_run": {"type": "boolean"},
+                "confirm_token": {"type": "string"},
             },
-            "required": ["channel_id"],
+            "required": ["channel_id", "reason"],
         },
     ),
 ]
@@ -62,6 +79,7 @@ CHANNEL_ADMIN_TOOLS = [
                     "type": "string",
                     "description": "Optional RTC region",
                 },
+                "reason": {"type": "string", "description": "Reason for creation"},
                 "video_quality_mode": {
                     "type": "number",
                     "description": "Optional video quality mode",
@@ -99,6 +117,20 @@ CHANNEL_ADMIN_TOOLS = [
                     "type": "object",
                     "description": "Optional default reaction emoji",
                 },
+                "default_layout": {
+                    "type": "number",
+                    "description": "Optional default forum layout: 0 not_set, 1 list_view, 2 gallery_view",
+                },
+                "default_sort_order": {
+                    "type": "number",
+                    "description": "Optional default forum sort order: 0 latest_activity, 1 creation_date",
+                },
+                "default_thread_slowmode_delay": {
+                    "type": "number",
+                    "description": "Optional default thread slowmode delay",
+                },
+                "position": {"type": "number", "description": "Optional channel position"},
+                "reason": {"type": "string", "description": "Reason for creation"},
                 "available_tags": {
                     "type": "array",
                     "items": {"type": "object"},
@@ -247,6 +279,18 @@ CHANNEL_ADMIN_TOOLS = [
                 "position": {
                     "type": "number",
                     "description": "Optional channel position",
+                },
+                "default_layout": {
+                    "type": "number",
+                    "description": "Optional default forum layout: 0 not_set, 1 list_view, 2 gallery_view",
+                },
+                "default_sort_order": {
+                    "type": "number",
+                    "description": "Optional default forum sort order: 0 latest_activity, 1 creation_date",
+                },
+                "default_thread_slowmode_delay": {
+                    "type": "number",
+                    "description": "Optional default thread slowmode delay",
                 },
                 "reason": {"type": "string", "description": "Reason for update"},
             },

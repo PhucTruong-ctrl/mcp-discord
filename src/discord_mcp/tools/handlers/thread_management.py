@@ -152,9 +152,21 @@ async def handle_leave_thread(
     thread, _guild = await gateway.resolve_thread(
         str(arguments["thread_id"]), arguments["server_id"]
     )
+
+    action = "leave_thread"
+    targets = {
+        "server_id": str(arguments["server_id"]),
+        "thread_id": str(arguments["thread_id"]),
+        "reason": str(arguments.get("reason") or ""),
+    }
+    details = {"threadId": str(thread.id)}
+    if _is_dry_run(arguments):
+        return json_text(build_dry_run_result(action, targets, details))
+    verify_confirm_token(action, targets, arguments.get("confirm_token"))
+
     await thread.leave()
     return json_text(
-        {"status": "executed", "action": "leave_thread", "threadId": str(thread.id)}
+        {"status": "executed", "action": action, **details}
     )
 
 

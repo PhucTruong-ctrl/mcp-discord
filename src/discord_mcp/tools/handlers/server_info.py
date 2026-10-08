@@ -67,9 +67,15 @@ async def handle_list_members(
     gateway = deps["gateway"]
     guild = await gateway.resolve_guild(arguments["server_id"])
     limit = min(int(arguments.get("limit", 100)), 1000)
+    kwargs: Dict[str, Any] = {"limit": limit}
+    if arguments.get("after") is not None:
+        parsed = try_int(arguments["after"])
+        if parsed is None:
+            raise ValueError(f"after must be a snowflake id, got {arguments['after']!r}")
+        kwargs["after"] = discord.Object(id=parsed)
 
     members = []
-    async for member in guild.fetch_members(limit=limit):
+    async for member in guild.fetch_members(**kwargs):
         members.append(
             {
                 "id": str(member.id),

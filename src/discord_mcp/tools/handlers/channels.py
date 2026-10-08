@@ -1,11 +1,13 @@
+import json
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import discord
 from mcp.types import TextContent
 
 from discord_mcp.core.emoji import parse_emoji
-
-from discord_mcp.core.validation import validate_snowflake
+from discord_mcp.core.resolve import try_int
+from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
+from discord_mcp.core.validation import require_reason, validate_snowflake
 
 
 def _json_text(message: str) -> List[TextContent]:
@@ -67,6 +69,26 @@ def _create_result(prefix: str, channel: Any, kind: str) -> List[TextContent]:
     return _json_text(f"{prefix} {kind} channel #{channel.name} (ID: {channel.id})")
 
 
+def _present(arguments: Dict[str, Any], *keys: str) -> Dict[str, Any]:
+    """Kwargs the caller actually set — discord.py treats ``None`` as a real value."""
+    return {key: arguments[key] for key in keys if arguments.get(key) is not None}
+
+
+def _int_option(value: Any, where: str) -> int:
+    parsed = try_int(value)
+    if parsed is None:
+        raise ValueError(f"{where} must be an integer, got {value!r}")
+    return parsed
+
+
+def _enum_option(value: Any, enum: Any, where: str) -> Any:
+    try:
+        return enum(int(value))
+    except (TypeError, ValueError):
+        allowed = ", ".join(f"{member.value} ({member.name})" for member in enum)
+        raise ValueError(f"{where} must be one of {allowed}, got {value!r}") from None
+
+
 async def handle_create_text_channel(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
@@ -74,11 +96,29 @@ async def handle_create_text_channel(
     guild = await gateway.resolve_guild(arguments["server_id"])
     category = _resolve_category(guild, arguments.get("category_id"))
 
+    options = _present(
+        arguments,
+        "topic",
+        "position",
+        "nsfw",
+        "slowmode_delay",
+        "default_auto_archive_duration",
+        "default_thread_slowmode_delay",
+    )
+    for key in (
+        "position",
+        "slowmode_delay",
+        "default_auto_archive_duration",
+        "default_thread_slowmode_delay",
+    ):
+        if key in options:
+            options[key] = _int_option(options[key], key)
+
     channel = await guild.create_text_channel(
         name=arguments["name"],
         category=category,
-        topic=arguments.get("topic"),
-        reason="Channel created via MCP",
+        reason=arguments.get("reason", "Channel created via MCP"),
+        **options,
     )
     return _create_result("Created", channel, "text")
 
@@ -202,17 +242,41 @@ async def handle_create_forum_channel(
     category = _resolve_category(guild, arguments.get("category_id"))
 
     extras = _pop_forum_extras(guild, arguments)
+    options = _present(
+        arguments,
+        "topic",
+        "position",
+        "nsfw",
+        "slowmode_delay",
+        "default_auto_archive_duration",
+        "default_thread_slowmode_delay",
+    )
+    for key in (
+        "position",
+        "slowmode_delay",
+        "default_auto_archive_duration",
+        "default_thread_slowmode_delay",
+    ):
+        if key in options:
+            options[key] = _int_option(options[key], key)
+    if arguments.get("default_sort_order") is not None:
+        options["default_sort_order"] = _enum_option(
+            arguments["default_sort_order"], discord.ForumOrderType, "default_sort_order"
+        )
+    if arguments.get("default_layout") is not None:
+        options["default_layout"] = _enum_option(
+            arguments["default_layout"], discord.ForumLayoutType, "default_layout"
+        )
+    if "default_reaction_emoji" in extras:
+        options["default_reaction_emoji"] = extras["default_reaction_emoji"]
+    if "available_tags" in extras:
+        options["available_tags"] = extras["available_tags"]
+
     channel = await guild.create_forum(
         name=arguments["name"],
         category=category,
-        topic=arguments.get("topic"),
-        nsfw=arguments.get("nsfw"),
-        slowmode_delay=arguments.get("slowmode_delay"),
-        default_auto_archive_duration=arguments.get("default_auto_archive_duration"),
-        default_reaction_emoji=extras.get("default_reaction_emoji"),
-        default_sort_order=arguments.get("default_sort_order"),
-        available_tags=extras.get("available_tags"),
         reason=arguments.get("reason", "Channel created via MCP"),
+        **options,
     )
     return _create_result("Created", channel, "forum")
 
@@ -243,9 +307,23 @@ async def handle_delete_channel(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    channel = await gateway.fetch_channel(arguments["channel_id"])
-    await channel.delete(reason=arguments.get("reason", "Channel deleted via MCP"))
-    return [TextContent(type="text", text="Deleted channel successfully")]
+    channel_id = str(arguments["channel_id"])
+    reason = require_reason(arguments.get("reason"), "delete_channel")
+
+    action = "delete_channel"
+    targets = {"channel_id": channel_id, "reason": reason}
+
+    if bool(arguments.get("dry_run", True)):
+        return _json_text(
+            json.dumps(build_dry_run_result(action, targets, {"reason": reason}))
+        )
+    verify_confirm_token(action, targets, arguments.get("confirm_token"))
+
+    channel = await gateway.fetch_channel(channel_id)
+    await channel.delete(reason=reason)
+    return _json_text(
+        json.dumps({"status": "executed", "action": action, "channelId": channel_id})
+    )
 
 
 async def handle_update_text_channel(
@@ -338,6 +416,8 @@ async def handle_update_forum_channel(
             "defaultReactionEmoji",
             "default_sort_order",
             "default_sort_order_value",
+            "default_layout",
+            "default_thread_slowmode_delay",
             "available_tags",
             "availableTags",
             "category_id",
@@ -357,11 +437,25 @@ async def handle_update_forum_channel(
         "default_auto_archive_duration",
         "default_reaction_emoji",
         "default_sort_order",
+        "default_layout",
+        "default_thread_slowmode_delay",
         "available_tags",
         "position",
     ):
         if key in arguments:
             updates[key] = arguments[key]
+    if updates.get("default_sort_order") is not None:
+        updates["default_sort_order"] = _enum_option(
+            updates["default_sort_order"], discord.ForumOrderType, "default_sort_order"
+        )
+    if updates.get("default_layout") is not None:
+        updates["default_layout"] = _enum_option(
+            updates["default_layout"], discord.ForumLayoutType, "default_layout"
+        )
+    if updates.get("default_thread_slowmode_delay") is not None:
+        updates["default_thread_slowmode_delay"] = _int_option(
+            updates["default_thread_slowmode_delay"], "default_thread_slowmode_delay"
+        )
     # emoji-bearing fields go through the shared codec so a read payload round trips
     updates.pop("available_tags", None)
     updates.pop("default_reaction_emoji", None)

@@ -43,6 +43,7 @@ GATED_TOOLS = {
     "remove_thread_member",
     "edit_thread",
     "delete_thread",
+    "leave_thread",
 }
 
 
@@ -333,8 +334,27 @@ class ThreadManagementHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(self.thread.join_count, 1)
 
-        leave = await self._call(
+        dry = await self._call(
             handle_leave_thread, {"server_id": "1", "thread_id": "222"}
+        )
+        self.assertEqual(dry["status"], "dry_run")
+        self.assertTrue(dry["confirmToken"])
+        self.assertEqual(self.thread.leave_count, 0)
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await self._call(
+                handle_leave_thread,
+                {"server_id": "1", "thread_id": "222", "dry_run": False},
+            )
+
+        leave = await self._call(
+            handle_leave_thread,
+            {
+                "server_id": "1",
+                "thread_id": "222",
+                "dry_run": False,
+                "confirm_token": dry["confirmToken"],
+            },
         )
         self.assertEqual(
             leave,

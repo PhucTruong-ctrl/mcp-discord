@@ -75,7 +75,8 @@ class MessagingWorkflowHandlerBehaviorTests(unittest.IsolatedAsyncioTestCase):
         message.crosspost.assert_awaited_once_with()
 
     async def test_execute_channel_webhook_requires_no_persistence(self):
-        webhook = type("Webhook", (), {"send": AsyncMock()})()
+        # webhook.send returns None when wait is not requested (discord.py default)
+        webhook = type("Webhook", (), {"send": AsyncMock(return_value=None)})()
         gateway = type(
             "Gateway", (), {"fetch_webhook": AsyncMock(return_value=webhook)}
         )()

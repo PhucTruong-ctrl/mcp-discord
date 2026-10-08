@@ -155,8 +155,34 @@ class RoleGovernanceToolTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("updated", updated[0].text)
 
-        deleted = await handle_delete_role(
+        dry = await handle_delete_role(
             {"server_id": "1", "role_id": role_id, "reason": "cleanup"}, self.deps
+        )
+        dry_payload = json.loads(dry[0].text)
+        self.assertEqual(dry_payload["status"], "dry_run")
+        self.assertTrue(dry_payload["confirmToken"])
+        self.assertEqual(len(self.guild.roles), 4)
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await handle_delete_role(
+                {
+                    "server_id": "1",
+                    "role_id": role_id,
+                    "reason": "cleanup",
+                    "dry_run": False,
+                },
+                self.deps,
+            )
+
+        deleted = await handle_delete_role(
+            {
+                "server_id": "1",
+                "role_id": role_id,
+                "reason": "cleanup",
+                "dry_run": False,
+                "confirm_token": dry_payload["confirmToken"],
+            },
+            self.deps,
         )
         self.assertIn("deleted", deleted[0].text)
 

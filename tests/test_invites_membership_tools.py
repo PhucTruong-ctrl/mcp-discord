@@ -125,6 +125,8 @@ class FakeGuild:
         self.invites_list = []
         self.bans_list = []
         self.bans_limit = None
+        self.bans_before = None
+        self.bans_after = None
         self.ban_by_user = {}
         self.members = []
         self.last_query = None
@@ -140,6 +142,8 @@ class FakeGuild:
 
     async def bans(self, *, limit=None, before=None, after=None):
         self.bans_limit = limit
+        self.bans_before = before
+        self.bans_after = after
         count = limit if limit is not None else len(self.bans_list)
         for entry in self.bans_list[:count]:
             yield entry
@@ -356,6 +360,32 @@ class InvitesMembershipHandlerTests(unittest.IsolatedAsyncioTestCase):
             await handle_list_bans(
                 {"server_id": "100", "limit": "many"}, self.deps
             )
+
+    async def test_list_bans_forwards_before_and_after(self):
+        self.guild.bans_list = [
+            discord.BanEntry(user=SimpleNamespace(id=11, name="bob"), reason="spam"),
+        ]
+
+        await handle_list_bans(
+            {"server_id": "100", "before": "111", "after": "222"}, self.deps
+        )
+
+        self.assertEqual(self.guild.bans_before.id, 111)
+        self.assertEqual(self.guild.bans_after.id, 222)
+
+    async def test_list_bans_omits_pagination_when_absent(self):
+        self.guild.bans_list = []
+
+        await handle_list_bans({"server_id": "100"}, self.deps)
+
+        self.assertIsNone(self.guild.bans_before)
+        self.assertIsNone(self.guild.bans_after)
+
+    async def test_list_bans_rejects_non_numeric_pagination_ids(self):
+        with self.assertRaisesRegex(ValueError, "before 'many' is not a valid snowflake"):
+            await handle_list_bans({"server_id": "100", "before": "many"}, self.deps)
+        with self.assertRaisesRegex(ValueError, "after 'many' is not a valid snowflake"):
+            await handle_list_bans({"server_id": "100", "after": "many"}, self.deps)
 
     async def test_get_ban_payload(self):
         self.guild.ban_by_user[11] = discord.BanEntry(

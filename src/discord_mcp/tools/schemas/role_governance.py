@@ -32,7 +32,7 @@ ROLE_GOVERNANCE_TOOLS = [
     ),
     Tool(
         name="delete_role",
-        description="Delete a guild role (by role_id or unique role_name)",
+        description="Delete a guild role (by role_id or unique role_name; dry-run by default)",
         inputSchema={
             "type": "object",
             "properties": {
@@ -43,8 +43,17 @@ ROLE_GOVERNANCE_TOOLS = [
                     "description": "Role name, case-insensitive; must match exactly one role",
                 },
                 "reason": {"type": "string"},
+                "dry_run": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Return dry-run result",
+                },
+                "confirm_token": {
+                    "type": "string",
+                    "description": "Confirm token from dry-run",
+                },
             },
-            "required": ["server_id"],
+            "required": ["server_id", "reason"],
         },
     ),
     Tool(

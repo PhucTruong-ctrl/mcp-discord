@@ -126,7 +126,7 @@ class ExpansionFillerContractTests(unittest.IsolatedAsyncioTestCase):
         names = {tool.name for tool in compose_tool_registry()}
         filler_names = {tool.name for tool in EXPANSION_FILLER_TOOLS}
         self.assertTrue(filler_names.issubset(names))
-        self.assertEqual(len(filler_names), 15)
+        self.assertEqual(len(filler_names), 16)
 
     async def test_mutating_fillers_require_a_gateway(self):
         """No silent success: mutating fillers fail loudly without a gateway."""

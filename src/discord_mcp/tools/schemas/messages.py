@@ -60,7 +60,7 @@ MESSAGE_TOOLS = [
     ),
     Tool(
         name="remove_reaction",
-        description="Remove a reaction from a message",
+        description="Remove a reaction from a message (dry-run by default)",
         inputSchema={
             "type": "object",
             "properties": {
@@ -80,8 +80,21 @@ MESSAGE_TOOLS = [
                     "type": "string",
                     "description": "Emoji to remove (Unicode or custom emoji ID)",
                 },
+                "reason": {
+                    "type": "string",
+                    "description": "Audit log reason",
+                },
+                "dry_run": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Return dry-run result",
+                },
+                "confirm_token": {
+                    "type": "string",
+                    "description": "Confirm token from dry-run",
+                },
             },
-            "required": ["channel_id", "message_id", "emoji"],
+            "required": ["channel_id", "message_id", "emoji", "reason"],
         },
     ),
     Tool(
@@ -114,6 +127,10 @@ MESSAGE_TOOLS = [
                     "description": "Number of messages to fetch (max 100)",
                     "minimum": 1,
                     "maximum": 100,
+                },
+                "before": {
+                    "type": "string",
+                    "description": "Only return messages older than this message ID",
                 },
             },
             "required": ["channel_id"],

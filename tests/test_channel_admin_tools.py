@@ -1,3 +1,4 @@
+import discord
 import importlib
 import json
 import os
@@ -37,70 +38,7 @@ discord_ext.commands = SimpleNamespace(Bot=_Bot)
 sys.modules.setdefault("discord.ext", discord_ext)
 sys.modules.setdefault("discord.ext.commands", discord_ext.commands)
 
-mcp = types.ModuleType("mcp")
-mcp_server = types.ModuleType("mcp.server")
 
-
-class _Server:
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def list_tools(self):
-        def decorator(func):
-            return func
-
-        return decorator
-
-    def call_tool(self):
-        def decorator(func):
-            return func
-
-        return decorator
-
-    async def run(self, *args, **kwargs):
-        return None
-
-    def create_initialization_options(self):
-        return None
-
-
-mcp_server.Server = _Server
-mcp_server_stdio = types.ModuleType("mcp.server.stdio")
-mcp_server_stdio.stdio_server = lambda: None
-# discord_mcp.server imports this; without the stub a single-file test run fails
-# with "No module named 'mcp.server.models'" when nothing else imported it first.
-mcp_server_models = types.ModuleType("mcp.server.models")
-
-
-class _InitializationOptions:
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-
-
-mcp_server_models.InitializationOptions = _InitializationOptions
-mcp_types = types.ModuleType("mcp.types")
-
-
-class _Tool:
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-
-
-class _TextContent:
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-
-
-mcp_types.TextContent = _TextContent
-mcp_types.Tool = _Tool
-# discord_mcp.server builds these at import time
-mcp_types.ServerCapabilities = _Tool
-mcp_types.ToolsCapability = _Tool
-sys.modules.setdefault("mcp", mcp)
-sys.modules.setdefault("mcp.server", mcp_server)
-sys.modules.setdefault("mcp.server.stdio", mcp_server_stdio)
-sys.modules.setdefault("mcp.server.models", mcp_server_models)
-sys.modules.setdefault("mcp.types", mcp_types)
 
 aiohttp = types.ModuleType("aiohttp")
 aiohttp.ClientSession = type(
@@ -127,6 +65,7 @@ from discord_mcp.tools.handlers.inventory import (
 
 from discord_mcp.core.serialize import _serialize_forum_tag
 from discord_mcp.tools.handlers.channels import _build_forum_tags, _guard_tag_ids
+
 
 class ChannelAdminToolRegistryTests(unittest.TestCase):
     def test_channel_admin_tools_are_present_in_schema_registry(self):
@@ -333,6 +272,199 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("Created forum channel", result[0].text)
 
+    async def test_create_text_channel_forwards_new_kwargs(self):
+        handler = router.TOOL_ROUTER["create_text_channel"]
+        guild = self._guild()
+        calls = []
+
+        async def create_text_channel(**kwargs):
+            calls.append(kwargs)
+            return self._channel(82, kwargs["name"], type="text")
+
+        guild.create_text_channel = create_text_channel
+        gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
+
+        result = await handler(
+            {
+                "server_id": "1",
+                "name": "announcements",
+                "position": 3,
+                "nsfw": True,
+                "slowmode_delay": 30,
+                "default_auto_archive_duration": 1440,
+                "default_thread_slowmode_delay": 10,
+                "reason": "launch",
+            },
+            {"gateway": gateway},
+        )
+
+        self.assertIn("Created text channel", result[0].text)
+        kwargs = calls[-1]
+        self.assertEqual(kwargs["position"], 3)
+        self.assertIs(kwargs["nsfw"], True)
+        self.assertEqual(kwargs["slowmode_delay"], 30)
+        self.assertEqual(kwargs["default_auto_archive_duration"], 1440)
+        self.assertEqual(kwargs["default_thread_slowmode_delay"], 10)
+        self.assertEqual(kwargs["reason"], "launch")
+
+    async def test_create_forum_channel_forwards_new_kwargs(self):
+        handler = router.TOOL_ROUTER["create_forum_channel"]
+        guild = self._guild()
+        calls = []
+
+        async def create_forum(**kwargs):
+            calls.append(kwargs)
+            return self._channel(83, kwargs["name"], type="forum")
+
+        guild.create_forum = create_forum
+        gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
+
+        result = await handler(
+            {
+                "server_id": "1",
+                "name": "support",
+                "position": 2,
+                "default_layout": 2,
+                "default_sort_order": 1,
+                "default_thread_slowmode_delay": 5,
+                "reason": "launch",
+            },
+            {"gateway": gateway},
+        )
+
+        self.assertIn("Created forum channel", result[0].text)
+        kwargs = calls[-1]
+        self.assertEqual(kwargs["position"], 2)
+        self.assertIs(kwargs["default_layout"], discord.ForumLayoutType.gallery_view)
+        self.assertIs(kwargs["default_sort_order"], discord.ForumOrderType.creation_date)
+        self.assertEqual(kwargs["default_thread_slowmode_delay"], 5)
+        self.assertEqual(kwargs["reason"], "launch")
+
+    async def test_create_forum_channel_rejects_bad_default_layout(self):
+        handler = router.TOOL_ROUTER["create_forum_channel"]
+        guild = self._guild()
+        gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
+
+        with self.assertRaisesRegex(ValueError, "default_layout must be one of"):
+            await handler(
+                {"server_id": "1", "name": "support", "default_layout": 9},
+                {"gateway": gateway},
+            )
+
+    async def test_update_forum_channel_forwards_layout_and_sort_order(self):
+        handler = router.TOOL_ROUTER["update_forum_channel"]
+        channel = self._channel(90, "forum", type="forum", available_tags=[])
+        guild = self._guild(channels=[channel])
+        gateway = SimpleNamespace(resolve_guild=self._async_value(guild))
+
+        result = await handler(
+            {
+                "server_id": "1",
+                "channel_id": "90",
+                "default_layout": 1,
+                "default_sort_order": 0,
+                "default_thread_slowmode_delay": 7,
+            },
+            {"gateway": gateway},
+        )
+
+        self.assertIn("Updated forum channel", result[0].text)
+        edit = channel.edit_calls[-1]
+        self.assertIs(edit["default_layout"], discord.ForumLayoutType.list_view)
+        self.assertIs(edit["default_sort_order"], discord.ForumOrderType.latest_activity)
+        self.assertEqual(edit["default_thread_slowmode_delay"], 7)
+
+    async def test_delete_channel_dry_run_default_and_reason_sensitive_token(self):
+        handler = router.TOOL_ROUTER["delete_channel"]
+        channel = self._channel(70, "general", type="text")
+        gateway = SimpleNamespace(fetch_channel=self._async_value(channel))
+
+        first = await handler(
+            {"channel_id": "70", "reason": "cleanup"}, {"gateway": gateway}
+        )
+        second = await handler(
+            {"channel_id": "70", "reason": "duplicate"}, {"gateway": gateway}
+        )
+
+        first_payload = json.loads(first[0].text)
+        second_payload = json.loads(second[0].text)
+        self.assertEqual(first_payload["status"], "dry_run")
+        self.assertEqual(first_payload["action"], "delete_channel")
+        self.assertNotEqual(first_payload["confirmToken"], second_payload["confirmToken"])
+        self.assertFalse(hasattr(channel, "deleted"))
+
+    async def test_delete_channel_requires_confirm_token(self):
+        handler = router.TOOL_ROUTER["delete_channel"]
+        channel = self._channel(71, "general", type="text")
+        gateway = SimpleNamespace(fetch_channel=self._async_value(channel))
+
+        with self.assertRaisesRegex(ValueError, "confirm_token"):
+            await handler(
+                {"channel_id": "71", "reason": "cleanup", "dry_run": False},
+                {"gateway": gateway},
+            )
+        self.assertFalse(hasattr(channel, "deleted"))
+
+    async def test_delete_channel_executes_with_valid_token(self):
+        handler = router.TOOL_ROUTER["delete_channel"]
+        channel = self._channel(72, "general", type="text")
+        gateway = SimpleNamespace(fetch_channel=self._async_value(channel))
+        arguments = {"channel_id": "72", "reason": "cleanup"}
+
+        dry = await handler(arguments, {"gateway": gateway})
+        token = json.loads(dry[0].text)["confirmToken"]
+        result = await handler(
+            {**arguments, "dry_run": False, "confirm_token": token},
+            {"gateway": gateway},
+        )
+
+        payload = json.loads(result[0].text)
+        self.assertEqual(payload["status"], "executed")
+        self.assertTrue(channel.deleted)
+
+    async def test_delete_channel_requires_reason(self):
+        handler = router.TOOL_ROUTER["delete_channel"]
+        gateway = SimpleNamespace(fetch_channel=self._async_value(object()))
+
+        with self.assertRaisesRegex(ValueError, "reason is required"):
+            await handler({"channel_id": "73"}, {"gateway": gateway})
+
+    def test_schemas_declare_the_new_channel_parameters(self):
+        by_name = {tool.name: tool for tool in schemas.compose_tool_registry()}
+        expected = {
+            "create_text_channel": [
+                "position",
+                "nsfw",
+                "slowmode_delay",
+                "default_auto_archive_duration",
+                "default_thread_slowmode_delay",
+                "reason",
+            ],
+            "create_voice_channel": ["reason"],
+            "create_forum_channel": [
+                "reason",
+                "default_sort_order",
+                "position",
+                "default_layout",
+                "default_thread_slowmode_delay",
+            ],
+            "update_forum_channel": [
+                "default_layout",
+                "default_sort_order",
+                "default_thread_slowmode_delay",
+            ],
+        }
+        for tool_name, fields in expected.items():
+            schema = by_name[tool_name].input_schema
+            properties = schema["properties"]
+            for field in fields:
+                with self.subTest(tool=tool_name, field=field):
+                    self.assertIn(field, properties)
+        delete_schema = by_name["delete_channel"].input_schema
+        self.assertIn("dry_run", delete_schema["properties"])
+        self.assertIn("confirm_token", delete_schema["properties"])
+        self.assertIn("reason", delete_schema["required"])
+
     async def test_read_tools_expose_admin_workflow_fields(self):
         guild = self._guild(
             channels=[
@@ -387,7 +519,7 @@ class ChannelAdminHandlerContractTests(unittest.IsolatedAsyncioTestCase):
                 setattr(channel, key, value)
 
         async def delete(**_kwargs):
-            data["deleted"] = True
+            channel.deleted = True
 
         data["edit"] = edit
         data["delete"] = delete

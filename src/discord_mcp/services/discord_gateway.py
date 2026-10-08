@@ -380,12 +380,22 @@ class DiscordGateway:
         return len(users)
 
     async def prune_inactive_members(
-        self, server_id: str, days: int, reason: Optional[str] = None
+        self,
+        server_id: str,
+        days: int,
+        reason: Optional[str] = None,
+        role_ids: Optional[List[str]] = None,
+        compute_prune_count: bool = True,
     ) -> Optional[int]:
         guild = await self.resolve_guild(server_id)
-        return await guild.prune_members(
-            days=int(days), compute_prune_count=True, reason=reason
-        )
+        kwargs: Dict[str, Any] = {
+            "days": int(days),
+            "compute_prune_count": bool(compute_prune_count),
+            "reason": reason,
+        }
+        if role_ids:
+            kwargs["roles"] = [discord.Object(id=int(role_id)) for role_id in role_ids]
+        return await guild.prune_members(**kwargs)
 
     async def collect_forum_threads(
         self,

@@ -114,11 +114,49 @@ async def handle_execute_channel_webhook(
     webhook = await deps["gateway"].fetch_webhook(
         arguments["webhook_id"], arguments["token"]
     )
-    await webhook.send(content=arguments["content"], username=arguments.get("username"))
-    payload = {
+    content = arguments.get("content")
+    embed_payload = arguments.get("embed")
+    file_urls = arguments.get("file_urls")
+    components = arguments.get("components")
+    if content is None and embed_payload is None and not file_urls and not components:
+        raise ValueError("content, embed, file_urls, or components is required")
+
+    kwargs: Dict[str, Any] = {}
+    if content is not None:
+        kwargs["content"] = str(content)
+    if arguments.get("username") is not None:
+        kwargs["username"] = arguments["username"]
+    if arguments.get("avatar_url") is not None:
+        kwargs["avatar_url"] = arguments["avatar_url"]
+    if arguments.get("tts") is not None:
+        kwargs["tts"] = bool(arguments["tts"])
+    if embed_payload is not None:
+        kwargs["embed"] = _build_embed(embed_payload)
+    if file_urls:
+        from discord_mcp.core.common import fetch_bytes
+        import io
+        files = []
+        for url in file_urls:
+            data = await fetch_bytes(str(url), "file_urls")
+            from urllib.parse import urlparse
+            import os
+            filename = os.path.basename(urlparse(str(url)).path) or "download"
+            files.append(discord.File(io.BytesIO(data), filename=filename))
+        kwargs["files"] = files
+    if components:
+        from discord_mcp.tools.handlers.messages_advanced import _build_view
+        kwargs["view"] = _build_view(components)
+    if arguments.get("wait") is not None:
+        kwargs["wait"] = bool(arguments["wait"])
+
+    message = await webhook.send(**kwargs)
+    payload: Dict[str, Any] = {
         "executed": True,
         "webhookId": str(arguments["webhook_id"]),
     }
+    if message is not None:
+        from discord_mcp.core.serialize import _serialize_message
+        payload["message"] = _serialize_message(message)
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))
     ]

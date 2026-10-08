@@ -164,14 +164,14 @@ class TestExpansionFillersRouterCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_dispatch_all_expansion_filler_tools(self):
         cases = {
-            "remove_member_timeout": {"server_id": "1", "member_id": "2"},
-            "unban_member": {"server_id": "1", "member_id": "2", "reason": "appeal"},
+            "remove_member_timeout": {"server_id": "1", "member_id": "2", "reason": "timeout", "dry_run": True},
+            "unban_member": {"server_id": "1", "member_id": "2", "reason": "appeal", "dry_run": True},
             "bulk_ban_members": {
                 "server_id": "1",
                 "member_ids": ["2", "3"],
                 "dry_run": True,
             },
-            "prune_inactive_members": {"server_id": "1", "days": 30, "dry_run": True},
+            "prune_inactive_members": {"server_id": "1", "days": 30, "reason": "prune", "dry_run": True},
             "create_category": {"server_id": "1", "name": "Ops"},
             "rename_category": {"category_id": "10", "name": "Ops 2"},
             "move_category": {"category_id": "10", "position": 1},
@@ -190,23 +190,29 @@ class TestExpansionFillersRouterCoverage(unittest.IsolatedAsyncioTestCase):
                 "incident_channel_id": "20",
                 "summary": "Resolved",
                 "reason": "stabilized",
+                "dry_run": False,
+                "confirm_token": "dummy",
             },
             "list_auto_moderation_rules": {"server_id": "1"},
             "create_auto_moderation_rule": {
                 "server_id": "1",
                 "rule": {"name": "spam"},
+                "reason": "rule-create",
+                "dry_run": False,
+                "confirm_token": "dummy",
             },
             "update_auto_moderation_rule": {
                 "server_id": "1",
                 "rule_id": "1",
                 "rule": {"name": "spam-v2"},
+                "reason": "rule-update",
+                "dry_run": False,
+                "confirm_token": "dummy",
             },
             "automod_export_rules": {"server_id": "1"},
         }
 
         mutable = {
-            "remove_member_timeout",
-            "unban_member",
             "create_category",
             "rename_category",
             "move_category",
@@ -235,7 +241,7 @@ class TestExpansionFillersRouterCoverage(unittest.IsolatedAsyncioTestCase):
                 "member_ids": ["2", "3"],
                 "dry_run": True,
             },
-            "prune_inactive_members": {"server_id": "1", "days": 30, "dry_run": True},
+            "prune_inactive_members": {"server_id": "1", "days": 30, "reason": "prune", "dry_run": True},
             "delete_category": {"category_id": "10", "dry_run": True},
         }
 

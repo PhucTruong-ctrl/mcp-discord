@@ -14,7 +14,7 @@ os.environ.setdefault("DISCORD_MCP_CONFIRM_SECRET", "test-secret")
 from discord_mcp.tools.schemas import compose_tool_registry
 
 
-# Composition breakdown of 212 canonical tools:
+# Composition breakdown of 213 canonical tools:
 #   24 baseline tools (SERVER_INFO[:3], ROLE, CHANNEL, MESSAGE,        ← +1 (reply_message)
 #                      FORUM, MISC, SERVER_INFO[3])                    ← +1 (update_guild)
 #    5 channel admin tools  (create_voice, create_forum, update_text, update_voice, update_forum)
@@ -44,14 +44,14 @@ from discord_mcp.tools.schemas import compose_tool_registry
 #    9 monetization & app commands      ← discord.py coverage-gap domain
 #    9 templates & widget               ← discord.py coverage-gap domain
 #  ---
-#  212 total
+#  213 total  ← +1 (delete_auto_moderation_rule)
 
 
 class TestFullRegistryCounts(unittest.TestCase):
-    def test_canonical_registry_has_212_unique_tools(self):
+    def test_canonical_registry_has_213_unique_tools(self):
         names = [tool.name for tool in compose_tool_registry()]
-        self.assertEqual(len(names), 212)
-        self.assertEqual(len(set(names)), 212)
+        self.assertEqual(len(names), 213)
+        self.assertEqual(len(set(names)), 213)
 
     def test_registry_order_is_deterministic(self):
         first = [tool.name for tool in compose_tool_registry()]

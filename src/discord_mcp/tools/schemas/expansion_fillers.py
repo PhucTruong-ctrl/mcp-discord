@@ -4,15 +4,19 @@ from mcp.types import Tool
 EXPANSION_FILLER_TOOLS = [
     Tool(
         name="remove_member_timeout",
-        description="Remove an active timeout from a member (member.timeout(None))",
+        description=(
+            "Remove an active timeout from a member (member.timeout(None); dry-run by default)"
+        ),
         inputSchema={
             "type": "object",
             "properties": {
                 "server_id": {"type": "string"},
                 "member_id": {"type": "string"},
                 "reason": {"type": "string", "description": "Audit log reason"},
+                "dry_run": {"type": "boolean"},
+                "confirm_token": {"type": "string"},
             },
-            "required": ["server_id", "member_id"],
+            "required": ["server_id", "member_id", "reason"],
         },
     ),
     Tool(
@@ -27,8 +31,10 @@ EXPANSION_FILLER_TOOLS = [
                 "server_id": {"type": "string"},
                 "member_id": {"type": "string"},
                 "reason": {"type": "string"},
+                "dry_run": {"type": "boolean"},
+                "confirm_token": {"type": "string"},
             },
-            "required": ["server_id", "member_id"],
+            "required": ["server_id", "member_id", "reason"],
         },
     ),
     Tool(
@@ -64,6 +70,15 @@ EXPANSION_FILLER_TOOLS = [
                 "dry_run": {"type": "boolean"},
                 "confirm_token": {"type": "string"},
                 "reason": {"type": "string"},
+                "role_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Only prune members holding at least one of these roles",
+                },
+                "compute_prune_count": {
+                    "type": "boolean",
+                    "description": "Ask Discord for the exact pruned count (slower)",
+                },
             },
             "required": ["server_id", "days"],
         },
@@ -173,6 +188,8 @@ EXPANSION_FILLER_TOOLS = [
                 "incident_channel_id": {"type": "string"},
                 "summary": {"type": "string"},
                 "reason": {"type": "string"},
+                "dry_run": {"type": "boolean"},
+                "confirm_token": {"type": "string"},
             },
             "required": ["incident_channel_id", "summary", "reason"],
         },
@@ -198,8 +215,10 @@ EXPANSION_FILLER_TOOLS = [
                     "type": "string",
                     "description": "Audit reason for the creation",
                 },
+                "dry_run": {"type": "boolean"},
+                "confirm_token": {"type": "string"},
             },
-            "required": ["server_id", "rule"],
+            "required": ["server_id", "rule", "reason"],
         },
     ),
     Tool(
@@ -215,8 +234,31 @@ EXPANSION_FILLER_TOOLS = [
                     "type": "string",
                     "description": "Audit reason for the update",
                 },
+                "dry_run": {"type": "boolean"},
+                "confirm_token": {"type": "string"},
             },
-            "required": ["server_id", "rule_id", "rule"],
+            "required": ["server_id", "rule_id", "rule", "reason"],
+        },
+    ),
+    Tool(
+        name="delete_auto_moderation_rule",
+        description=(
+            "Delete an auto moderation rule (dry-run by default). Without this, "
+            "automod_apply_ruleset cannot remove rules the ruleset omits."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "server_id": {"type": "string"},
+                "rule_id": {"type": "string"},
+                "reason": {
+                    "type": "string",
+                    "description": "Audit reason for the deletion",
+                },
+                "dry_run": {"type": "boolean"},
+                "confirm_token": {"type": "string"},
+            },
+            "required": ["server_id", "rule_id", "reason"],
         },
     ),
     Tool(

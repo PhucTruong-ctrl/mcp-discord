@@ -67,7 +67,7 @@ MESSAGING_WORKFLOW_TOOLS = [
     ),
     Tool(
         name="execute_channel_webhook",
-        description="Execute channel webhook using caller-supplied id/token",
+        description="Execute channel webhook using caller-supplied id/token. content is optional when embed, file_urls, or components are provided.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -75,8 +75,22 @@ MESSAGING_WORKFLOW_TOOLS = [
                 "token": {"type": "string"},
                 "content": {"type": "string"},
                 "username": {"type": "string"},
+                "avatar_url": {"type": "string"},
+                "tts": {"type": "boolean"},
+                "wait": {"type": "boolean"},
+                "embed": {"type": "object"},
+                "file_urls": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Attachment URLs to download and attach",
+                },
+                "components": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Button/select components",
+                },
             },
-            "required": ["webhook_id", "token", "content"],
+            "required": ["webhook_id", "token"],
         },
     ),
     Tool(

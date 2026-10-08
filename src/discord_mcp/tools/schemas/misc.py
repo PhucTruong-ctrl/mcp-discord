@@ -67,6 +67,15 @@ MISC_TOOLS = [
                     "minimum": 0,
                     "maximum": 40320,
                 },
+                "dry_run": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Return dry-run result",
+                },
+                "confirm_token": {
+                    "type": "string",
+                    "description": "Confirm token from dry-run",
+                },
             },
             "required": ["channel_id", "message_id", "reason"],
         },

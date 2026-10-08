@@ -1,9 +1,9 @@
+import json
 import importlib
 import os
 import sys
 import unittest
 from types import SimpleNamespace
-
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SRC = os.path.join(ROOT, "src")
@@ -85,13 +85,39 @@ class MiscHandlerLockSemanticsTests(unittest.IsolatedAsyncioTestCase):
         misc = importlib.import_module("discord_mcp.tools.handlers.misc")
         message = FakeMessage(author=SimpleNamespace())
         gateway = FakeGateway(channel=FakeChannel(message), member=SimpleNamespace())
+        base = {
+            "channel_id": "555",
+            "message_id": "101",
+            "reason": "policy",
+            "server_id": "42",
+        }
+
+        dry = await misc.handle_moderate_message(
+            base,
+            {
+                "gateway": gateway,
+                "discord_client": SimpleNamespace(user=SimpleNamespace(id=999)),
+            },
+        )
+        payload = json.loads(dry[0].text)
+        self.assertEqual(payload["status"], "dry_run")
+        self.assertTrue(payload["confirmToken"])
+        self.assertEqual(message.deleted_reasons, [])
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await misc.handle_moderate_message(
+                {**base, "dry_run": False},
+                {
+                    "gateway": gateway,
+                    "discord_client": SimpleNamespace(user=SimpleNamespace(id=999)),
+                },
+            )
 
         await misc.handle_moderate_message(
             {
-                "channel_id": "555",
-                "message_id": "101",
-                "reason": "policy",
-                "server_id": "42",
+                **base,
+                "dry_run": False,
+                "confirm_token": payload["confirmToken"],
             },
             {
                 "gateway": gateway,
@@ -129,13 +155,25 @@ class MiscHandlerLockSemanticsTests(unittest.IsolatedAsyncioTestCase):
             },
             deps,
         )
+
+        base = {
+            "channel_id": "555",
+            "message_id": "101",
+            "emoji": "🔥",
+            "server_id": "42",
+            "reason": "cleanup",
+        }
+        dry = await misc.handle_remove_reaction(base, deps)
+        payload = json.loads(dry[0].text)
+        self.assertEqual(payload["status"], "dry_run")
+        self.assertTrue(payload["confirmToken"])
+        self.assertEqual(message.removed_reactions, [])
+
+        with self.assertRaisesRegex(ValueError, "confirm_token is required"):
+            await misc.handle_remove_reaction({**base, "dry_run": False}, deps)
+
         await misc.handle_remove_reaction(
-            {
-                "channel_id": "555",
-                "message_id": "101",
-                "emoji": "🔥",
-                "server_id": "42",
-            },
+            {**base, "dry_run": False, "confirm_token": payload["confirmToken"]},
             deps,
         )
 

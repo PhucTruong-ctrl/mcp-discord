@@ -262,8 +262,12 @@ async def handle_list_bans(
     gateway = require_gateway(deps, "list_bans")
     guild = await gateway.resolve_guild(arguments["server_id"])
     limit = validate_limit(arguments.get("limit"), 1000, 1000)
+    kwargs: Dict[str, Any] = {"limit": limit}
+    for field in ("before", "after"):
+        if arguments.get(field) is not None:
+            kwargs[field] = discord.Object(id=_snowflake(arguments[field], field, str(guild.id)))
 
-    entries = [entry async for entry in guild.bans(limit=limit)]
+    entries = [entry async for entry in guild.bans(**kwargs)]
     rows = [
         {
             "userId": str(entry.user.id),

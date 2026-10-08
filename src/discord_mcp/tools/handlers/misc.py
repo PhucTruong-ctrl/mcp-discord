@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Dict, List
@@ -6,6 +7,12 @@ from urllib.parse import unquote, urlparse
 import aiohttp
 import discord
 from mcp.types import TextContent
+
+from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
+
+
+def _json(payload: Dict[str, Any]) -> List[TextContent]:
+    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]
 
 
 async def handle_download_attachment(
@@ -72,23 +79,45 @@ async def handle_moderate_message(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     server_id = arguments.get("server_id")
+    reason = str(arguments.get("reason") or "")
+    timeout_minutes = arguments.get("timeout_minutes")
+    targets = {
+        "message_id": str(arguments["message_id"]),
+        "timeout_minutes": timeout_minutes,
+        "reason": reason,
+    }
+
+    if bool(arguments.get("dry_run", True)):
+        return _json(
+            build_dry_run_result(
+                "moderate_message",
+                targets,
+                {
+                    "channel_id": str(arguments["channel_id"]),
+                    "message_id": str(arguments["message_id"]),
+                    "will_timeout": bool(timeout_minutes and timeout_minutes > 0),
+                    "timeout_minutes": timeout_minutes,
+                    "reason": reason,
+                },
+            )
+        )
+    verify_confirm_token("moderate_message", targets, arguments.get("confirm_token"))
+
     channel = await deps["gateway"].resolve_text_or_thread_channel(
         arguments["channel_id"], server_id
     )
     message = await channel.fetch_message(int(arguments["message_id"]))
 
-    await message.delete(reason=arguments["reason"])
+    await message.delete(reason=reason)
 
-    if "timeout_minutes" in arguments and arguments["timeout_minutes"] > 0:
+    if timeout_minutes and timeout_minutes > 0:
         if isinstance(message.author, discord.Member):
-            duration = discord.utils.utcnow() + timedelta(
-                minutes=arguments["timeout_minutes"]
-            )
-            await message.author.timeout(duration, reason=arguments["reason"])
+            duration = discord.utils.utcnow() + timedelta(minutes=timeout_minutes)
+            await message.author.timeout(duration, reason=reason)
             return [
                 TextContent(
                     type="text",
-                    text=f"Message deleted and user timed out for {arguments['timeout_minutes']} minutes.",
+                    text=f"Message deleted and user timed out for {timeout_minutes} minutes.",
                 )
             ]
 
@@ -131,6 +160,29 @@ async def handle_remove_reaction(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     server_id = arguments.get("server_id")
+    reason = str(arguments.get("reason") or "")
+    targets = {
+        "channel_id": str(arguments["channel_id"]),
+        "message_id": str(arguments["message_id"]),
+        "emoji": str(arguments["emoji"]),
+        "reason": reason,
+    }
+
+    if bool(arguments.get("dry_run", True)):
+        return _json(
+            build_dry_run_result(
+                "remove_reaction",
+                targets,
+                {
+                    "channel_id": str(arguments["channel_id"]),
+                    "message_id": str(arguments["message_id"]),
+                    "emoji": str(arguments["emoji"]),
+                    "reason": reason,
+                },
+            )
+        )
+    verify_confirm_token("remove_reaction", targets, arguments.get("confirm_token"))
+
     channel = await deps["gateway"].resolve_text_or_thread_channel(
         arguments["channel_id"], server_id
     )

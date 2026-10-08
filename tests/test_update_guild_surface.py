@@ -15,6 +15,7 @@ os.environ.setdefault("DISCORD_TOKEN", "test-token")
 import discord  # noqa: E402
 from discord_mcp.core.images import load_image_bytes  # noqa: E402
 from discord_mcp.tools.handlers.server_info import (  # noqa: E402
+    handle_list_members,
     handle_update_guild,
 )
 
@@ -42,6 +43,7 @@ class FakeGuild:
             FakeChannel(12, "general-2"),
         ]
         self.edits = []
+        self.members_after = None
 
     def get_channel(self, channel_id):
         return next((c for c in self.channels if c.id == channel_id), None)
@@ -50,6 +52,11 @@ class FakeGuild:
         self.edits.append(kwargs)
         if "description" in kwargs:
             self.description = kwargs["description"]
+
+    async def fetch_members(self, *, limit=100, after=None):
+        self.members_after = after
+        return
+        yield
 
 
 class FakeGateway:
@@ -210,6 +217,35 @@ class UpdateGuildSurfaceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "MANAGE_GUILD") as ctx:
             await handle_update_guild({"server_id": "1", "icon": None}, deps)
         self.assertIn("matching guild feature", str(ctx.exception))
+
+class ListMembersTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.guild = FakeGuild()
+        self.deps = {"gateway": FakeGateway(self.guild)}
+
+    async def test_after_is_forwarded_to_fetch_members(self):
+        self.guild.members = [
+            type(
+                "M",
+                (),
+                {"id": 11, "name": "bob", "nick": None, "joined_at": None, "roles": []},
+            )()
+        ]
+
+        await handle_list_members({"server_id": "1", "after": "100"}, self.deps)
+
+        self.assertEqual(self.guild.members_after.id, 100)
+
+    async def test_after_is_omitted_when_absent(self):
+        self.guild.members = []
+
+        await handle_list_members({"server_id": "1"}, self.deps)
+
+        self.assertIsNone(self.guild.members_after)
+
+    async def test_after_rejects_non_numeric_value(self):
+        with self.assertRaisesRegex(ValueError, "after must be a snowflake id"):
+            await handle_list_members({"server_id": "1", "after": "many"}, self.deps)
 
 
 if __name__ == "__main__":

@@ -134,6 +134,14 @@ INVITES_MEMBERSHIP_TOOLS = [
                     "type": "integer",
                     "description": "Maximum bans to return (default and cap 1000)",
                 },
+                "before": {
+                    "type": "string",
+                    "description": "Only return bans created before this snowflake id",
+                },
+                "after": {
+                    "type": "string",
+                    "description": "Only return bans created after this snowflake id",
+                },
             },
             "required": ["server_id"],
         },

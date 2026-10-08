@@ -2,11 +2,14 @@ import json
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List
+import discord
 
 from mcp.types import TextContent
 
 from discord_mcp.core.permissions import as_permission_bits, permission_names
 from discord_mcp.core.validation import validate_limit
+from discord_mcp.core.resolve import try_int
+from discord_mcp.services.discord_gateway import resolve_audit_action
 
 _PERMISSION_FIELDS = ("permissions", "allow", "deny")
 
@@ -133,19 +136,44 @@ def _within_window(entries: Iterable[Any], window_hours: int) -> List[Any]:
     return [entry for entry in entries if entry.created_at >= cutoff]
 
 
+def _snowflake(value: Any, field: str) -> int:
+    parsed = try_int(value)
+    if parsed is None:
+        raise ValueError(f"{field} must be a snowflake id, got {value!r}")
+    return parsed
+
+
+async def _fetch_audit_entries(guild: Any, **kwargs: Any) -> List[Any]:
+    return [entry async for entry in guild.audit_logs(**kwargs)]
+
+
+def _audit_kwargs(arguments: Dict[str, Any], limit: int) -> Dict[str, Any]:
+    """Pagination kwargs for ``Guild.audit_logs``, omitted when not provided."""
+    kwargs: Dict[str, Any] = {"limit": limit}
+    for field in ("before", "after"):
+        if arguments.get(field) is not None:
+            kwargs[field] = discord.Object(id=_snowflake(arguments[field], field))
+    if arguments.get("oldest_first") is not None:
+        kwargs["oldest_first"] = bool(arguments["oldest_first"])
+    return kwargs
+
+
+
+
 async def handle_get_audit_log(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    server_id = arguments["server_id"]
+    guild = await gateway.resolve_guild(arguments["server_id"])
     limit = validate_limit(arguments.get("limit"), 50, 1000)
     action_type = arguments.get("action_type")
-    entries = await gateway.fetch_audit_entries(
-        server_id, limit=limit, action_type=action_type
-    )
+    kwargs = _audit_kwargs(arguments, limit)
+    if action_type:
+        kwargs["action"] = resolve_audit_action(action_type)
+    entries = await _fetch_audit_entries(guild, **kwargs)
 
     payload = {
-        "serverId": str(server_id),
+        "serverId": str(arguments["server_id"]),
         "actionType": action_type or None,
         "entryCount": len(entries),
         "entries": [_serialize_entry(entry) for entry in entries],
@@ -155,21 +183,28 @@ async def handle_get_audit_log(
     ]
 
 
+
+
 async def handle_get_member_moderation_history(
     arguments: Dict[str, Any], deps: Dict[str, Any]
 ) -> List[TextContent]:
     gateway = deps["gateway"]
-    server_id = arguments["server_id"]
+    guild = await gateway.resolve_guild(arguments["server_id"])
     user_id = str(arguments["user_id"])
     limit = validate_limit(arguments.get("limit"), 200, 1000)
-    entries = await gateway.fetch_audit_entries(server_id, limit=limit)
+    # Discord filters server-side on ``user``; a client-side filter would only see
+    # the newest page and silently truncate older events.
+    entries = await _fetch_audit_entries(
+        guild,
+        limit=limit,
+        user=discord.Object(id=_snowflake(user_id, "user_id")),
+    )
 
-    history = [entry for entry in entries if _target_id(entry) == user_id]
     payload = {
-        "serverId": str(server_id),
+        "serverId": str(arguments["server_id"]),
         "targetUserId": user_id,
-        "eventCount": len(history),
-        "events": [_serialize_entry(entry) for entry in history],
+        "eventCount": len(entries),
+        "events": [_serialize_entry(entry) for entry in entries],
     }
     return [
         TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))

@@ -9,6 +9,7 @@ from mcp.types import TextContent
 from discord_mcp.core.emoji import emoji_payload
 from discord_mcp.core.permissions import overwrite_rows, role_payload
 from discord_mcp.core.serialize import _serialize_forum_tag
+from discord_mcp.core.safety import build_dry_run_result, verify_confirm_token
 
 
 def _overwrites_map(channel: Any) -> Dict[str, Dict[str, Any]]:
@@ -369,7 +370,38 @@ async def handle_remove_channel_permission_overwrite(
         guild, arguments["target_id"], arguments.get("target_type")
     )
 
-    reason = arguments.get("reason")
+    reason = str(arguments.get("reason") or "").strip()
+    if not reason:
+        raise ValueError("reason is required")
+
+    targets = {
+        "channel_id": str(channel.id),
+        "target_id": str(target.id),
+        "reason": reason,
+    }
+    if bool(arguments.get("dry_run", True)):
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    build_dry_run_result(
+                        "remove_channel_permission_overwrite",
+                        targets,
+                        {
+                            "channelId": str(channel.id),
+                            "targetId": str(target.id),
+                            "targetType": str(getattr(target, "name", target)).lower(),
+                            "reason": reason,
+                        },
+                    ),
+                    ensure_ascii=False,
+                ),
+            )
+        ]
+    verify_confirm_token(
+        "remove_channel_permission_overwrite", targets, arguments.get("confirm_token")
+    )
+
     await channel.set_permissions(target, overwrite=None, reason=reason)
 
     refreshed = await deps["gateway"].fetch_channel(arguments["channel_id"])
