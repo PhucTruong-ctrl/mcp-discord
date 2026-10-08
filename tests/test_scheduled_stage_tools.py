@@ -259,7 +259,7 @@ class ScheduledStageToolsSchemaAndHandlersTests(unittest.IsolatedAsyncioTestCase
         # Read-only tools must NOT declare them.
         from discord_mcp.tools.schemas.scheduled_stage import SCHEDULED_STAGE_TOOLS
         for t in SCHEDULED_STAGE_TOOLS:
-            props = t.inputSchema.get("properties", {})
+            props = t.input_schema.get("properties", {})
             if t.name in GATED:
                 self.assertIn("dry_run", props)
                 self.assertIn("confirm_token", props)
@@ -271,11 +271,11 @@ class ScheduledStageToolsSchemaAndHandlersTests(unittest.IsolatedAsyncioTestCase
         from discord_mcp.tools.schemas.scheduled_stage import SCHEDULED_STAGE_TOOLS
         for name in REASON_REQUIRED:
             t = next(t for t in SCHEDULED_STAGE_TOOLS if t.name == name)
-            self.assertIn("reason", t.inputSchema.get("required", []))
+            self.assertIn("reason", t.input_schema.get("required", []))
         # Start/end reason optional (not in required)
         for name in ("start_scheduled_event", "end_scheduled_event"):
             t = next(t for t in SCHEDULED_STAGE_TOOLS if t.name == name)
-            self.assertNotIn("reason", t.inputSchema.get("required", []))
+            self.assertNotIn("reason", t.input_schema.get("required", []))
 
     async def test_get_scheduled_event_payload_keys(self):
         result = await handlers.handle_get_scheduled_event(

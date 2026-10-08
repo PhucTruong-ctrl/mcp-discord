@@ -7,10 +7,17 @@ from functools import wraps
 
 import discord
 from discord.ext import commands
-from mcp.server import Server
+from mcp.server import Server, ServerRequestContext
 from mcp.server.models import InitializationOptions
-from mcp.types import ServerCapabilities, Tool, TextContent, ToolsCapability
 from mcp.server.stdio import stdio_server
+from mcp.types import (
+    CallToolRequestParams,
+    CallToolResult,
+    ListToolsResult,
+    ServerCapabilities,
+    TextContent,
+    ToolsCapability,
+)
 
 from ._version import __version__
 from .composition import (
@@ -34,7 +41,6 @@ _configure_windows_stdout_encoding()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("discord-mcp-server")
 
-
 # Lazy token resolver: validated at runtime, not import time
 def _require_discord_token() -> str:
     token = os.getenv("DISCORD_TOKEN")
@@ -49,9 +55,6 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Initialize MCP server
-app = Server("discord-server")
-
 # Store Discord client reference
 discord_client = None
 
@@ -63,30 +66,55 @@ async def on_ready():
     logger.info(f"Logged in as {bot.user.name}")
 
 
-# Helper function to ensure Discord client is ready
-def require_discord_client(func):
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        if not discord_client:
-            raise RuntimeError("Discord client not ready")
-        return await func(*args, **kwargs)
-
-    return wrapper
+def _require_ready_client() -> None:
+    """Raise unless the Discord gateway finished connecting."""
+    if not discord_client:
+        raise RuntimeError("Discord client not ready")
 
 
-@app.list_tools()
-async def list_tools() -> List[Tool]:
-    """List available Discord tools."""
-    return compose_tool_registry()
+@wraps(dispatch_tool_call)
+async def _run_tool(name: str, arguments: Any) -> List[TextContent]:
+    """Dispatch one tool against a freshly built dependency set."""
+    _require_ready_client()
+    return await dispatch_tool_call(name, arguments, build_tool_dependencies(discord_client))
 
 
-@app.call_tool()
-@require_discord_client
-async def call_tool(name: str, arguments: Any) -> List[TextContent]:
-    """Handle Discord tool calls."""
-    arguments = arguments or {}
-    dependencies = build_tool_dependencies(discord_client)
-    return await dispatch_tool_call(name, arguments, dependencies)
+async def _on_call_tool(
+    context: ServerRequestContext, params: CallToolRequestParams
+) -> CallToolResult:
+    """Run one Discord tool call.
+
+    MCP SDK 2.x replaced the ``@app.call_tool()`` decorator with a constructor
+    callback that receives typed request params instead of ``(name, arguments)``.
+
+    A failing tool comes back as a result with ``is_error`` set rather than as a
+    transport fault: SDK 2.x turns an escaping exception into a JSON-RPC error,
+    which would hide "unknown tool" / "channel not found" / "missing permission"
+    behind an opaque connection failure instead of text the model can read.
+    """
+    try:
+        content = await _run_tool(params.name, params.arguments or {})
+        return CallToolResult(content=content)
+    except Exception as exc:  # noqa: BLE001 - surfaced to the caller as tool output
+        logger.warning("tool %s failed: %s", params.name, exc)
+        return CallToolResult(
+            content=[TextContent(type="text", text=f"{type(exc).__name__}: {exc}")],
+            is_error=True,
+        )
+
+
+async def _on_list_tools(context: ServerRequestContext, params: Any) -> ListToolsResult:
+    """Advertise the Discord tool registry."""
+    return ListToolsResult(tools=compose_tool_registry())
+
+
+# Initialize MCP server (the callbacks must exist before the Server is built)
+app: Server = Server(
+    name="discord-server",
+    version=__version__,
+    on_list_tools=_on_list_tools,
+    on_call_tool=_on_call_tool,
+)
 
 
 async def main():

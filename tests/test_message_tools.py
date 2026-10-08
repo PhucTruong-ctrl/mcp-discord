@@ -34,32 +34,32 @@ class MessageSchemaTests(unittest.TestCase):
         tool = _tool_by_name("reply_message")
         self.assertIsNotNone(tool)
         self.assertEqual(tool.name, "reply_message")
-        self.assertIn("channel_id", tool.inputSchema["properties"])
-        self.assertIn("message_id", tool.inputSchema["properties"])
-        self.assertIn("content", tool.inputSchema["properties"])
+        self.assertIn("channel_id", tool.input_schema["properties"])
+        self.assertIn("message_id", tool.input_schema["properties"])
+        self.assertIn("content", tool.input_schema["properties"])
         self.assertEqual(
-            set(tool.inputSchema["required"]), {"channel_id", "message_id", "content"}
+            set(tool.input_schema["required"]), {"channel_id", "message_id", "content"}
         )
 
     def test_reply_message_accepts_optional_server_id(self):
         tool = _tool_by_name("reply_message")
-        self.assertIn("server_id", tool.inputSchema["properties"])
+        self.assertIn("server_id", tool.input_schema["properties"])
 
     def test_send_message_schema_unchanged(self):
         tool = _tool_by_name("send_message")
-        self.assertNotIn("message_id", tool.inputSchema["properties"])
-        self.assertNotIn("server_id", tool.inputSchema["properties"])
+        self.assertNotIn("message_id", tool.input_schema["properties"])
+        self.assertNotIn("server_id", tool.input_schema["properties"])
 
     def test_read_messages_schema_unchanged(self):
         tool = _tool_by_name("read_messages")
-        self.assertIn("channel_id", tool.inputSchema["properties"])
-        self.assertIn("limit", tool.inputSchema["properties"])
+        self.assertIn("channel_id", tool.input_schema["properties"])
+        self.assertIn("limit", tool.input_schema["properties"])
 
     def test_edit_message_schema_unchanged(self):
         tool = _tool_by_name("edit_message")
-        self.assertIn("channel_id", tool.inputSchema["properties"])
-        self.assertIn("message_id", tool.inputSchema["properties"])
-        self.assertIn("content", tool.inputSchema["properties"])
+        self.assertIn("channel_id", tool.input_schema["properties"])
+        self.assertIn("message_id", tool.input_schema["properties"])
+        self.assertIn("content", tool.input_schema["properties"])
 
 
 class EmbedSerializationTests(unittest.TestCase):

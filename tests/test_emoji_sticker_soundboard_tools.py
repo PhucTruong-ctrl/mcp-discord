@@ -320,7 +320,7 @@ class EmojiStickerSoundboardSchemaTests(unittest.TestCase):
 
     def test_gate_properties_only_on_gated_tools(self):
         for tool in EMOJI_STICKER_SOUNDBOARD_TOOLS:
-            properties = tool.inputSchema["properties"]
+            properties = tool.input_schema["properties"]
             if tool.name in GATED_TOOLS:
                 self.assertIn("dry_run", properties, tool.name)
                 self.assertIn("confirm_token", properties, tool.name)
@@ -336,7 +336,7 @@ class EmojiStickerSoundboardSchemaTests(unittest.TestCase):
 
     def test_reason_required_where_the_table_requires_it(self):
         for tool in EMOJI_STICKER_SOUNDBOARD_TOOLS:
-            required = tool.inputSchema["required"]
+            required = tool.input_schema["required"]
             if tool.name in REASON_REQUIRED_TOOLS:
                 self.assertIn("reason", required, tool.name)
             else:
@@ -345,8 +345,8 @@ class EmojiStickerSoundboardSchemaTests(unittest.TestCase):
     def test_read_only_tools_take_no_gate_or_reason(self):
         for tool in EMOJI_STICKER_SOUNDBOARD_TOOLS:
             if tool.name in READ_ONLY_TOOLS:
-                required = tool.inputSchema["required"]
-                properties = tool.inputSchema["properties"]
+                required = tool.input_schema["required"]
+                properties = tool.input_schema["properties"]
                 for key in ("reason", "dry_run", "confirm_token"):
                     self.assertNotIn(key, properties, tool.name)
                     self.assertNotIn(key, required, tool.name)

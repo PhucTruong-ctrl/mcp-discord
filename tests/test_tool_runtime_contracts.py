@@ -96,7 +96,7 @@ class McpContentContractTests(unittest.TestCase):
         tools = compose_tool_registry()
         for tool in tools:
             self.assertIsInstance(tool.name, str)
-            self.assertIsInstance(tool.inputSchema, dict)
+            self.assertIsInstance(tool.input_schema, dict)
             # description is optional in mcp SDK but we always provide it
             self.assertIsNotNone(
                 tool.description, f"Tool {tool.name} missing description"

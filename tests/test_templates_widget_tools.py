@@ -222,14 +222,14 @@ class SchemaTests(TemplatesWidgetTestCase):
     def test_every_schema_is_an_object_with_required(self):
         for tool in TEMPLATES_WIDGET_TOOLS:
             with self.subTest(tool=tool.name):
-                self.assertEqual(tool.inputSchema["type"], "object")
-                self.assertTrue(tool.inputSchema["required"])
+                self.assertEqual(tool.input_schema["type"], "object")
+                self.assertTrue(tool.input_schema["required"])
                 self.assertTrue(tool.description)
 
     def test_gated_tools_declare_gate_params_and_read_ones_do_not(self):
         for tool in TEMPLATES_WIDGET_TOOLS:
             with self.subTest(tool=tool.name):
-                properties = tool.inputSchema["properties"]
+                properties = tool.input_schema["properties"]
                 if tool.name in GATED_TOOLS:
                     self.assertIn("dry_run", properties)
                     self.assertIs(properties["dry_run"]["default"], True)
@@ -244,7 +244,7 @@ class SchemaTests(TemplatesWidgetTestCase):
             for tool in TEMPLATES_WIDGET_TOOLS
             if tool.name == "delete_template"
         )
-        self.assertIn("reason", delete_tool.inputSchema["required"])
+        self.assertIn("reason", delete_tool.input_schema["required"])
 
 
 class HandlerContractTests(TemplatesWidgetTestCase):

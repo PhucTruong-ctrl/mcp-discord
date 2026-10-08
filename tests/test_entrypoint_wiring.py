@@ -13,13 +13,15 @@ from discord_mcp import server
 from discord_mcp.tools.handlers.router import TOOL_ROUTER
 from discord_mcp.tools.schemas import compose_tool_registry
 
-# MCP SDK API surface contracts for drift detection
-# These reflect mcp>=1.27.2 model fields
-EXPECTED_TOOL_FIELDS = {"name", "description", "inputSchema", "title", "outputSchema"}
+# MCP SDK API surface contracts for drift detection.
+# These reflect mcp>=2.3.0 model fields, which are snake_case with a camelCase
+# wire alias: constructing by alias still works, attribute reads do not.
+EXPECTED_TOOL_FIELDS = {"name", "description", "input_schema", "title", "output_schema"}
 EXPECTED_TEXT_CONTENT_FIELDS = {"type", "text", "annotations"}
 
-EXPECTED_TOOL_REQUIRED_FIELDS = {"name", "inputSchema"}
-EXPECTED_TEXT_CONTENT_REQUIRED_FIELDS = {"type", "text"}
+EXPECTED_TOOL_REQUIRED_FIELDS = {"name", "input_schema"}
+# SDK 2.x dropped the `type` requirement on TextContent (it defaults to "text")
+EXPECTED_TEXT_CONTENT_REQUIRED_FIELDS = {"text"}
 
 
 class McpSdkApiDriftTests(unittest.TestCase):
@@ -116,7 +118,9 @@ class McpSdkApiDriftTests(unittest.TestCase):
         )
         self.assertEqual(tool.name, "test_tool")
         self.assertEqual(tool.description, "A test tool")
-        self.assertEqual(tool.inputSchema["type"], "object")
+        # SDK 2.x keeps a camelCase wire alias but the field itself is snake_case
+        self.assertEqual(tool.input_schema["type"], "object")
+        self.assertEqual(tool.model_dump(by_alias=True)["inputSchema"], tool.input_schema)
 
     def test_text_content_constructor_accepts_current_usage(self):
         """Verify that TextContent construction as used in handlers is valid."""
@@ -127,41 +131,42 @@ class McpSdkApiDriftTests(unittest.TestCase):
         self.assertEqual(content.text, "hello")
 
 
-class ServerDecoratorContractTests(unittest.IsolatedAsyncioTestCase):
-    """Verify that the MCP Server decorator pattern works correctly."""
+class ServerHandlerContractTests(unittest.IsolatedAsyncioTestCase):
+    """Verify the MCP Server handler-registration pattern works correctly.
 
-    async def test_server_list_tools_decorator_binds_tool_list(self):
-        """The @app.list_tools() decorator should register a tool listing function."""
+    SDK 2.x removed the ``@app.list_tools()`` / ``@app.call_tool()`` decorators
+    in favour of ``on_list_tools`` / ``on_call_tool`` constructor callbacks.
+    """
+
+    async def test_server_accepts_on_list_tools_callback(self):
         from mcp.server import Server
-        from mcp.types import Tool
+        from mcp.types import ListToolsResult
 
-        app = Server("test")
-        recorded = None
+        async def my_tools(context, params) -> ListToolsResult:
+            return ListToolsResult(tools=[])
 
-        @app.list_tools()
-        async def my_tools() -> List[Tool]:
-            nonlocal recorded
-            recorded = True
-            return []
+        app = Server("test", on_list_tools=my_tools)
+        self.assertEqual(app.name, "test")
 
-        # Just verify the decorator syntax is accepted
-        self.assertIsNotNone(my_tools)
-
-    async def test_server_call_tool_decorator_binds_handler(self):
-        """The @app.call_tool() decorator should register a tool call handler."""
+    async def test_server_accepts_on_call_tool_callback(self):
         from mcp.server import Server
-        from mcp.types import TextContent
+        from mcp.types import CallToolRequestParams, CallToolResult, TextContent
 
-        app = Server("test")
-        recorded = None
+        async def my_call(context, params: CallToolRequestParams) -> CallToolResult:
+            return CallToolResult(content=[TextContent(type="text", text="ok")])
 
-        @app.call_tool()
-        async def my_call(name: str, arguments: dict) -> List[TextContent]:
-            nonlocal recorded
-            recorded = (name, arguments)
-            return [TextContent(type="text", text="ok")]
+        app = Server("test", on_call_tool=my_call)
+        self.assertEqual(app.name, "test")
 
-        self.assertIsNotNone(my_call)
+    async def test_server_no_longer_exposes_tool_decorators(self):
+        """Pin the 2.x contract so a silent 1.x/2.x mixup gets caught."""
+        from mcp.server import Server
+
+        for removed in ("list_tools", "call_tool"):
+            self.assertFalse(
+                hasattr(Server, removed),
+                f"Server.{removed} was removed in mcp 2.x; use on_{removed}",
+            )
 
     async def test_production_init_options_construction_mirrors_server_main(self):
         """Mirror the exact InitializationOptions construction from server.py:main().
@@ -214,16 +219,20 @@ class ServerDecoratorContractTests(unittest.IsolatedAsyncioTestCase):
 
 class EntrypointWiringTests(unittest.IsolatedAsyncioTestCase):
     async def test_list_tools_delegates_to_schema_registry(self):
-        expected = [object()]
+        from mcp.types import Tool
+
+        expected = [Tool(name="probe", description="d", input_schema={"type": "object"})]
         with patch(
             "discord_mcp.server.compose_tool_registry", return_value=expected
         ) as compose:
-            tools = await server.list_tools()
-        self.assertIs(tools, expected)
+            result = await server._on_list_tools(None, None)
+        self.assertEqual(result.tools, expected)
         compose.assert_called_once_with()
 
     async def test_call_tool_delegates_to_router_dispatcher(self):
-        expected = [object()]
+        from mcp.types import CallToolRequestParams, TextContent
+
+        expected = [TextContent(type="text", text="ok")]
         deps = object()
         fake_client = object()
         with (
@@ -236,9 +245,12 @@ class EntrypointWiringTests(unittest.IsolatedAsyncioTestCase):
                 new=AsyncMock(return_value=expected),
             ) as dispatch,
         ):
-            result = await server.call_tool("list_servers", {"x": 1})
+            result = await server._on_call_tool(
+                None, CallToolRequestParams(name="list_servers", arguments={"x": 1})
+            )
 
-        self.assertIs(result, expected)
+        self.assertFalse(result.is_error)
+        self.assertEqual(result.content, expected)
         build.assert_called_once_with(fake_client)
         dispatch.assert_awaited_once_with("list_servers", {"x": 1}, deps)
 

@@ -200,13 +200,13 @@ class SchemaContractTests(unittest.TestCase):
 
     def test_gated_tools_declare_dry_run_and_confirm_token(self):
         for tool in MONETIZATION_APPCMDS_TOOLS:
-            props = tool.inputSchema.get("properties", {})
+            props = tool.input_schema.get("properties", {})
             if tool.name in GATED_TOOLS:
                 self.assertIn("dry_run", props, f"{tool.name}: missing dry_run prop")
                 self.assertIn("confirm_token", props, f"{tool.name}: missing confirm_token prop")
                 # create_entitlement / delete_entitlement require reason in schema
                 if tool.name in ("create_entitlement", "delete_entitlement"):
-                    self.assertIn("reason", tool.inputSchema.get("required", []), f"{tool.name}: reason required")
+                    self.assertIn("reason", tool.input_schema.get("required", []), f"{tool.name}: reason required")
             else:
                 self.assertNotIn("dry_run", props, f"{tool.name}: dry_run should not appear")
                 self.assertNotIn("confirm_token", props, f"{tool.name}: confirm_token should not appear")

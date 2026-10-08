@@ -30,21 +30,21 @@ def _tool_by_name(tools, name):
 class MiscAndMessageSchemaTests(unittest.TestCase):
     def test_get_user_info_accepts_optional_server_id(self):
         tool = _tool_by_name(MISC_TOOLS, "get_user_info")
-        self.assertIn("server_id", tool.inputSchema["properties"])
-        self.assertEqual(tool.inputSchema["required"], ["user_id"])
+        self.assertIn("server_id", tool.input_schema["properties"])
+        self.assertEqual(tool.input_schema["required"], ["user_id"])
 
     def test_moderate_message_accepts_optional_server_id(self):
         tool = _tool_by_name(MISC_TOOLS, "moderate_message")
-        self.assertIn("server_id", tool.inputSchema["properties"])
+        self.assertIn("server_id", tool.input_schema["properties"])
         self.assertEqual(
-            tool.inputSchema["required"], ["channel_id", "message_id", "reason"]
+            tool.input_schema["required"], ["channel_id", "message_id", "reason"]
         )
 
     def test_reaction_tools_accept_optional_server_id(self):
         names = {"add_reaction", "add_multiple_reactions", "remove_reaction"}
         for name in names:
             tool = _tool_by_name(MESSAGE_TOOLS, name)
-            self.assertIn("server_id", tool.inputSchema["properties"])
+            self.assertIn("server_id", tool.input_schema["properties"])
 
 
 class MiscAndMessageHandlerLockTests(unittest.IsolatedAsyncioTestCase):

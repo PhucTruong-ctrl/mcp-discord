@@ -324,7 +324,7 @@ class MembersRolesAdvancedSchemaTests(unittest.TestCase):
             EXPECTED_TOOL_NAMES,
         )
         for tool in MEMBERS_ROLES_ADVANCED_TOOLS:
-            properties = tool.inputSchema["properties"]
+            properties = tool.input_schema["properties"]
             if tool.name in GATED_TOOLS:
                 self.assertIn("dry_run", properties, tool.name)
                 self.assertIn("confirm_token", properties, tool.name)
@@ -334,18 +334,18 @@ class MembersRolesAdvancedSchemaTests(unittest.TestCase):
 
     def test_reason_required_where_the_contract_requires_it(self):
         by_name = {tool.name: tool for tool in MEMBERS_ROLES_ADVANCED_TOOLS}
-        self.assertIn("reason", by_name["request_to_speak"].inputSchema["required"])
-        self.assertIn("reason", by_name["reorder_roles"].inputSchema["required"])
+        self.assertIn("reason", by_name["request_to_speak"].input_schema["required"])
+        self.assertIn("reason", by_name["reorder_roles"].input_schema["required"])
         # optional reasons stay out of "required"
         self.assertNotIn(
-            "reason", by_name["change_member_voice_state"].inputSchema["required"]
+            "reason", by_name["change_member_voice_state"].input_schema["required"]
         )
         self.assertIn(
-            "reason", by_name["change_member_voice_state"].inputSchema["properties"]
+            "reason", by_name["change_member_voice_state"].input_schema["properties"]
         )
         # ClientUser.edit takes no audit reason
         self.assertNotIn(
-            "reason", by_name["update_bot_profile"].inputSchema["properties"]
+            "reason", by_name["update_bot_profile"].input_schema["properties"]
         )
 
     def test_reorder_roles_documents_contiguous_positions(self):
@@ -354,7 +354,7 @@ class MembersRolesAdvancedSchemaTests(unittest.TestCase):
             for entry in MEMBERS_ROLES_ADVANCED_TOOLS
             if entry.name == "reorder_roles"
         )
-        blob = tool.description + " " + tool.inputSchema["properties"]["positions"][
+        blob = tool.description + " " + tool.input_schema["properties"]["positions"][
             "description"
         ]
         self.assertIn("contiguous", blob)
@@ -365,7 +365,7 @@ class MembersRolesAdvancedSchemaTests(unittest.TestCase):
         for name in ("change_member_voice_state", "move_member_voice"):
             self.assertIn("disconnect", by_name[name].description, name)
             self.assertIn(
-                "disconnect", by_name[name].inputSchema["properties"]["channel_id"][
+                "disconnect", by_name[name].input_schema["properties"]["channel_id"][
                     "description"
                 ],
                 name,

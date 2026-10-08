@@ -27,6 +27,22 @@ For full details, use:
 | `DEFAULT_GUILD_ID` / `DISCORD_GUILD_ID` | no | default server when a tool call omits `server_id` |
 | `DISCORD_MCP_STATE_DIR` | no | where incident/tool state is stored (default `~/.local/state/discord-mcp`) |
 
+
+## Runtime requirements
+
+| Package | Floor | Notes |
+|---|---|---|
+| Python | 3.12 | `requires-python = ">=3.12"` |
+| `discord.py` | 2.7.1 | current PyPI latest is also 2.7.1 |
+| `mcp` | **2.3.0** | the 2.x line is required: SDK 2.0 removed the low-level `Server.list_tools()` / `Server.call_tool()` decorators in favour of the `on_list_tools` / `on_call_tool` constructor callbacks that `src/discord_mcp/server.py` uses |
+
+SDK 2.x also renamed pydantic fields to snake_case while keeping the camelCase
+wire alias, so `Tool(..., inputSchema=...)` still works but reads must go through
+`tool.input_schema`. A failing tool is returned as a result with `is_error` set
+rather than as a transport fault, which is what keeps "unknown tool" / "channel
+not found" readable to the model.
+
+
 ## Channel CRUD/Admin Mapping
 
 Channel CRUD/admin tools are exposed per channel type:

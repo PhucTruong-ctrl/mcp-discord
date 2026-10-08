@@ -3,7 +3,7 @@ import sys
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from mcp.types import TextContent
+from mcp.types import CallToolRequestParams, TextContent
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -87,18 +87,46 @@ class TestToolContractsBaseline(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(canonical_set - alias_enabled), 13)
 
     async def test_call_tool_delegates_to_router(self):
+        params = CallToolRequestParams(name="list_servers", arguments={})
         with patch(
             "discord_mcp.server.dispatch_tool_call",
             new=AsyncMock(return_value=[TextContent(type="text", text="ok")]),
         ) as dispatch:
-            result = await server.call_tool("list_servers", {})
+            result = await server._on_call_tool(None, params)
 
-        self.assertEqual(result[0].text, "ok")
+        self.assertFalse(result.is_error)
+        self.assertEqual(result.content[0].text, "ok")
         dispatch.assert_awaited_once()
         name, arguments, deps = dispatch.await_args.args
         self.assertEqual(name, "list_servers")
         self.assertEqual(arguments, {})
         self.assertIs(deps["discord_client"], server.discord_client)
+
+    async def test_call_tool_reports_failure_as_a_tool_error(self):
+        """A failing tool must come back as is_error output, not raise.
+
+        SDK 2.x turns an escaping exception into a JSON-RPC error, which would
+        hide "unknown tool" behind an opaque transport failure.
+        """
+        params = CallToolRequestParams(name="list_servers", arguments={})
+        with patch(
+            "discord_mcp.server.dispatch_tool_call",
+            new=AsyncMock(side_effect=ValueError("Unknown tool: list_servers")),
+        ):
+            result = await server._on_call_tool(None, params)
+
+        self.assertTrue(result.is_error)
+        self.assertIn("Unknown tool", result.content[0].text)
+
+    async def test_call_tool_without_arguments_defaults_to_empty(self):
+        params = CallToolRequestParams(name="list_servers")
+        with patch(
+            "discord_mcp.server.dispatch_tool_call",
+            new=AsyncMock(return_value=[TextContent(type="text", text="ok")]),
+        ) as dispatch:
+            await server._on_call_tool(None, params)
+
+        self.assertEqual(dispatch.await_args.args[1], {})
 
 
 if __name__ == "__main__":

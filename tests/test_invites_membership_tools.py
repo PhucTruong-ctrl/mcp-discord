@@ -212,9 +212,9 @@ class InvitesMembershipSchemaTests(unittest.TestCase):
         )
         gated = {"create_invite", "delete_invite"}
         for tool in tools:
-            self.assertEqual(tool.inputSchema["type"], "object")
+            self.assertEqual(tool.input_schema["type"], "object")
             self.assertTrue(tool.description)
-            properties = tool.inputSchema["properties"]
+            properties = tool.input_schema["properties"]
             if tool.name in gated:
                 self.assertIn("dry_run", properties)
                 self.assertIn("confirm_token", properties)
@@ -222,7 +222,7 @@ class InvitesMembershipSchemaTests(unittest.TestCase):
                 self.assertNotIn("dry_run", properties)
                 self.assertNotIn("confirm_token", properties)
         delete_tool = next(t for t in tools if t.name == "delete_invite")
-        self.assertIn("reason", delete_tool.inputSchema["required"])
+        self.assertIn("reason", delete_tool.input_schema["required"])
 
 
 class InvitesMembershipHandlerTests(unittest.IsolatedAsyncioTestCase):

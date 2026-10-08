@@ -193,7 +193,7 @@ class WebhookMgmtSchemaTests(unittest.TestCase):
 
     def test_gate_params_declared_only_on_gated_tools(self):
         for name in EXPECTED_TOOL_NAMES:
-            schema = _tool(name).inputSchema
+            schema = _tool(name).input_schema
             properties = schema["properties"]
             with self.subTest(tool=name):
                 self.assertEqual(schema["type"], "object")
@@ -227,7 +227,7 @@ class WebhookMgmtSchemaTests(unittest.TestCase):
         }
         for name, required in expected.items():
             with self.subTest(tool=name):
-                self.assertEqual(_tool(name).inputSchema["required"], required)
+                self.assertEqual(_tool(name).input_schema["required"], required)
 
 
 class WebhookMgmtHandlerTests(unittest.IsolatedAsyncioTestCase):

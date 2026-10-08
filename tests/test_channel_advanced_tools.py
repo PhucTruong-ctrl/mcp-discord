@@ -188,7 +188,7 @@ class SchemaTests(ChannelAdvancedTestCase):
     def test_every_tool_declares_gate_params(self):
         for tool in CHANNEL_ADVANCED_TOOLS:
             with self.subTest(tool=tool.name):
-                schema = tool.inputSchema
+                schema = tool.input_schema
                 self.assertEqual(schema["type"], "object")
                 self.assertTrue(schema["required"])
                 self.assertIn("dry_run", schema["properties"])

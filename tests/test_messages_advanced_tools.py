@@ -205,7 +205,7 @@ class MessagesAdvancedSchemaTests(unittest.TestCase):
     def test_gate_tools_declare_dry_run_confirm_token_and_reason(self):
         for name in GATED_TOOLS:
             with self.subTest(name=name):
-                schema = _tool(name).inputSchema
+                schema = _tool(name).input_schema
                 self.assertIn("dry_run", schema["properties"])
                 self.assertIn("confirm_token", schema["properties"])
                 self.assertIn("reason", schema["properties"])
@@ -215,13 +215,13 @@ class MessagesAdvancedSchemaTests(unittest.TestCase):
         ungated = EXPECTED_TOOL_NAMES - set(GATED_TOOLS)
         for name in ungated:
             with self.subTest(name=name):
-                properties = _tool(name).inputSchema["properties"]
+                properties = _tool(name).input_schema["properties"]
                 self.assertNotIn("dry_run", properties)
                 self.assertNotIn("confirm_token", properties)
                 self.assertNotIn("reason", properties)
 
     def test_components_schema_documents_the_spec_shape(self):
-        description = _tool("send_components").inputSchema["properties"]["components"][
+        description = _tool("send_components").input_schema["properties"]["components"][
             "description"
         ]
         self.assertIn('"type":"button"', description)

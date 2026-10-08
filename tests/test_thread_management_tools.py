@@ -170,7 +170,7 @@ class ThreadManagementSchemaTests(unittest.TestCase):
             [tool.name for tool in THREAD_MANAGEMENT_TOOLS], EXPECTED_TOOL_NAMES
         )
         for tool in THREAD_MANAGEMENT_TOOLS:
-            properties = tool.inputSchema["properties"]
+            properties = tool.input_schema["properties"]
             if tool.name in GATED_TOOLS:
                 self.assertIn("dry_run", properties, tool.name)
                 self.assertIn("confirm_token", properties, tool.name)
@@ -182,7 +182,7 @@ class ThreadManagementSchemaTests(unittest.TestCase):
         delete = next(
             tool for tool in THREAD_MANAGEMENT_TOOLS if tool.name == "delete_thread"
         )
-        self.assertIn("reason", delete.inputSchema["required"])
+        self.assertIn("reason", delete.input_schema["required"])
 
 
 class ThreadManagementHandlerTests(unittest.IsolatedAsyncioTestCase):
